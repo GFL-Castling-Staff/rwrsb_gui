@@ -4,6 +4,7 @@ Editing state for voxel binding and skeleton structure.
 """
 import copy
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -80,6 +81,9 @@ class EditorState:
 
         self.gpu_dirty = True
         self.skeleton_dirty = True
+
+    def _preset_dir(self):
+        return Path(__file__).parent / "presets"
 
     def _clone_sticks(self):
         return [stick.clone() for stick in self.sticks]
@@ -196,6 +200,68 @@ class EditorState:
         self.gpu_dirty = True
         self.skeleton_dirty = True
         return data
+
+    def list_skeleton_presets(self):
+        preset_dir = self._preset_dir()
+        preset_dir.mkdir(parents=True, exist_ok=True)
+        presets = []
+        for path in sorted(preset_dir.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            presets.append(
+                {
+                    "file": path.name,
+                    "path": str(path),
+                    "name": data.get("name", path.stem),
+                    "particles": len(data.get("particles", [])),
+                    "sticks": len(data.get("sticks", [])),
+                }
+            )
+        return presets
+
+    def current_skeleton_data(self, name=None):
+        return {
+            "name": name or "Custom Skeleton",
+            "particles": copy.deepcopy(self.particles),
+            "sticks": [{"a": s.particle_a_id, "b": s.particle_b_id} for s in self.sticks],
+        }
+
+    def save_skeleton_preset(self, preset_name, file_name=None, overwrite=False):
+        preset_name = str(preset_name).strip()
+        if not preset_name:
+            raise ValueError("Preset name is required")
+        if not self.particles:
+            raise ValueError("No particles to save")
+        if not self.sticks:
+            raise ValueError("No sticks to save")
+
+        safe_stem = re.sub(r"[^A-Za-z0-9._-]+", "_", (file_name or preset_name).strip()).strip("._")
+        if not safe_stem:
+            raise ValueError("Preset file name is invalid")
+        if not safe_stem.lower().endswith(".json"):
+            safe_stem += ".json"
+
+        preset_dir = self._preset_dir()
+        preset_dir.mkdir(parents=True, exist_ok=True)
+        out_path = preset_dir / safe_stem
+        if out_path.exists() and not overwrite:
+            raise ValueError(f"Preset already exists: {out_path.name}")
+
+        data = self.current_skeleton_data(name=preset_name)
+        out_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        return str(out_path)
+
+    def delete_skeleton_preset(self, preset_path):
+        path = Path(preset_path)
+        preset_dir = self._preset_dir().resolve()
+        resolved = path.resolve()
+        if preset_dir not in resolved.parents:
+            raise ValueError("Preset path is outside presets directory")
+        if not resolved.exists():
+            raise ValueError("Preset does not exist")
+        resolved.unlink()
 
     def get_particle_options(self):
         return [f"{p['name']} ({p['id']})" for p in self.particles]

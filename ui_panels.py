@@ -24,6 +24,8 @@ class UIState:
 
         self.new_stick_a = 0
         self.new_stick_b = 0
+        self.preset_selected = 0
+        self.preset_name_buf = ""
 
         self._load_error = ""
         self._save_error = ""
@@ -343,7 +345,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
 
     renderer.highlight_stick_idx = editor_state.active_stick_idx if editor_state.sticks else -1
 
-    if imgui.button("Load Human Preset", width=-1):
+    if imgui.button("Presets", width=-1):
         ui_state.show_preset_dialog = True
 
     imgui.separator()
@@ -485,23 +487,78 @@ def draw_save_dialog(ui_state, editor_state, skeleton_sticks_ref, WIN_W, WIN_H):
 def draw_preset_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WIN_W, WIN_H):
     if not ui_state.show_preset_dialog:
         return
-    imgui.open_popup("Load Preset")
-    imgui.set_next_window_position(WIN_W // 2 - 170, WIN_H // 2 - 55)
-    imgui.set_next_window_size(340, 110)
-    opened, _ = imgui.begin_popup_modal("Load Preset", flags=imgui.WINDOW_NO_RESIZE)
+    imgui.open_popup("Preset Manager")
+    imgui.set_next_window_position(WIN_W // 2 - 240, WIN_H // 2 - 150)
+    imgui.set_next_window_size(480, 300)
+    opened, _ = imgui.begin_popup_modal("Preset Manager", flags=imgui.WINDOW_NO_RESIZE)
     if opened:
-        imgui.text("Load standard human skeleton (15 particles, 17 sticks).")
-        imgui.text("Existing bindings are kept.")
-        imgui.spacing()
-        if imgui.button("Confirm", width=100):
-            data = editor_state.load_skeleton_preset()
-            skeleton_sticks_ref[0] = data.get("sticks", [])
-            renderer.upload_skeleton_lines(editor_state.particles, editor_state.sticks)
-            editor_state.gpu_dirty = True
-            ui_state.show_preset_dialog = False
-            imgui.close_current_popup()
+        presets = editor_state.list_skeleton_presets()
+        preset_labels = [f"{p['name']} [{p['particles']}p/{p['sticks']}s]" for p in presets] or ["(no presets)"]
+        ui_state.preset_selected = _clamp_index(ui_state.preset_selected, len(preset_labels))
+
+        imgui.text("Load, save, and delete skeleton presets.")
+        imgui.text("Loading keeps current voxel bindings.")
+        imgui.separator()
+
+        imgui.text("Available presets:")
+        changed, ui_state.preset_selected = imgui.combo("##preset_combo", ui_state.preset_selected, preset_labels)
+        if presets:
+            selected = presets[ui_state.preset_selected]
+            imgui.text(f"File: {selected['file']}")
+        else:
+            imgui.text_disabled("Preset folder is empty")
+
+        if imgui.button("Load Selected", width=140):
+            if presets:
+                try:
+                    data = editor_state.load_skeleton_preset(presets[ui_state.preset_selected]["path"])
+                    skeleton_sticks_ref[0] = data.get("sticks", [])
+                    renderer.upload_skeleton_lines(editor_state.particles, editor_state.sticks)
+                    editor_state.gpu_dirty = True
+                    ui_state._bone_error = ""
+                except Exception as exc:
+                    ui_state._bone_error = str(exc)
         imgui.same_line()
-        if imgui.button("Cancel", width=80):
+        if imgui.button("Delete Selected", width=140):
+            if presets:
+                try:
+                    editor_state.delete_skeleton_preset(presets[ui_state.preset_selected]["path"])
+                    ui_state.preset_selected = max(0, ui_state.preset_selected - 1)
+                    ui_state._bone_error = ""
+                except Exception as exc:
+                    ui_state._bone_error = str(exc)
+
+        imgui.separator()
+        imgui.text("Save current skeleton as preset:")
+        imgui.set_next_item_width(-1)
+        _, ui_state.preset_name_buf = imgui.input_text("##preset_name", ui_state.preset_name_buf, 128)
+
+        if imgui.button("Save New Preset", width=140):
+            try:
+                editor_state.save_skeleton_preset(ui_state.preset_name_buf or "Custom Skeleton", overwrite=False)
+                ui_state._bone_error = ""
+            except Exception as exc:
+                ui_state._bone_error = str(exc)
+        imgui.same_line()
+        if imgui.button("Overwrite Selected", width=140):
+            if presets:
+                try:
+                    selected = presets[ui_state.preset_selected]
+                    editor_state.save_skeleton_preset(
+                        ui_state.preset_name_buf or selected["name"],
+                        file_name=selected["file"],
+                        overwrite=True,
+                    )
+                    ui_state._bone_error = ""
+                except Exception as exc:
+                    ui_state._bone_error = str(exc)
+
+        if ui_state._bone_error:
+            imgui.separator()
+            imgui.text_colored(ui_state._bone_error, 1.0, 0.3, 0.3, 1.0)
+
+        imgui.separator()
+        if imgui.button("Close", width=100):
             ui_state.show_preset_dialog = False
             imgui.close_current_popup()
         imgui.end_popup()

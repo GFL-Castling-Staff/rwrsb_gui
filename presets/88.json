@@ -1,0 +1,210 @@
+{
+  "name": "88",
+  "particles": [
+    {
+      "id": 50,
+      "name": "head",
+      "invMass": 15.0,
+      "bodyAreaHint": 2,
+      "x": 0.5,
+      "y": 55.5,
+      "z": 0.5
+    },
+    {
+      "id": 45,
+      "name": "neck",
+      "invMass": 10.0,
+      "bodyAreaHint": 2,
+      "x": 0.5,
+      "y": 48.5,
+      "z": 0.5
+    },
+    {
+      "id": 15,
+      "name": "rightshoulder",
+      "invMass": 8.0,
+      "bodyAreaHint": 2,
+      "x": -6.5,
+      "y": 45.5,
+      "z": 0.5
+    },
+    {
+      "id": 25,
+      "name": "leftshoulder",
+      "invMass": 8.0,
+      "bodyAreaHint": 2,
+      "x": 7.5,
+      "y": 45.5,
+      "z": 0.5
+    },
+    {
+      "id": 12274576,
+      "name": "rightelbow",
+      "invMass": 70.0,
+      "bodyAreaHint": 2,
+      "x": -14.5,
+      "y": 45.5,
+      "z": 0.5
+    },
+    {
+      "id": 12273840,
+      "name": "leftelbow",
+      "invMass": 70.0,
+      "bodyAreaHint": 2,
+      "x": 15.5,
+      "y": 45.5,
+      "z": 0.5
+    },
+    {
+      "id": 12274112,
+      "name": "righthand",
+      "invMass": 200.0,
+      "bodyAreaHint": 2,
+      "x": -21.5,
+      "y": 44.5,
+      "z": 0.5
+    },
+    {
+      "id": 12273488,
+      "name": "lefthand",
+      "invMass": 200.0,
+      "bodyAreaHint": 2,
+      "x": 22.5,
+      "y": 44.5,
+      "z": 0.5
+    },
+    {
+      "id": 1,
+      "name": "midspine",
+      "invMass": 10.0,
+      "bodyAreaHint": 1,
+      "x": 0.5,
+      "y": 35.5,
+      "z": 0.5
+    },
+    {
+      "id": 10,
+      "name": "righthip",
+      "invMass": 10.0,
+      "bodyAreaHint": 1,
+      "x": -4.5,
+      "y": 28.5,
+      "z": 0.5
+    },
+    {
+      "id": 20,
+      "name": "lefthip",
+      "invMass": 10.0,
+      "bodyAreaHint": 1,
+      "x": 5.5,
+      "y": 28.5,
+      "z": 0.5
+    },
+    {
+      "id": 12285328,
+      "name": "rightknee",
+      "invMass": 15.0,
+      "bodyAreaHint": 1,
+      "x": -4.5,
+      "y": 13.5,
+      "z": 0.5
+    },
+    {
+      "id": 21,
+      "name": "leftknee",
+      "invMass": 15.0,
+      "bodyAreaHint": 1,
+      "x": 5.5,
+      "y": 13.5,
+      "z": 0.5
+    },
+    {
+      "id": 12285680,
+      "name": "rightfoot",
+      "invMass": 20.0,
+      "bodyAreaHint": 1,
+      "x": -4.5,
+      "y": 0.5,
+      "z": 0.5
+    },
+    {
+      "id": 22,
+      "name": "leftfoot",
+      "invMass": 20.0,
+      "bodyAreaHint": 1,
+      "x": 5.5,
+      "y": 0.5,
+      "z": 0.5
+    }
+  ],
+  "sticks": [
+    {
+      "a": 12285328,
+      "b": 12285680
+    },
+    {
+      "a": 10,
+      "b": 12285328
+    },
+    {
+      "a": 10,
+      "b": 20
+    },
+    {
+      "a": 20,
+      "b": 21
+    },
+    {
+      "a": 21,
+      "b": 22
+    },
+    {
+      "a": 10,
+      "b": 1
+    },
+    {
+      "a": 1,
+      "b": 15
+    },
+    {
+      "a": 15,
+      "b": 25
+    },
+    {
+      "a": 20,
+      "b": 1
+    },
+    {
+      "a": 1,
+      "b": 25
+    },
+    {
+      "a": 25,
+      "b": 12273840
+    },
+    {
+      "a": 12273840,
+      "b": 12273488
+    },
+    {
+      "a": 15,
+      "b": 12274576
+    },
+    {
+      "a": 12274576,
+      "b": 12274112
+    },
+    {
+      "a": 15,
+      "b": 45
+    },
+    {
+      "a": 45,
+      "b": 25
+    },
+    {
+      "a": 45,
+      "b": 50
+    }
+  ]
+}
