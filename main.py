@@ -13,7 +13,7 @@ from imgui.integrations.glfw import GlfwRenderer
 
 from camera       import OrbitCamera
 from editor_state import EditorState
-from renderer     import VoxelRenderer, pick_voxel, box_select_voxels
+from renderer     import VoxelRenderer, pick_voxel, box_select_voxels, pick_particle_screen
 from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_status_bar, draw_load_dialog, draw_save_dialog,
                           draw_preset_dialog,
@@ -34,6 +34,11 @@ g_skeleton_sticks = [None]   # mutable ref: g_skeleton_sticks[0]
 g_mouse_x = g_mouse_y = 0.0
 g_lmb_down    = False
 g_brush_active = False
+g_particle_drag_active = False
+g_drag_particle_idx = -1
+g_drag_plane_normal = None
+g_drag_grab_offset = None
+g_hover_particle_idx = -1
 g_positions_np = None          # (N,3) float32 cache for picking
 g_renderer     = None          # set in main()
 g_imgui_impl   = None          # GlfwRenderer set in main()
@@ -54,6 +59,15 @@ def is_over_viewport(x, y):
     return (x < WIN_W - PANEL_W and
             y > TOOLBAR_H and
             y < WIN_H - STATUS_H)
+
+
+def particle_positions_np():
+    if not g_editor.particles:
+        return np.zeros((0, 3), dtype=np.float32)
+    return np.array(
+        [(p['x'], p['y'], p['z']) for p in g_editor.particles],
+        dtype=np.float32
+    )
 
 
 # ── interaction helpers ───────────────────────
@@ -86,6 +100,80 @@ def _finish_box_select():
         g_editor.selected_voxels.clear()
     g_editor.selected_voxels.update(indices)
     g_editor.gpu_dirty = True
+
+
+def _ray_plane_intersection(origin, direction, plane_point, plane_normal):
+    denom = float(np.dot(direction, plane_normal))
+    if abs(denom) < 1e-6:
+        return None
+    t = float(np.dot(plane_point - origin, plane_normal) / denom)
+    return origin + direction * t
+
+
+def _pick_particle(sx, sy):
+    positions = particle_positions_np()
+    if len(positions) == 0:
+        return -1
+    vp_w = WIN_W - PANEL_W
+    vp_h = WIN_H - TOOLBAR_H - STATUS_H
+    mvp = g_camera.get_mvp()
+    return pick_particle_screen(mvp, positions, sx, sy - TOOLBAR_H, vp_w, vp_h)
+
+
+def _begin_particle_drag(sx, sy, particle_idx):
+    global g_particle_drag_active, g_drag_particle_idx, g_drag_plane_normal, g_drag_grab_offset
+    particle = g_editor.particles[particle_idx]
+    plane_point = np.array([particle['x'], particle['y'], particle['z']], dtype=np.float32)
+    cam_pos = np.asarray(g_camera.get_position(), dtype=np.float32)
+    plane_normal = plane_point - cam_pos
+    norm = np.linalg.norm(plane_normal)
+    if norm < 1e-6:
+        plane_normal = np.array([0.0, 0.0, 1.0], dtype=np.float32)
+    else:
+        plane_normal /= norm
+
+    origin, direction = g_camera.get_ray(sx, sy - TOOLBAR_H)
+    hit = _ray_plane_intersection(
+        np.asarray(origin, dtype=np.float32),
+        np.asarray(direction, dtype=np.float32),
+        plane_point,
+        plane_normal,
+    )
+    if hit is None:
+        hit = plane_point.copy()
+
+    g_editor._push_undo()
+    g_editor.set_active_particle(particle_idx)
+    g_particle_drag_active = True
+    g_drag_particle_idx = particle_idx
+    g_drag_plane_normal = plane_normal
+    g_drag_grab_offset = plane_point - hit
+
+
+def _update_particle_drag(sx, sy):
+    if not g_particle_drag_active or g_drag_particle_idx < 0:
+        return
+    particle = g_editor.particles[g_drag_particle_idx]
+    plane_point = np.array([particle['x'], particle['y'], particle['z']], dtype=np.float32)
+    origin, direction = g_camera.get_ray(sx, sy - TOOLBAR_H)
+    hit = _ray_plane_intersection(
+        np.asarray(origin, dtype=np.float32),
+        np.asarray(direction, dtype=np.float32),
+        plane_point,
+        g_drag_plane_normal,
+    )
+    if hit is None:
+        return
+    pos = hit + g_drag_grab_offset
+    g_editor.set_particle_position(g_drag_particle_idx, pos[0], pos[1], pos[2], push_undo=False)
+
+
+def _end_particle_drag():
+    global g_particle_drag_active, g_drag_particle_idx, g_drag_plane_normal, g_drag_grab_offset
+    g_particle_drag_active = False
+    g_drag_particle_idx = -1
+    g_drag_plane_normal = None
+    g_drag_grab_offset = None
 
 
 def _load_file(path):
@@ -145,7 +233,10 @@ def on_mouse_button(window, button, action, mods):
     if button == glfw.MOUSE_BUTTON_LEFT:
         g_lmb_down = pressed
         if pressed:
-            if g_editor.tool_mode == 'brush' and g_editor.sticks:
+            hit_particle = _pick_particle(g_mouse_x, g_mouse_y)
+            if hit_particle >= 0:
+                _begin_particle_drag(g_mouse_x, g_mouse_y, hit_particle)
+            elif g_editor.tool_mode == 'brush' and g_editor.sticks:
                 g_editor.begin_brush_stroke()
                 _do_brush_paint(g_mouse_x, g_mouse_y)
                 g_brush_active = True
@@ -154,6 +245,8 @@ def on_mouse_button(window, button, action, mods):
                 g_ui.box_x0 = g_ui.box_x1 = g_mouse_x
                 g_ui.box_y0 = g_ui.box_y1 = g_mouse_y
         else:
+            if g_particle_drag_active:
+                _end_particle_drag()
             if g_brush_active:
                 g_editor.commit_brush_stroke()
                 g_brush_active = False
@@ -165,6 +258,7 @@ def on_mouse_button(window, button, action, mods):
 
 
 def on_cursor_pos(window, xpos, ypos):
+    global g_hover_particle_idx
     global g_mouse_x, g_mouse_y
     g_mouse_x, g_mouse_y = xpos, ypos
     if g_imgui_impl:
@@ -173,6 +267,19 @@ def on_cursor_pos(window, xpos, ypos):
     if io.want_capture_mouse:
         return
     if not is_over_viewport(xpos, ypos):
+        g_hover_particle_idx = -1
+        if g_renderer is not None:
+            g_renderer.highlight_particle_idx = g_editor.active_particle_idx
+        return
+    hover_particle = _pick_particle(xpos, ypos)
+    g_hover_particle_idx = hover_particle
+    if g_renderer is not None:
+        if g_particle_drag_active:
+            g_renderer.highlight_particle_idx = g_drag_particle_idx
+        else:
+            g_renderer.highlight_particle_idx = hover_particle if hover_particle >= 0 else g_editor.active_particle_idx
+    if g_particle_drag_active:
+        _update_particle_drag(xpos, ypos)
         return
     if g_lmb_down and g_brush_active and g_editor.tool_mode == 'brush':
         _do_brush_paint(xpos, ypos)
@@ -187,6 +294,8 @@ def on_scroll(window, dx, dy):
         g_imgui_impl.scroll_callback(window, dx, dy)
     io = imgui.get_io()
     if io.want_capture_mouse:
+        return
+    if g_particle_drag_active:
         return
     if is_over_viewport(g_mouse_x, g_mouse_y):
         g_camera.on_scroll(dy)

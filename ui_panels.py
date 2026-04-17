@@ -231,6 +231,7 @@ def _draw_particle_editor(ui_state, editor_state):
     for idx, particle in enumerate(editor_state.particles):
         imgui.push_id(f"particle-{idx}")
         if imgui.tree_node(f"{particle['name']} ({particle['id']})##node"):
+            editor_state.set_active_particle(idx)
             changed_name, new_name = imgui.input_text("Name", particle["name"], 128)
             changed_id, new_id = imgui.input_int("Id", int(particle["id"]))
             changed_mass, new_mass = imgui.input_float("InvMass", float(particle["invMass"]), 0.0, 0.0, "%.3f")
@@ -344,7 +345,6 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
     imgui.begin("##bones", flags=FIXED_FLAGS)
 
     renderer.highlight_stick_idx = editor_state.active_stick_idx if editor_state.sticks else -1
-
     if imgui.button("Presets", width=-1):
         ui_state.show_preset_dialog = True
 
@@ -353,6 +353,11 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
     imgui.text_colored(f"Voxels: {bound}/{total} bound", 0.7, 0.7, 0.7, 1.0)
     imgui.text(f"Particles: {len(editor_state.particles)}")
     imgui.text(f"Sticks: {len(editor_state.sticks)}")
+    if 0 <= editor_state.active_particle_idx < len(editor_state.particles):
+        active_particle = editor_state.particles[editor_state.active_particle_idx]
+        imgui.text(f"Active particle: {active_particle['name']} ({active_particle['id']})")
+    else:
+        imgui.text("Active particle: none")
     imgui.separator()
     imgui.text("Stick List")
     _draw_stick_list(ui_state, editor_state)
@@ -389,6 +394,9 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
     if ui_state._bone_error:
         imgui.separator()
         imgui.text_colored(ui_state._bone_error, 1.0, 0.3, 0.3, 1.0)
+
+    imgui.separator()
+    imgui.text_disabled("Tip: drag orange particle points in the viewport.")
 
     imgui.end()
 

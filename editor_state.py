@@ -73,6 +73,7 @@ class EditorState:
         self.trans_bias = 127
         self.selected_voxels = set()
         self.active_stick_idx = 0
+        self.active_particle_idx = -1
         self.tool_mode = "brush"
 
         self._undo_stack = []
@@ -94,6 +95,7 @@ class EditorState:
             "sticks": self._clone_sticks(),
             "bindings": copy.deepcopy(self.bindings),
             "active_stick_idx": self.active_stick_idx,
+            "active_particle_idx": self.active_particle_idx,
         }
 
     def _restore_snapshot(self, snapshot):
@@ -101,6 +103,7 @@ class EditorState:
         self.sticks = [stick.clone() for stick in snapshot["sticks"]]
         self.bindings = copy.deepcopy(snapshot["bindings"])
         self.active_stick_idx = int(snapshot["active_stick_idx"])
+        self.active_particle_idx = int(snapshot.get("active_particle_idx", -1))
         self._normalize_stick_indices()
         self._dirty = True
         self.gpu_dirty = True
@@ -162,6 +165,7 @@ class EditorState:
         self.particles = []
         self.sticks = []
         self.active_stick_idx = 0
+        self.active_particle_idx = -1
         self.skeleton_dirty = True
         print(f"[state] loaded VOX: {path} ({len(self.voxels)} voxels)")
 
@@ -183,6 +187,7 @@ class EditorState:
         self.particles = list(skeleton.get("particles", []))
         self._rebuild_sticks_from_raw(skeleton.get("sticks", []))
         self.active_stick_idx = 0
+        self.active_particle_idx = -1
 
         print(
             f"[state] loaded XML: {path} "
@@ -197,6 +202,7 @@ class EditorState:
         self.particles = list(data.get("particles", []))
         self._rebuild_sticks_from_raw(data.get("sticks", []))
         self.active_stick_idx = 0
+        self.active_particle_idx = -1
         self.gpu_dirty = True
         self.skeleton_dirty = True
         return data
@@ -265,6 +271,24 @@ class EditorState:
 
     def get_particle_options(self):
         return [f"{p['name']} ({p['id']})" for p in self.particles]
+
+    def set_active_particle(self, particle_index):
+        if 0 <= particle_index < len(self.particles):
+            self.active_particle_idx = int(particle_index)
+        else:
+            self.active_particle_idx = -1
+
+    def set_particle_position(self, particle_index, x, y, z, push_undo=False):
+        if particle_index < 0 or particle_index >= len(self.particles):
+            return
+        if push_undo:
+            self._push_undo()
+        particle = self.particles[particle_index]
+        particle["x"] = float(x)
+        particle["y"] = float(y)
+        particle["z"] = float(z)
+        self.active_particle_idx = particle_index
+        self._mark_skeleton_changed()
 
     def add_particle(self, name=None, x=0.0, y=0.0, z=0.0, invMass=10.0, bodyAreaHint=1, particle_id=None):
         self._push_undo()
