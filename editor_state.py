@@ -1,100 +1,150 @@
 """
 editor_state.py
-绑骨编辑状态、骨骼列表、Undo/Redo 栈
-
-数据模型 (v2.3):
-  RWR 的 skeletonVoxelBindings.group.constraintIndex 指向 *stick* 下标,
-  不是 particle 下标。一个 stick 连接两个 particle(两端),体素跟随整根 stick 运动。
-  因此状态里同时维护:
-    self.particles : 完整 particle 列表(来自 XML <particle> 或 preset),
-                     序列化回 XML 用,同时供渲染骨骼线查坐标。
-    self.sticks    : list of StickEntry,下标即 constraintIndex。
-    self.bindings  : {voxel_index: constraint_index (== stick 下标)}。
+Editing state for voxel binding and skeleton structure.
 """
-import json
 import copy
-import numpy as np
+import json
 from pathlib import Path
 
-# 自动分配给骨骼的高对比度颜色表（RGB float 0-1）
-BONE_COLORS = [
-    (0.95, 0.30, 0.30),  # 红
-    (0.30, 0.75, 0.95),  # 青
-    (0.40, 0.90, 0.40),  # 绿
-    (0.95, 0.85, 0.20),  # 黄
-    (0.90, 0.50, 0.10),  # 橙
-    (0.70, 0.35, 0.95),  # 紫
-    (0.95, 0.50, 0.75),  # 粉
-    (0.20, 0.60, 0.40),  # 深绿
-    (0.20, 0.30, 0.90),  # 蓝
-    (0.90, 0.20, 0.60),  # 洋红
-    (0.55, 0.85, 0.65),  # 薄荷
-    (0.95, 0.65, 0.40),  # 杏
-    (0.40, 0.65, 0.95),  # 天蓝
-    (0.75, 0.95, 0.30),  # 黄绿
-    (0.60, 0.40, 0.25),  # 棕
-    (0.75, 0.75, 0.75),  # 灰（兜底）
-]
+import numpy as np
 
-UNBOUND_COLOR = (0.45, 0.45, 0.45)  # 未绑定体素显示颜色
+
+BONE_COLORS = [
+    (0.95, 0.30, 0.30),
+    (0.30, 0.75, 0.95),
+    (0.40, 0.90, 0.40),
+    (0.95, 0.85, 0.20),
+    (0.90, 0.50, 0.10),
+    (0.70, 0.35, 0.95),
+    (0.95, 0.50, 0.75),
+    (0.20, 0.60, 0.40),
+    (0.20, 0.30, 0.90),
+    (0.90, 0.20, 0.60),
+    (0.55, 0.85, 0.65),
+    (0.95, 0.65, 0.40),
+    (0.40, 0.65, 0.95),
+    (0.75, 0.95, 0.30),
+    (0.60, 0.40, 0.25),
+    (0.75, 0.75, 0.75),
+]
 
 
 class StickEntry:
-    """
-    单根 stick 条目,对应 XML <stick a=... b=.../>
-    constraint_index 等同于此 stick 在 self.sticks 列表里的下标。
-    """
-    def __init__(self, constraint_index, particle_a_id, particle_b_id,
-                 name, color=None):
-        self.constraint_index = constraint_index
-        self.particle_a_id = particle_a_id
-        self.particle_b_id = particle_b_id
-        self.name = name                  # 默认 "a_name_b_name",可覆盖
-        self.color = color or BONE_COLORS[constraint_index % len(BONE_COLORS)]
+    def __init__(self, constraint_index, particle_a_id, particle_b_id, name, color=None):
+        self.constraint_index = int(constraint_index)
+        self.particle_a_id = int(particle_a_id)
+        self.particle_b_id = int(particle_b_id)
+        self.name = name
+        self.color = color or BONE_COLORS[self.constraint_index % len(BONE_COLORS)]
         self.visible = True
 
     def display_name(self):
         return f"[{self.constraint_index}] {self.name}"
 
+    def clone(self):
+        cloned = StickEntry(
+            self.constraint_index,
+            self.particle_a_id,
+            self.particle_b_id,
+            self.name,
+            tuple(self.color),
+        )
+        cloned.visible = self.visible
+        return cloned
+
 
 def _make_stick_name(particles_by_id, pa_id, pb_id):
-    """生成 stick 的默认 name: pa_name_pb_name"""
     pa = particles_by_id.get(pa_id, {})
     pb = particles_by_id.get(pb_id, {})
-    na = pa.get('name', f'p{pa_id}')
-    nb = pb.get('name', f'p{pb_id}')
+    na = pa.get("name", f"p{pa_id}")
+    nb = pb.get("name", f"p{pb_id}")
     return f"{na}_{nb}"
 
 
 class EditorState:
     def __init__(self):
-        self.voxels = []          # list of (x,y,z,r,g,b,a)  原始颜色
-        self.particles = []       # list of particle dict(含 id,name,invMass,x,y,z,...)
-        self.sticks = []          # list of StickEntry,下标 == constraint_index
-        self.bindings = {}        # {voxel_index: constraint_index}
+        self.voxels = []
+        self.particles = []
+        self.sticks = []
+        self.bindings = {}
 
-        self.source_path = None   # 当前加载的文件路径
-        self.trans_bias = 127     # 坐标变换 bias,可配置
+        self.source_path = None
+        self.trans_bias = 127
+        self.selected_voxels = set()
+        self.active_stick_idx = 0
+        self.tool_mode = "brush"
 
-        # 选中状态
-        self.selected_voxels = set()   # set of voxel_index
-        self.active_stick_idx = 0      # 当前激活 stick 的下标(== ci)
-
-        # 工具模式
-        self.tool_mode = 'brush'   # 'brush' | 'select'
-
-        # Undo 栈:每条记录是 bindings 的深拷贝
         self._undo_stack = []
         self._redo_stack = []
-        self._dirty = False        # 有未保存修改
+        self._dirty = False
 
-        # GPU 端需要刷新的标志
+        self.gpu_dirty = True
+        self.skeleton_dirty = True
+
+    def _clone_sticks(self):
+        return [stick.clone() for stick in self.sticks]
+
+    def _snapshot(self):
+        return {
+            "particles": copy.deepcopy(self.particles),
+            "sticks": self._clone_sticks(),
+            "bindings": copy.deepcopy(self.bindings),
+            "active_stick_idx": self.active_stick_idx,
+        }
+
+    def _restore_snapshot(self, snapshot):
+        self.particles = copy.deepcopy(snapshot["particles"])
+        self.sticks = [stick.clone() for stick in snapshot["sticks"]]
+        self.bindings = copy.deepcopy(snapshot["bindings"])
+        self.active_stick_idx = int(snapshot["active_stick_idx"])
+        self._normalize_stick_indices()
+        self._dirty = True
+        self.gpu_dirty = True
+        self.skeleton_dirty = True
+
+    def _push_undo(self):
+        self._undo_stack.append(self._snapshot())
+        self._redo_stack.clear()
+        if len(self._undo_stack) > 64:
+            self._undo_stack.pop(0)
+
+    def _mark_bindings_changed(self):
+        self._dirty = True
         self.gpu_dirty = True
 
-    # ── 文件加载 ──────────────────────────────
+    def _mark_skeleton_changed(self):
+        self._dirty = True
+        self.gpu_dirty = True
+        self.skeleton_dirty = True
+
+    def _normalize_stick_indices(self):
+        for ci, stick in enumerate(self.sticks):
+            stick.constraint_index = ci
+        if self.sticks:
+            self.active_stick_idx = min(max(self.active_stick_idx, 0), len(self.sticks) - 1)
+        else:
+            self.active_stick_idx = 0
+
+    def _next_particle_id(self):
+        used = {int(p["id"]) for p in self.particles}
+        candidate = 1
+        while candidate in used:
+            candidate += 1
+        return candidate
+
+    def _rebuild_sticks_from_raw(self, raw_sticks):
+        particles_by_id = {p["id"]: p for p in self.particles}
+        self.sticks = []
+        for ci, stick in enumerate(raw_sticks):
+            pa_id = int(stick["a"])
+            pb_id = int(stick["b"])
+            name = _make_stick_name(particles_by_id, pa_id, pb_id)
+            self.sticks.append(StickEntry(ci, pa_id, pb_id, name))
+        self.skeleton_dirty = True
 
     def load_vox(self, path, trans_bias=None):
         from xml_io import parse_vox
+
         if trans_bias is not None:
             self.trans_bias = trans_bias
         self.voxels = parse_vox(path, self.trans_bias)
@@ -105,14 +155,15 @@ class EditorState:
         self._redo_stack.clear()
         self._dirty = False
         self.gpu_dirty = True
-        # VOX 路径没有骨架信息,清空骨架。用户需手动 Load Preset。
         self.particles = []
         self.sticks = []
         self.active_stick_idx = 0
-        print(f'[state] 已加载 VOX: {path}  ({len(self.voxels)} 体素)')
+        self.skeleton_dirty = True
+        print(f"[state] loaded VOX: {path} ({len(self.voxels)} voxels)")
 
     def load_xml(self, path, trans_bias=None):
         from xml_io import parse_xml
+
         if trans_bias is not None:
             self.trans_bias = trans_bias
         voxels, skeleton, bindings = parse_xml(path)
@@ -125,77 +176,186 @@ class EditorState:
         self._dirty = False
         self.gpu_dirty = True
 
-        # 从 XML skeleton 重建 particles + sticks
-        self.particles = list(skeleton.get('particles', []))
-        self._rebuild_sticks_from_raw(skeleton.get('sticks', []))
+        self.particles = list(skeleton.get("particles", []))
+        self._rebuild_sticks_from_raw(skeleton.get("sticks", []))
         self.active_stick_idx = 0
 
-        print(f'[state] 已加载 XML: {path}  '
-              f'({len(self.voxels)} 体素, '
-              f'{len(self.particles)} particles, '
-              f'{len(self.sticks)} sticks)')
-        return skeleton  # 返回原始 skeleton(保留旧接口兼容性)
+        print(
+            f"[state] loaded XML: {path} "
+            f"({len(self.voxels)} voxels, {len(self.particles)} particles, {len(self.sticks)} sticks)"
+        )
+        return skeleton
 
     def load_skeleton_preset(self, preset_path=None):
-        """加载骨骼预设(json),覆盖当前 particles + sticks。不影响 bindings。"""
         if preset_path is None:
-            preset_path = Path(__file__).parent / 'presets' / 'human_skeleton.json'
-        data = json.loads(Path(preset_path).read_text(encoding='utf-8'))
-        self.particles = list(data.get('particles', []))
-        self._rebuild_sticks_from_raw(data.get('sticks', []))
+            preset_path = Path(__file__).parent / "presets" / "human_skeleton.json"
+        data = json.loads(Path(preset_path).read_text(encoding="utf-8"))
+        self.particles = list(data.get("particles", []))
+        self._rebuild_sticks_from_raw(data.get("sticks", []))
         self.active_stick_idx = 0
         self.gpu_dirty = True
-        return data  # 保留旧接口:返回完整 data
+        self.skeleton_dirty = True
+        return data
 
-    def _rebuild_sticks_from_raw(self, raw_sticks):
-        """
-        从原始 stick dict 列表(含 'a','b' 为 particle id)构建 StickEntry 列表。
-        调用方负责先填充 self.particles。
-        """
-        particles_by_id = {p['id']: p for p in self.particles}
-        self.sticks = []
-        for ci, s in enumerate(raw_sticks):
-            pa_id = int(s['a'])
-            pb_id = int(s['b'])
-            name = _make_stick_name(particles_by_id, pa_id, pb_id)
-            self.sticks.append(StickEntry(ci, pa_id, pb_id, name))
+    def get_particle_options(self):
+        return [f"{p['name']} ({p['id']})" for p in self.particles]
 
-    # ── stick 操作 ────────────────────────────
-    # 本工具不支持添加/删除 stick(骨架结构由动画系统约束,不能随便改)。
-    # 删除按钮的语义改为:解绑这根 stick 上的所有体素。
+    def add_particle(self, name=None, x=0.0, y=0.0, z=0.0, invMass=10.0, bodyAreaHint=1, particle_id=None):
+        self._push_undo()
+        pid = self._next_particle_id() if particle_id is None else int(particle_id)
+        if any(int(p["id"]) == pid for p in self.particles):
+            raise ValueError(f"Particle id already exists: {pid}")
+        self.particles.append(
+            {
+                "id": pid,
+                "name": name or f"particle_{pid}",
+                "invMass": float(invMass),
+                "bodyAreaHint": int(bodyAreaHint),
+                "x": float(x),
+                "y": float(y),
+                "z": float(z),
+            }
+        )
+        self._mark_skeleton_changed()
+        return len(self.particles) - 1
+
+    def update_particle(self, particle_index, **fields):
+        if particle_index < 0 or particle_index >= len(self.particles):
+            return
+        particle = self.particles[particle_index]
+        old_id = int(particle["id"])
+        new_id = int(fields.get("id", old_id))
+        if new_id != old_id and any(int(p["id"]) == new_id for i, p in enumerate(self.particles) if i != particle_index):
+            raise ValueError(f"Particle id already exists: {new_id}")
+
+        self._push_undo()
+        for key, value in fields.items():
+            if key in ("invMass", "x", "y", "z"):
+                particle[key] = float(value)
+            elif key in ("bodyAreaHint", "id"):
+                particle[key] = int(value)
+            elif key == "name":
+                particle[key] = str(value)
+
+        if new_id != old_id:
+            for stick in self.sticks:
+                if stick.particle_a_id == old_id:
+                    stick.particle_a_id = new_id
+                if stick.particle_b_id == old_id:
+                    stick.particle_b_id = new_id
+        self.rename_sticks_from_particles(push_undo=False)
+        self._mark_skeleton_changed()
+
+    def delete_particle(self, particle_index):
+        if particle_index < 0 or particle_index >= len(self.particles):
+            return
+        self._push_undo()
+        removed_id = int(self.particles[particle_index]["id"])
+        del self.particles[particle_index]
+
+        remap = {}
+        kept = []
+        next_ci = 0
+        for old_ci, stick in enumerate(self.sticks):
+            if stick.particle_a_id == removed_id or stick.particle_b_id == removed_id:
+                continue
+            stick.constraint_index = next_ci
+            kept.append(stick)
+            remap[old_ci] = next_ci
+            next_ci += 1
+        self.sticks = kept
+        self.bindings = {vi: remap[ci] for vi, ci in self.bindings.items() if ci in remap}
+        self.rename_sticks_from_particles(push_undo=False)
+        self._normalize_stick_indices()
+        self._mark_skeleton_changed()
+
+    def add_stick(self, particle_a_id, particle_b_id, name=None):
+        pa_id = int(particle_a_id)
+        pb_id = int(particle_b_id)
+        if pa_id == pb_id:
+            raise ValueError("Stick endpoints must be different particles")
+        particle_ids = {int(p["id"]) for p in self.particles}
+        if pa_id not in particle_ids or pb_id not in particle_ids:
+            raise ValueError("Stick endpoint particle does not exist")
+        if any({s.particle_a_id, s.particle_b_id} == {pa_id, pb_id} for s in self.sticks):
+            raise ValueError("Stick already exists")
+
+        self._push_undo()
+        particles_by_id = {p["id"]: p for p in self.particles}
+        ci = len(self.sticks)
+        stick_name = name or _make_stick_name(particles_by_id, pa_id, pb_id)
+        self.sticks.append(StickEntry(ci, pa_id, pb_id, stick_name))
+        self.active_stick_idx = ci
+        self._mark_skeleton_changed()
+
+    def update_stick(self, stick_idx, particle_a_id=None, particle_b_id=None, name=None):
+        if stick_idx < 0 or stick_idx >= len(self.sticks):
+            return
+        stick = self.sticks[stick_idx]
+        pa_id = stick.particle_a_id if particle_a_id is None else int(particle_a_id)
+        pb_id = stick.particle_b_id if particle_b_id is None else int(particle_b_id)
+        if pa_id == pb_id:
+            raise ValueError("Stick endpoints must be different particles")
+        particle_ids = {int(p["id"]) for p in self.particles}
+        if pa_id not in particle_ids or pb_id not in particle_ids:
+            raise ValueError("Stick endpoint particle does not exist")
+
+        self._push_undo()
+        stick.particle_a_id = pa_id
+        stick.particle_b_id = pb_id
+        if name is None:
+            particles_by_id = {p["id"]: p for p in self.particles}
+            stick.name = _make_stick_name(particles_by_id, pa_id, pb_id)
+        else:
+            stick.name = str(name)
+        self._mark_skeleton_changed()
+
+    def delete_stick(self, stick_idx):
+        if stick_idx < 0 or stick_idx >= len(self.sticks):
+            return
+        self._push_undo()
+        del self.sticks[stick_idx]
+        remap = {}
+        for old_ci in range(len(self.sticks) + 1):
+            if old_ci < stick_idx:
+                remap[old_ci] = old_ci
+            elif old_ci > stick_idx:
+                remap[old_ci] = old_ci - 1
+        self.bindings = {vi: remap[ci] for vi, ci in self.bindings.items() if ci in remap}
+        self._normalize_stick_indices()
+        self._mark_skeleton_changed()
+
+    def rename_sticks_from_particles(self, push_undo=True):
+        if push_undo:
+            self._push_undo()
+        particles_by_id = {p["id"]: p for p in self.particles}
+        for stick in self.sticks:
+            stick.name = _make_stick_name(particles_by_id, stick.particle_a_id, stick.particle_b_id)
+        self._mark_skeleton_changed()
 
     def unbind_stick_voxels(self, stick_idx):
-        """把绑定到指定 stick 的所有体素解绑。stick 本身保留。"""
         if stick_idx < 0 or stick_idx >= len(self.sticks):
             return
         self._push_undo()
         to_unbind = [vi for vi, ci in self.bindings.items() if ci == stick_idx]
         for vi in to_unbind:
             del self.bindings[vi]
-        self._dirty = True
-        self.gpu_dirty = True
-
-    # ── 绑骨操作 ──────────────────────────────
+        self._mark_bindings_changed()
 
     def bind_voxels(self, voxel_indices, stick_idx):
-        """将一批体素绑定到指定 stick。stick_idx == constraint_index。"""
         if not voxel_indices or stick_idx < 0 or stick_idx >= len(self.sticks):
             return
         for vi in voxel_indices:
             self.bindings[vi] = stick_idx
-        self._dirty = True
-        self.gpu_dirty = True
+        self._mark_bindings_changed()
 
     def unbind_voxels(self, voxel_indices):
-        """解绑一批体素"""
         for vi in voxel_indices:
             if vi in self.bindings:
                 del self.bindings[vi]
-        self._dirty = True
-        self.gpu_dirty = True
+        self._mark_bindings_changed()
 
     def bind_selection(self, stick_idx):
-        """将当前选中体素绑定到 stick"""
         self._push_undo()
         self.bind_voxels(list(self.selected_voxels), stick_idx)
 
@@ -204,42 +364,29 @@ class EditorState:
         self.unbind_voxels(list(self.selected_voxels))
 
     def begin_brush_stroke(self):
-        """画笔模式:按下鼠标时推入 undo 快照(操作前)"""
         self._push_undo()
 
     def commit_brush_stroke(self):
-        """画笔模式:松开鼠标(保留空实现,快照已在 begin 时推入)"""
         pass
 
-    # ── 颜色查询(供 renderer 使用)──────────
-
     def get_voxel_color(self, voxel_index):
-        """返回体素应渲染的颜色 (r,g,b)"""
         ci = self.bindings.get(voxel_index, -1)
         if ci < 0 or ci >= len(self.sticks):
-            # 未绑定或绑到不存在的 stick:显示原始颜色(略暗)
-            ox, oy, oz, r, g, b, a = self.voxels[voxel_index]
+            _, _, _, r, g, b, _ = self.voxels[voxel_index]
             return (r * 0.5, g * 0.5, b * 0.5)
         stick = self.sticks[ci]
         if not stick.visible:
-            ox, oy, oz, r, g, b, a = self.voxels[voxel_index]
+            _, _, _, r, g, b, _ = self.voxels[voxel_index]
             return (r * 0.5, g * 0.5, b * 0.5)
         return stick.color
 
     def build_instance_arrays(self):
-        """
-        构建 GPU instancing 所需的 numpy 数组,仅在 gpu_dirty 时调用。
-        返回:
-          positions: (N,3) float32
-          colors:    (N,4) float32
-          selected:  (N,1) float32
-        """
         n = len(self.voxels)
         positions = np.zeros((n, 3), dtype=np.float32)
-        colors    = np.zeros((n, 4), dtype=np.float32)
-        selected  = np.zeros((n, 1), dtype=np.float32)
+        colors = np.zeros((n, 4), dtype=np.float32)
+        selected = np.zeros((n, 1), dtype=np.float32)
 
-        for i, (x, y, z, r, g, b, a) in enumerate(self.voxels):
+        for i, (x, y, z, r, g, b, _) in enumerate(self.voxels):
             positions[i] = (x, y, z)
             cr, cg, cb = self.get_voxel_color(i)
             colors[i] = (cr, cg, cb, 1.0)
@@ -248,14 +395,10 @@ class EditorState:
         self.gpu_dirty = False
         return positions, colors, selected
 
-    # ── 选择操作 ──────────────────────────────
-
     def select_stick_voxels(self, stick_idx):
-        """选中某 stick 的全部体素"""
         if stick_idx < 0 or stick_idx >= len(self.sticks):
             return
-        self.selected_voxels = {vi for vi, c in self.bindings.items()
-                                if c == stick_idx}
+        self.selected_voxels = {vi for vi, ci in self.bindings.items() if ci == stick_idx}
         self.gpu_dirty = True
 
     def clear_selection(self):
@@ -267,46 +410,28 @@ class EditorState:
         self.selected_voxels = set(range(len(self.voxels))) - bound
         self.gpu_dirty = True
 
-    # ── Undo / Redo ───────────────────────────
-
-    def _push_undo(self):
-        self._undo_stack.append(copy.deepcopy(self.bindings))
-        self._redo_stack.clear()
-        if len(self._undo_stack) > 64:
-            self._undo_stack.pop(0)
-
     def undo(self):
         if not self._undo_stack:
             return
-        self._redo_stack.append(copy.deepcopy(self.bindings))
-        self.bindings = self._undo_stack.pop()
-        self._dirty = True
-        self.gpu_dirty = True
+        self._redo_stack.append(self._snapshot())
+        self._restore_snapshot(self._undo_stack.pop())
 
     def redo(self):
         if not self._redo_stack:
             return
-        self._undo_stack.append(copy.deepcopy(self.bindings))
-        self.bindings = self._redo_stack.pop()
-        self._dirty = True
-        self.gpu_dirty = True
-
-    # ── 保存 ──────────────────────────────────
+        self._undo_stack.append(self._snapshot())
+        self._restore_snapshot(self._redo_stack.pop())
 
     def save_xml(self, path, skeleton_sticks=None):
-        """
-        skeleton_sticks 参数保留给旧调用方;若为 None 或空,则从 self.sticks
-        反序列化出 [{'a':..,'b':..},...] 写出。
-        """
         from xml_io import write_xml
+
         if skeleton_sticks:
             out_sticks = list(skeleton_sticks)
         else:
-            out_sticks = [{'a': s.particle_a_id, 'b': s.particle_b_id}
-                          for s in self.sticks]
+            out_sticks = [{"a": s.particle_a_id, "b": s.particle_b_id} for s in self.sticks]
         skeleton = {
-            'particles': list(self.particles),
-            'sticks': out_sticks,
+            "particles": list(self.particles),
+            "sticks": out_sticks,
         }
         write_xml(path, self.voxels, skeleton, self.bindings)
         self._dirty = False
@@ -316,13 +441,7 @@ class EditorState:
         return self._dirty
 
     def stats(self):
-        bound = len(self.bindings)
-        total = len(self.voxels)
-        return bound, total
-
-    # ── 兼容性别名 ────────────────────────────
-    # 为了让旧的 main.py 不改也能跑,提供 bones / active_bone_idx 的只读别名。
-    # 新代码应直接用 sticks / active_stick_idx。
+        return len(self.bindings), len(self.voxels)
 
     @property
     def bones(self):

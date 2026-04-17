@@ -22,7 +22,7 @@ from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
 # ── globals ───────────────────────────────────
 
 WIN_W, WIN_H  = 1280, 800
-PANEL_W       = 240
+PANEL_W       = 280
 TOOLBAR_H     = 38
 STATUS_H      = 24
 
@@ -279,6 +279,10 @@ def main():
         g_imgui_impl.process_inputs()
 
         imgui.new_frame()
+
+        if g_editor.skeleton_dirty and g_renderer is not None:
+            g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks)
+            g_editor.skeleton_dirty = False
 
         # update GPU buffers when dirty
         if g_editor.gpu_dirty and g_editor.voxels:
