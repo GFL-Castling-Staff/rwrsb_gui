@@ -16,7 +16,8 @@ from editor_state import EditorState
 from renderer     import VoxelRenderer, pick_voxel, box_select_voxels
 from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_status_bar, draw_load_dialog, draw_save_dialog,
-                          draw_preset_dialog, draw_box_select_overlay)
+                          draw_preset_dialog,
+                          draw_box_select_overlay)
 
 # ── globals ───────────────────────────────────
 
@@ -99,7 +100,8 @@ def _load_file(path):
         elif ext == '.xml':
             sk = g_editor.load_xml(path, g_ui.trans_bias)
             g_skeleton_sticks[0] = sk.get('sticks', [])
-            g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks)
+            g_renderer.upload_skeleton_lines(
+                g_editor.particles, g_editor.sticks)
             rebuild_positions_cache()
             g_camera.reset_to_model(g_editor.voxels)
 
@@ -327,7 +329,7 @@ def main():
         draw_box_select_overlay(g_ui)
         imgui.end()
 
-        draw_toolbar(g_ui, g_editor, g_renderer, WIN_W)
+        draw_toolbar(g_ui, g_editor, g_renderer, g_camera, WIN_W)
         draw_bone_panel(g_ui, g_editor, WIN_W, WIN_H,
                         g_renderer, g_skeleton_sticks)
         draw_status_bar(g_editor, WIN_W, WIN_H)

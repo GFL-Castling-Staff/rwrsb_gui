@@ -49,7 +49,7 @@ def _push_red():
 
 # ── toolbar ───────────────────────────────────
 
-def draw_toolbar(ui_state, editor_state, renderer, WIN_W):
+def draw_toolbar(ui_state, editor_state, renderer, camera, WIN_W):
     imgui.set_next_window_position(0, 0)
     imgui.set_next_window_size(WIN_W, 38)
     imgui.begin("##toolbar", flags=FIXED_FLAGS | imgui.WINDOW_NO_SCROLLBAR)
@@ -109,6 +109,35 @@ def draw_toolbar(ui_state, editor_state, renderer, WIN_W):
     if imgui.button("Redo"):
         editor_state.redo()
 
+    # ── 视图控制 (最右侧) ──
+    imgui.same_line()
+    imgui.separator()
+    imgui.same_line()
+    if imgui.button("Center"):
+        camera.reset_to_model(editor_state.voxels)
+    imgui.same_line()
+
+    # 正交 / 透视 toggle
+    is_ortho = bool(camera.is_ortho)
+    if is_ortho: _push_blue()
+    if imgui.button("Ortho"):
+        camera.is_ortho = not camera.is_ortho
+        camera._dirty = True
+    if is_ortho: imgui.pop_style_color()
+    imgui.same_line()
+
+    if imgui.button("Front"):
+        camera.set_view_preset('front')
+    imgui.same_line()
+    if imgui.button("Side"):
+        camera.set_view_preset('side')
+    imgui.same_line()
+    if imgui.button("Top"):
+        camera.set_view_preset('top')
+    imgui.same_line()
+    if imgui.button("3/4"):
+        camera.set_view_preset('perspective')
+
     imgui.end()
 
 
@@ -129,6 +158,12 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer,
     imgui.set_next_window_position(WIN_W - PANEL_W, TOOLBAR_H)
     imgui.set_next_window_size(PANEL_W, WIN_H - TOOLBAR_H - STATUS_H)
     imgui.begin("##bones", flags=FIXED_FLAGS)
+
+    # 同步选中高亮到 renderer(每帧一次,覆盖所有路径对 active_stick_idx 的改动)
+    if editor_state.sticks:
+        renderer.highlight_stick_idx = editor_state.active_stick_idx
+    else:
+        renderer.highlight_stick_idx = -1
 
     if imgui.button("Load Human Preset", width=-1):
         ui_state.show_preset_dialog = True
