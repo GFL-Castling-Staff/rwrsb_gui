@@ -36,6 +36,13 @@ class OrbitCamera:
 
         self._dirty = True
 
+    def _view_up(self):
+        if self.elevation >= 89.999:
+            return np.array([0.0, 0.0, -1.0], dtype=np.float32)
+        if self.elevation <= -89.999:
+            return np.array([0.0, 0.0, 1.0], dtype=np.float32)
+        return np.array([0.0, 1.0, 0.0], dtype=np.float32)
+
     def resize(self, w, h):
         self.width = w
         self.height = h
@@ -124,7 +131,7 @@ class OrbitCamera:
 
     def get_view_matrix(self):
         pos = self.get_position()
-        return look_at(pos, self.target, np.array([0.0, 1.0, 0.0]))
+        return look_at(pos, self.target, self._view_up())
 
     def get_proj_matrix(self, fov=45.0, near=0.5, far=5000.0):
         aspect = max(self.width, 1) / max(self.height, 1)
@@ -170,7 +177,7 @@ class OrbitCamera:
         elif preset == 'top':
             # 俯视
             self.azimuth = 0.0
-            self.elevation = 89.0   # 89 避开 look_at 奇点
+            self.elevation = 90.0
         elif preset == 'perspective':
             self.azimuth = 45.0
             self.elevation = 25.0
@@ -200,7 +207,7 @@ class OrbitCamera:
 
             # 构造相机右/上方向(和 get_proj_matrix 的 aspect 对齐)
             aspect = max(self.width, 1) / max(self.height, 1)
-            world_up = np.array([0.0, 1.0, 0.0])
+            world_up = self._view_up()
             cam_right = np.cross(view_dir, world_up)
             nr = np.linalg.norm(cam_right)
             if nr > 1e-6:

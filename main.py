@@ -38,6 +38,7 @@ g_particle_drag_active = False
 g_drag_particle_idx = -1
 g_drag_plane_normal = None
 g_drag_grab_offset = None
+g_drag_particle_origin = None
 g_hover_particle_idx = -1
 g_positions_np = None          # (N,3) float32 cache for picking
 g_renderer     = None          # set in main()
@@ -70,9 +71,19 @@ def particle_positions_np():
     )
 
 
+def grid_step_value():
+    if g_ui.grid_mode == 0:
+        return 0.5
+    if g_ui.grid_mode == 1:
+        return 1.0
+    return float(max(1, int(g_ui.grid_multiple)))
+
+
 # ── interaction helpers ───────────────────────
 
 def _do_brush_paint(sx, sy):
+    if not g_ui.allow_skeleton_edit:
+        return
     if g_positions_np is None or len(g_positions_np) == 0:
         return
     # 窗口坐标 → viewport 坐标（camera 的 width/height 每帧设为 vp_w/vp_h）
@@ -121,7 +132,7 @@ def _pick_particle(sx, sy):
 
 
 def _begin_particle_drag(sx, sy, particle_idx):
-    global g_particle_drag_active, g_drag_particle_idx, g_drag_plane_normal, g_drag_grab_offset
+    global g_particle_drag_active, g_drag_particle_idx, g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin
     particle = g_editor.particles[particle_idx]
     plane_point = np.array([particle['x'], particle['y'], particle['z']], dtype=np.float32)
     cam_pos = np.asarray(g_camera.get_position(), dtype=np.float32)
@@ -148,9 +159,57 @@ def _begin_particle_drag(sx, sy, particle_idx):
     g_drag_particle_idx = particle_idx
     g_drag_plane_normal = plane_normal
     g_drag_grab_offset = plane_point - hit
+    g_drag_particle_origin = plane_point.copy()
 
 
-def _update_particle_drag(sx, sy):
+def _drag_axis_mask(window):
+    shift = (
+        glfw.get_key(window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS
+        or glfw.get_key(window, glfw.KEY_RIGHT_SHIFT) == glfw.PRESS
+    )
+    ctrl = (
+        glfw.get_key(window, glfw.KEY_LEFT_CONTROL) == glfw.PRESS
+        or glfw.get_key(window, glfw.KEY_RIGHT_CONTROL) == glfw.PRESS
+    )
+    alt = (
+        glfw.get_key(window, glfw.KEY_LEFT_ALT) == glfw.PRESS
+        or glfw.get_key(window, glfw.KEY_RIGHT_ALT) == glfw.PRESS
+    )
+    if shift:
+        return "x"
+    if ctrl:
+        return "y"
+    if alt:
+        return "z"
+    return None
+
+
+def _apply_particle_drag_rules(pos, axis_mask):
+    out = np.array(pos, dtype=np.float32)
+    if axis_mask == "x":
+        out[1] = g_drag_particle_origin[1]
+        out[2] = g_drag_particle_origin[2]
+    elif axis_mask == "y":
+        out[0] = g_drag_particle_origin[0]
+        out[2] = g_drag_particle_origin[2]
+    elif axis_mask == "z":
+        out[0] = g_drag_particle_origin[0]
+        out[1] = g_drag_particle_origin[1]
+
+    if g_ui.snap_particles_to_grid:
+        step = grid_step_value()
+        if axis_mask == "x":
+            out[0] = round(float(out[0]) / step) * step
+        elif axis_mask == "y":
+            out[1] = round(float(out[1]) / step) * step
+        elif axis_mask == "z":
+            out[2] = round(float(out[2]) / step) * step
+        else:
+            out = np.round(out / step) * step
+    return out
+
+
+def _update_particle_drag(window, sx, sy):
     if not g_particle_drag_active or g_drag_particle_idx < 0:
         return
     particle = g_editor.particles[g_drag_particle_idx]
@@ -165,15 +224,54 @@ def _update_particle_drag(sx, sy):
     if hit is None:
         return
     pos = hit + g_drag_grab_offset
+    pos = _apply_particle_drag_rules(pos, _drag_axis_mask(window))
     g_editor.set_particle_position(g_drag_particle_idx, pos[0], pos[1], pos[2], push_undo=False)
 
 
 def _end_particle_drag():
-    global g_particle_drag_active, g_drag_particle_idx, g_drag_plane_normal, g_drag_grab_offset
+    global g_particle_drag_active, g_drag_particle_idx, g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin
     g_particle_drag_active = False
     g_drag_particle_idx = -1
     g_drag_plane_normal = None
     g_drag_grab_offset = None
+    g_drag_particle_origin = None
+
+
+def _update_grid():
+    if g_renderer is None:
+        return
+    g_renderer.show_grid = g_ui.show_grid
+    if not g_ui.show_grid:
+        g_renderer.upload_grid((0.0, 0.0, 0.0), 0.0, 0.0, 1, False, False, False)
+        return
+
+    points = []
+    points.extend([(v[0], v[1], v[2]) for v in g_editor.voxels])
+    points.extend([(p['x'], p['y'], p['z']) for p in g_editor.particles])
+    if points:
+        arr = np.array(points, dtype=np.float32)
+        mins = arr.min(axis=0)
+        maxs = arr.max(axis=0)
+        center = (mins + maxs) * 0.5
+        model_extent = max(float(np.max(maxs - mins)) * 0.75, 8.0)
+    else:
+        center = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+        model_extent = 16.0
+
+    if 0 <= g_editor.active_particle_idx < len(g_editor.particles):
+        active = g_editor.particles[g_editor.active_particle_idx]
+        center = np.array([active['x'], active['y'], active['z']], dtype=np.float32)
+
+    camera_extent = max(float(g_camera.ortho_size) * 1.2, float(g_camera.distance) * 0.35, 8.0)
+    extent = max(model_extent, camera_extent)
+    step = grid_step_value()
+    if g_ui.snap_particles_to_grid:
+        center = np.round(center / step) * step
+    major_every = 2 if step == 0.5 else 4
+    g_renderer.upload_grid(
+        center, extent, step, major_every,
+        g_ui.show_grid_xz, g_ui.show_grid_xy, g_ui.show_grid_yz
+    )
 
 
 def _load_file(path):
@@ -234,13 +332,13 @@ def on_mouse_button(window, button, action, mods):
         g_lmb_down = pressed
         if pressed:
             hit_particle = _pick_particle(g_mouse_x, g_mouse_y)
-            if hit_particle >= 0:
+            if hit_particle >= 0 and g_ui.allow_particle_edit:
                 _begin_particle_drag(g_mouse_x, g_mouse_y, hit_particle)
-            elif g_editor.tool_mode == 'brush' and g_editor.sticks:
+            elif g_ui.allow_skeleton_edit and g_editor.tool_mode == 'brush' and g_editor.sticks:
                 g_editor.begin_brush_stroke()
                 _do_brush_paint(g_mouse_x, g_mouse_y)
                 g_brush_active = True
-            elif g_editor.tool_mode == 'select':
+            elif g_ui.allow_skeleton_edit and g_editor.tool_mode == 'select':
                 g_ui.box_selecting = True
                 g_ui.box_x0 = g_ui.box_x1 = g_mouse_x
                 g_ui.box_y0 = g_ui.box_y1 = g_mouse_y
@@ -279,11 +377,11 @@ def on_cursor_pos(window, xpos, ypos):
         else:
             g_renderer.highlight_particle_idx = hover_particle if hover_particle >= 0 else g_editor.active_particle_idx
     if g_particle_drag_active:
-        _update_particle_drag(xpos, ypos)
+        _update_particle_drag(window, xpos, ypos)
         return
-    if g_lmb_down and g_brush_active and g_editor.tool_mode == 'brush':
+    if g_ui.allow_skeleton_edit and g_lmb_down and g_brush_active and g_editor.tool_mode == 'brush':
         _do_brush_paint(xpos, ypos)
-    if g_lmb_down and g_ui.box_selecting and g_editor.tool_mode == 'select':
+    if g_ui.allow_skeleton_edit and g_lmb_down and g_ui.box_selecting and g_editor.tool_mode == 'select':
         g_ui.box_x1 = xpos
         g_ui.box_y1 = ypos
     g_camera.on_mouse_move(xpos, ypos)
@@ -318,9 +416,11 @@ def on_key(window, key, scancode, action, mods):
         elif key == glfw.KEY_F:
             g_camera.reset_to_model(g_editor.voxels)
         elif key == glfw.KEY_B:
-            g_editor.tool_mode = 'brush'
+            if g_ui.allow_skeleton_edit:
+                g_editor.tool_mode = 'brush'
         elif key == glfw.KEY_S and not ctrl:
-            g_editor.tool_mode = 'select'
+            if g_ui.allow_skeleton_edit:
+                g_editor.tool_mode = 'select'
 
 
 def on_char(window, codepoint):
@@ -389,6 +489,7 @@ def main():
 
         imgui.new_frame()
 
+        _update_grid()
         if g_editor.skeleton_dirty and g_renderer is not None:
             g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks)
             g_editor.skeleton_dirty = False

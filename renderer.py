@@ -16,6 +16,8 @@ _HIGHLIGHT_COLOR = (1.0, 0.95, 0.25)
 _PARTICLE_COLOR = (0.95, 0.35, 0.20)
 _PARTICLE_SIZE = 10.0
 _PARTICLE_SIZE_HIGHLIGHT = 16.0
+_GRID_MINOR_COLOR = (0.28, 0.31, 0.38)
+_GRID_MAJOR_COLOR = (0.52, 0.56, 0.66)
 
 
 def _make_cube_vbo():
@@ -64,9 +66,14 @@ class VoxelRenderer:
         self.point_vao = None
         self.n_points = 0
 
+        self.grid_vbo = None
+        self.grid_vao = None
+        self.n_grid_vertices = 0
+
         self.show_skeleton = True
         self.highlight_stick_idx = -1
         self.highlight_particle_idx = -1
+        self.show_grid = True
 
     def upload_voxels(self, positions, colors, selected):
         n = len(positions)
@@ -184,6 +191,92 @@ class VoxelRenderer:
         else:
             self.n_points = 0
 
+    def upload_grid(self, center, extent, step, major_every=4,
+                    show_xz=True, show_xy=True, show_yz=True):
+        if self.grid_vbo:
+            self.grid_vbo.release()
+            self.grid_vbo = None
+        if self.grid_vao:
+            self.grid_vao.release()
+            self.grid_vao = None
+        self.n_grid_vertices = 0
+
+        step = float(step)
+        if step <= 0.0:
+            return
+
+        major_every = max(1, int(major_every))
+        half = max(step * 4.0, float(extent))
+        min_x = np.floor((center[0] - half) / step) * step
+        max_x = np.ceil((center[0] + half) / step) * step
+        min_y = np.floor((center[1] - half) / step) * step
+        max_y = np.ceil((center[1] + half) / step) * step
+        min_z = np.floor((center[2] - half) / step) * step
+        max_z = np.ceil((center[2] + half) / step) * step
+        verts = []
+
+        def add_segment(ax, ay, az, bx, by, bz, line_index):
+            is_major = (line_index % major_every) == 0
+            color = _GRID_MAJOR_COLOR if is_major else _GRID_MINOR_COLOR
+            verts.extend([ax, ay, az, color[0], color[1], color[2], 1.0])
+            verts.extend([bx, by, bz, color[0], color[1], color[2], 1.0])
+
+        if show_xz:
+            x = min_x
+            xi = 0
+            while x <= max_x + 1e-6:
+                add_segment(x, center[1], min_z, x, center[1], max_z, xi)
+                x += step
+                xi += 1
+
+            z = min_z
+            zi = 0
+            while z <= max_z + 1e-6:
+                add_segment(min_x, center[1], z, max_x, center[1], z, zi)
+                z += step
+                zi += 1
+
+        if show_xy:
+            x = min_x
+            xi = 0
+            while x <= max_x + 1e-6:
+                add_segment(x, min_y, center[2], x, max_y, center[2], xi)
+                x += step
+                xi += 1
+
+            y = min_y
+            yi = 0
+            while y <= max_y + 1e-6:
+                add_segment(min_x, y, center[2], max_x, y, center[2], yi)
+                y += step
+                yi += 1
+
+        if show_yz:
+            y = min_y
+            yi = 0
+            while y <= max_y + 1e-6:
+                add_segment(center[0], y, min_z, center[0], y, max_z, yi)
+                y += step
+                yi += 1
+
+            z = min_z
+            zi = 0
+            while z <= max_z + 1e-6:
+                add_segment(center[0], min_y, z, center[0], max_y, z, zi)
+                z += step
+                zi += 1
+
+        if not verts:
+            return
+
+        grid_arr = np.array(verts, dtype=np.float32)
+        self.grid_vbo = self.ctx.buffer(grid_arr.tobytes())
+        self.grid_vao = self.ctx.vertex_array(
+            self.line_prog,
+            [(self.grid_vbo, "3f 4f", "in_vert", "in_color")],
+        )
+        self.n_grid_vertices = len(verts) // 7
+
     def render(self, mvp):
         if self.n_voxels == 0 or self.vao is None:
             return
@@ -191,6 +284,18 @@ class VoxelRenderer:
         mvp_bytes = mvp.astype(np.float32).T.tobytes()
         self.prog["u_mvp"].write(mvp_bytes)
         self.prog["u_light_dir"].value = (0.6, 1.0, 0.4)
+
+        if self.show_grid and self.n_grid_vertices > 0 and self.grid_vao:
+            self.line_prog["u_mvp"].write(mvp_bytes)
+            self.ctx.enable(moderngl.BLEND)
+            self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
+            self.ctx.disable(moderngl.DEPTH_TEST)
+            self.ctx.line_width = 1.0
+            self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 0.55)
+            self.grid_vao.render(moderngl.LINES, vertices=self.n_grid_vertices)
+            self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 1.0)
+            self.ctx.disable(moderngl.BLEND)
+            self.ctx.enable(moderngl.DEPTH_TEST)
 
         self.ctx.enable(moderngl.DEPTH_TEST)
         self.ctx.disable(moderngl.CULL_FACE)
@@ -253,6 +358,8 @@ class VoxelRenderer:
             self.line_vao,
             self.point_vbo,
             self.point_vao,
+            self.grid_vbo,
+            self.grid_vao,
             self.prog,
             self.line_prog,
         ]:

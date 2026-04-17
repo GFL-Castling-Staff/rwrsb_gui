@@ -26,6 +26,16 @@ class UIState:
         self.new_stick_b = 0
         self.preset_selected = 0
         self.preset_name_buf = ""
+        self.allow_stick_edit = True
+        self.allow_particle_edit = True
+        self.allow_skeleton_edit = True
+        self.show_grid = True
+        self.show_grid_xz = True
+        self.show_grid_xy = True
+        self.show_grid_yz = True
+        self.snap_particles_to_grid = False
+        self.grid_mode = 0
+        self.grid_multiple = 2
 
         self._load_error = ""
         self._save_error = ""
@@ -56,6 +66,14 @@ def _clamp_index(value, count):
     if count <= 0:
         return 0
     return min(max(int(value), 0), count - 1)
+
+
+def _grid_step(ui_state):
+    if ui_state.grid_mode == 0:
+        return 0.5
+    if ui_state.grid_mode == 1:
+        return 1.0
+    return float(max(1, int(ui_state.grid_multiple)))
 
 
 def draw_toolbar(ui_state, editor_state, renderer, camera, WIN_W):
@@ -92,7 +110,8 @@ def draw_toolbar(ui_state, editor_state, renderer, camera, WIN_W):
     if is_brush:
         _push_green()
     if imgui.button("Brush [B]"):
-        editor_state.tool_mode = "brush"
+        if ui_state.allow_skeleton_edit:
+            editor_state.tool_mode = "brush"
     if is_brush:
         imgui.pop_style_color()
 
@@ -101,7 +120,8 @@ def draw_toolbar(ui_state, editor_state, renderer, camera, WIN_W):
     if is_sel:
         _push_blue()
     if imgui.button("Select [S]"):
-        editor_state.tool_mode = "select"
+        if ui_state.allow_skeleton_edit:
+            editor_state.tool_mode = "select"
     if is_sel:
         imgui.pop_style_color()
 
@@ -221,6 +241,10 @@ def _draw_particle_editor(ui_state, editor_state):
     if not imgui.collapsing_header("Particles", flags=imgui.TREE_NODE_DEFAULT_OPEN)[0]:
         return
 
+    if not ui_state.allow_particle_edit:
+        imgui.text_disabled("Particle editing is disabled")
+        return
+
     if imgui.button("Add Particle", width=-1):
         try:
             editor_state.add_particle()
@@ -272,6 +296,10 @@ def _draw_active_stick_editor(ui_state, editor_state):
     if not imgui.collapsing_header("Active Stick", flags=imgui.TREE_NODE_DEFAULT_OPEN)[0]:
         return
 
+    if not ui_state.allow_stick_edit:
+        imgui.text_disabled("Stick editing is disabled")
+        return
+
     if not editor_state.sticks:
         imgui.text_disabled("No stick yet")
         return
@@ -312,6 +340,10 @@ def _draw_active_stick_editor(ui_state, editor_state):
 
 def _draw_add_stick(ui_state, editor_state):
     if not imgui.collapsing_header("Create Stick", flags=imgui.TREE_NODE_DEFAULT_OPEN)[0]:
+        return
+
+    if not ui_state.allow_stick_edit:
+        imgui.text_disabled("Stick editing is disabled")
         return
 
     if len(editor_state.particles) < 2:
@@ -377,8 +409,9 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
         imgui.text(active.name)
 
     if imgui.button("Select unbound", width=-1):
-        editor_state.tool_mode = "select"
-        editor_state.select_unbound()
+        if ui_state.allow_skeleton_edit:
+            editor_state.tool_mode = "select"
+            editor_state.select_unbound()
 
     imgui.separator()
     _draw_active_stick_editor(ui_state, editor_state)
@@ -387,6 +420,41 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
 
     imgui.separator()
     if imgui.collapsing_header("Advanced")[0]:
+        _, ui_state.allow_skeleton_edit = imgui.checkbox("Allow skeleton edit", ui_state.allow_skeleton_edit)
+        if not ui_state.allow_skeleton_edit:
+            ui_state.allow_stick_edit = False
+            ui_state.allow_particle_edit = False
+            editor_state.tool_mode = "select"
+            editor_state.clear_selection()
+        else:
+            if not ui_state.allow_stick_edit and not ui_state.allow_particle_edit:
+                ui_state.allow_stick_edit = True
+                ui_state.allow_particle_edit = True
+        if ui_state.allow_skeleton_edit:
+            _, ui_state.allow_stick_edit = imgui.checkbox("Allow stick edit", ui_state.allow_stick_edit)
+            _, ui_state.allow_particle_edit = imgui.checkbox("Allow particle edit", ui_state.allow_particle_edit)
+        else:
+            imgui.text_disabled("Allow stick edit: disabled by master switch")
+            imgui.text_disabled("Allow particle edit: disabled by master switch")
+        _, ui_state.show_grid = imgui.checkbox("Show grid", ui_state.show_grid)
+        if ui_state.show_grid:
+            _, ui_state.show_grid_xz = imgui.checkbox("Grid XZ", ui_state.show_grid_xz)
+            _, ui_state.show_grid_xy = imgui.checkbox("Grid XY", ui_state.show_grid_xy)
+            _, ui_state.show_grid_yz = imgui.checkbox("Grid YZ", ui_state.show_grid_yz)
+        else:
+            imgui.text_disabled("Grid XZ")
+            imgui.text_disabled("Grid XY")
+            imgui.text_disabled("Grid YZ")
+        _, ui_state.snap_particles_to_grid = imgui.checkbox("Snap particle to grid", ui_state.snap_particles_to_grid)
+        changed_mode, ui_state.grid_mode = imgui.combo(
+            "Grid unit",
+            ui_state.grid_mode,
+            ["0.5 voxel", "1 voxel", "N voxels"],
+        )
+        if ui_state.grid_mode == 2:
+            changed_int, ui_state.grid_multiple = imgui.input_int("Grid N", ui_state.grid_multiple)
+            ui_state.grid_multiple = max(1, ui_state.grid_multiple)
+        imgui.text(f"Current step: {_grid_step(ui_state):.3f}")
         imgui.text("trans_bias (reload to apply):")
         imgui.set_next_item_width(80)
         _, ui_state.trans_bias = imgui.input_int("##tbias", ui_state.trans_bias)
@@ -397,6 +465,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
 
     imgui.separator()
     imgui.text_disabled("Tip: drag orange particle points in the viewport.")
+    imgui.text_disabled("Shift=X  Ctrl=Y  Alt=Z")
 
     imgui.end()
 
