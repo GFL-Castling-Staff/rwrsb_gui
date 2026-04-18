@@ -32,6 +32,10 @@ echo.
 echo Build complete:
 echo   dist\rwrsb_gui\rwrsb_gui.exe
 echo.
+echo IMPORTANT:
+echo   Run the EXE from dist\rwrsb_gui\rwrsb_gui.exe
+echo   Do NOT run build\rwrsb_gui\rwrsb_gui.exe
+echo.
 echo Recommended release artifact:
 echo   zip the whole dist\rwrsb_gui folder
 echo.

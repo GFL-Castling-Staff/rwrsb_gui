@@ -18,7 +18,7 @@ from renderer     import VoxelRenderer, pick_voxel, box_select_voxels, pick_part
 from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_status_bar, draw_load_dialog, draw_save_dialog,
                           draw_preset_dialog,
-                          draw_box_select_overlay)
+                          draw_box_select_overlay, draw_exit_dialog)
 
 # ── globals ───────────────────────────────────
 
@@ -143,6 +143,15 @@ def _window_title():
     if g_ui.language == "zh":
         return "rwrsb v2.0 -- RWR 骨架绑定编辑器"
     return "rwrsb v2.0 -- RWR Skeleton Binder"
+
+
+def _prepare_save_dialog():
+    g_ui.show_save_dialog = True
+    path = g_editor.source_path or ""
+    if path.lower().endswith(".vox"):
+        path = path[:-4] + "_bound.xml"
+    g_ui.save_path_buf = path
+    g_ui._save_error = ""
 
 
 def rebuild_positions_cache():
@@ -595,6 +604,9 @@ def main():
 
     while not glfw.window_should_close(window):
         glfw.poll_events()
+        if glfw.window_should_close(window) and g_editor.is_dirty and not g_ui.show_exit_dialog and not g_ui.pending_exit_after_save:
+            glfw.set_window_should_close(window, False)
+            g_ui.show_exit_dialog = True
         g_imgui_impl.process_inputs()
         _apply_ui_scale()
         g_camera.invert_y = g_ui.invert_y_axis
@@ -669,6 +681,25 @@ def main():
         draw_save_dialog(g_ui, g_editor, g_skeleton_sticks, WIN_W, WIN_H)
         draw_preset_dialog(g_ui, g_editor, g_renderer,
                            g_skeleton_sticks, WIN_W, WIN_H)
+        exit_action = draw_exit_dialog(g_ui, WIN_W, WIN_H)
+        if exit_action == "discard":
+            glfw.set_window_should_close(window, True)
+        elif exit_action == "save":
+            if g_editor.source_path and g_editor.source_path.lower().endswith(".xml"):
+                try:
+                    g_editor.save_xml(g_editor.source_path, g_skeleton_sticks[0])
+                    glfw.set_window_should_close(window, True)
+                except Exception as exc:
+                    g_ui._save_error = str(exc)
+                    _prepare_save_dialog()
+                    g_ui.pending_exit_after_save = True
+            else:
+                _prepare_save_dialog()
+                g_ui.pending_exit_after_save = True
+
+        if g_ui.pending_exit_after_save and not g_editor.is_dirty and not g_ui.show_save_dialog:
+            g_ui.pending_exit_after_save = False
+            glfw.set_window_should_close(window, True)
 
         imgui.render()
         g_imgui_impl.render(imgui.get_draw_data())
@@ -677,7 +708,10 @@ def main():
 
     g_renderer.release()
     g_imgui_impl.shutdown()
-    imgui.destroy_context()
+    try:
+        imgui.destroy_context()
+    except RuntimeError:
+        pass
     glfw.terminate()
 
 

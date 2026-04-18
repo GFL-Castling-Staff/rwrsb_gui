@@ -1,234 +1,252 @@
 # rwrsb_gui
 
-Voxel skeleton binding editor for RWR-style assets.
+这是一个面向 RWR 风格资源的体素骨架绑定编辑器。
 
-This tool can load `.vox` or project XML, edit skeleton structure and voxel bindings, and export back to the target XML format. The current codebase is focused on a practical desktop workflow for adding, modifying, and reusing skeletons instead of only rebinding an existing human preset.
+它可以直接读取 `.vox` 或项目 XML，编辑骨架结构与体素绑定关系，并导出回目标 XML 格式。当前版本的重点是“可实用地编辑和复用骨架”，而不只是给默认人骨重新绑点。
 
-## What It Can Do
+## 功能概览
 
-- Load MagicaVoxel `.vox` files
-- Load supported XML files with voxels, skeleton, and bindings
-- Edit `particle` nodes
-- Edit `stick` connections
-- Rebind voxels to skeleton groups
-- Save and reuse skeleton presets from `presets/`
-- Drag particles directly in the viewport
-- Snap particles to a configurable grid
-- Show orthographic helper grids on `XZ`, `XY`, and `YZ` planes
-- Export the edited result as XML
+- 读取 MagicaVoxel `.vox`
+- 读取项目使用的 XML
+- 编辑 `particle` 节点
+- 编辑 `stick` 连线
+- 给体素重新绑定骨段
+- 保存和复用骨架预设
+- 在视口中直接拖拽粒子点
+- 网格显示、主次网格和网格吸附
+- 中英双语界面
+- UI 缩放
+- 相机 Y 轴反转
+- 导出 XML
 
-## Requirements
+## 运行环境
 
 - Windows
 - Python 3.10+
-- OpenGL-capable GPU / driver
+- 可用的 OpenGL 驱动
 
-Python packages used by the app:
+项目主要依赖：
 
 - `moderngl`
 - `glfw`
 - `imgui[glfw]`
 - `numpy`
 
-## Quick Start
+## 快速开始
 
-Create the virtual environment and install dependencies:
+首次初始化环境：
 
 ```bat
 setup.bat
 ```
 
-Launch the editor:
+启动编辑器：
 
 ```bat
 run.bat
 ```
 
-Or run directly:
+也可以直接运行：
 
 ```bat
 .venv\Scripts\python main.py
 ```
 
-You can also open a file immediately:
+如果要直接打开一个文件：
 
 ```bat
 .venv\Scripts\python main.py path\to\model.vox
 ```
 
-## Build EXE
+## build.bat 怎么用
 
-This project is prepared for Windows packaging with PyInstaller.
+`build.bat` 是项目的一键打包脚本，用来把当前工程打成 Windows 可分发目录包。
 
-Build a packaged app:
+直接运行：
 
 ```bat
 build.bat
 ```
 
-Expected output:
+它会自动做这几件事：
+
+1. 检查 `.venv` 是否存在
+2. 激活虚拟环境
+3. 如果还没安装 `PyInstaller`，自动安装
+4. 删除旧的 `build/` 和 `dist/`
+5. 按 [rwrsb_gui.spec](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/rwrsb_gui.spec) 重新打包
+
+打包成功后，输出位置是：
 
 ```text
 dist\rwrsb_gui\rwrsb_gui.exe
 ```
 
-Packaging notes:
+发布时建议不要只拿单个 exe，而是把整个 `dist\rwrsb_gui` 文件夹压缩成 zip 再发。
 
-- The build includes `shaders/` and `presets/`
-- Directory build is the recommended default
-- OpenGL support still depends on the target machine's graphics driver
-- If `PyInstaller` is missing, `build.bat` will install it into `.venv`
+原因是这个目录里除了 exe 之外，还会包含：
 
-## Main Workflow
+- PyInstaller 运行时文件
+- `shaders/`
+- `presets/`
+- `glfw3.dll` 等打包资源
 
-1. Load a `.vox` or `.xml` file.
-2. Inspect or edit the skeleton in the right-side panels.
-3. Create, modify, or delete `particle` and `stick` entries.
-4. Bind voxels with brush/select tools.
-5. Move particles in the viewport by direct dragging.
-6. Save XML when the skeleton and bindings are ready.
-7. Optionally save the current skeleton as a preset for reuse.
+## 编辑流程
 
-## Editing Notes
+1. 打开 `.vox` 或 `.xml`
+2. 在右侧面板检查或编辑骨架
+3. 新增、修改或删除 `particle` / `stick`
+4. 用 `brush` 或 `select` 做体素绑定
+5. 在视口中拖动粒子点微调骨架
+6. 保存为 XML
+7. 如有需要，把当前骨架另存为预设
 
-- `particle` is a skeleton node with position and metadata.
-- `stick` connects two particles and becomes one binding constraint group.
-- Binding groups rely on `constraintIndex`.
-- `constraintIndex` must stay aligned with the current stick order.
-- Deleting or reordering sticks should always keep bindings in sync.
-- Grid snapping can use `0.5`, `1`, or any positive integer voxel step.
-- Grid planes can be enabled independently for `XZ`, `XY`, and `YZ`.
-- Particle drag supports axis locking:
-  - `Shift`: X axis
-  - `Ctrl`: Y axis
-  - `Alt`: Z axis
+## 编辑说明
 
-## Project Structure
+- `particle` 是骨架节点，包含位置和元数据
+- `stick` 连接两个粒子，对应一个绑定约束组
+- 绑定关系依赖 `constraintIndex`
+- `constraintIndex` 必须和当前 stick 顺序保持一致
+- 删除或重排 stick 时，必须同步修正绑定映射
+- 网格步长支持 `0.5`、`1`、或任意正整数体素
+- 网格平面可以分别启用 `XZ / XY / YZ`
+- 视口拖拽粒子支持轴约束：
+  - `Shift`: 锁 X
+  - `Ctrl`: 锁 Y
+  - `Alt`: 锁 Z
+
+## 项目结构
 
 - `main.py`
-  - Application entry point
-  - Window lifecycle
-  - Input handling
-  - Particle dragging
-  - Grid updates
+  - 主入口
+  - GLFW 窗口生命周期
+  - 输入事件
+  - 视口拖拽
+  - UI 生效逻辑
 - `editor_state.py`
-  - Core editable project state
-  - Undo/redo snapshots
-  - Skeleton CRUD
-  - Binding data
-  - Preset CRUD
+  - 可编辑项目状态
+  - Undo/Redo
+  - 骨架 CRUD
+  - 绑定数据
+  - 预设 CRUD
 - `ui_panels.py`
-  - ImGui panels and dialogs
-  - Skeleton editing UI
-  - Load/save dialogs
-  - Grid and editing settings
+  - 右侧面板和弹窗
+  - 中英双语文案
+  - UI 设置项
 - `renderer.py`
-  - Voxel rendering
-  - Skeleton rendering
-  - Particle picking
-  - Grid rendering
+  - 体素渲染
+  - 骨架渲染
+  - 粒子拾取
+  - 网格渲染
 - `camera.py`
-  - Orbit and orthographic camera behavior
-  - View presets
-  - Ray construction
+  - Orbit / Ortho 相机
+  - 视角预设
+  - 射线构造
 - `xml_io.py`
-  - `.vox` parsing
-  - XML parsing
-  - XML writing
-  - Coordinate conversion helpers
+  - `.vox` 解析
+  - XML 解析
+  - XML 写出
+  - 坐标转换
+- `resource_utils.py`
+  - 统一资源路径
+  - 兼容源码运行和 PyInstaller 打包
 - `presets/`
-  - Skeleton preset JSON files
+  - 骨架预设 JSON
 - `shaders/`
-  - GLSL shader sources
+  - GLSL 着色器
 
-## XML Model
+## XML 数据模型
 
-The XML workflow is centered around three related blocks:
+XML 工作流主要围绕三块数据：
 
 - `voxels`
-  - Voxel positions and colors
+  - 体素位置和颜色
 - `skeleton`
   - `particle`
   - `stick`
 - `skeletonVoxelBindings`
   - `group constraintIndex="..."`
-  - voxel indices belonging to each stick group
+  - 属于某个骨段组的体素索引
 
-Important invariants:
+几个关键约束：
 
-- Particle IDs must stay unique.
-- Stick endpoints must reference valid particle IDs.
-- Group `constraintIndex` must match the stick index.
-- Export should preserve all active voxel bindings after skeleton edits.
+- Particle ID 必须唯一
+- Stick 两端必须引用存在的粒子
+- `group.constraintIndex` 必须等于 stick 的下标
+- 编辑骨架后，导出时必须保留正确的绑定关系
 
-## Presets
+## 预设
 
-Skeleton presets are stored as JSON files in `presets/`.
+骨架预设保存在 `presets/` 下的 JSON 文件中。
 
-Current repository presets:
+当前仓库内已有：
 
 - `human_skeleton.json`
 - `88.json`
 
-Presets store skeleton structure only:
+预设只保存骨架结构：
 
 - particles
 - sticks
 
-Voxel bindings are project-specific and are not treated as preset data.
+体素绑定属于具体项目数据，不作为预设的一部分。
 
-## For Human Contributors
+## 给开发者的说明
 
-- Use `setup.bat` first on a fresh machine.
-- Keep `.venv/` local only.
-- Do not commit `__pycache__/`.
-- Test loading both `.vox` and `.xml` if you change parsing or export code.
-- Be careful with coordinate conversion changes; they affect both import and export.
-- Be careful with stick deletion and reindexing; binding corruption usually starts there.
+- 新机器先跑 `setup.bat`
+- `.venv/` 只保留在本地，不要提交
+- 不要提交 `__pycache__/`
+- 如果改了解析或导出逻辑，至少要测一次 `.vox` 和 `.xml`
+- 坐标转换改动要特别小心，它会同时影响导入和导出
+- stick 删除和重排最容易把 binding 搞坏，修改时要重点验证
 
-## For AI Contributors
+## 给 AI 接手者的说明
 
-When extending this project, start here:
+如果后续要继续扩展这个项目，建议先读：
 
-- Read `main.py` to understand the runtime loop and input flow.
-- Read `editor_state.py` before changing any skeleton behavior.
-- Read `xml_io.py` before touching import/export assumptions.
-- Read `ui_panels.py` for all editor-side controls and settings.
+- [main.py](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/main.py)
+- [editor_state.py](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/editor_state.py)
+- [xml_io.py](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/xml_io.py)
+- [ui_panels.py](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/ui_panels.py)
 
-Expected architecture boundaries:
+建议遵守的边界：
 
-- `editor_state.py` should own editable data and mutations.
-- `renderer.py` should draw and pick, not own project state rules.
-- `ui_panels.py` should call state mutations, not duplicate business logic.
-- `xml_io.py` should stay focused on file parsing/serialization.
+- `editor_state.py` 负责状态和业务规则
+- `renderer.py` 负责绘制与拾取
+- `ui_panels.py` 负责界面调用，不要重复实现业务逻辑
+- `xml_io.py` 负责文件格式解析与写出
 
-When changing skeleton logic, verify these paths together:
+如果改动骨架逻辑，至少一起检查：
 
-- viewport drag
-- panel editing
-- preset save/load
+- 视口拖拽
+- 面板编辑
+- 预设保存/加载
 - undo/redo
-- XML export
-- binding reindexing after stick edits
+- XML 导出
+- 删除 stick 后的绑定重排
 
-## Git Hygiene
+## Git 清洁
 
-This repository intentionally ignores generated local artifacts:
+仓库会忽略这些本地产物：
 
 ```gitignore
 .venv/
 __pycache__/
 *.py[cod]
+build/
+dist/
 ```
 
-If these files ever get tracked by mistake again, remove them from the Git index instead of deleting local working files.
+如果这些文件以后又被误跟踪，应该把它们从 Git 索引里移除，而不是直接删本地文件。
 
-## Release
+## 发布
 
-Release instructions are documented in [RELEASE.md](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/RELEASE.md).
+发版流程见 [RELEASE.md](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/RELEASE.md)。
 
-## Known Practical Limitations
+本次版本说明稿见 [RELEASE_NOTES_v0.1.0.md](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/RELEASE_NOTES_v0.1.0.md)。
 
-- Runtime validation still depends on a local machine with working OpenGL and ImGui dependencies.
-- XML compatibility is aimed at the current project format, not arbitrary unrelated schemas.
-- The tool is desktop-oriented and not packaged as a standalone executable yet.
+## 已知限制
+
+- 最终运行效果仍然建议在本机 OpenGL 环境里实际验证
+- 当前 XML 兼容性是面向本项目格式，不是任意通用 schema
+- 当前发布包是目录版，不是单文件版 exe

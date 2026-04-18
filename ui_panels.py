@@ -97,6 +97,11 @@ _TEXT = {
         "save_xml_title": "Save XML",
         "output_xml_path": "Output XML path:",
         "save": "Save",
+        "save_and_exit": "Save and Exit",
+        "discard_and_exit": "Discard and Exit",
+        "cancel_exit": "Cancel",
+        "unsaved_changes_title": "Unsaved Changes",
+        "unsaved_changes_body": "You have unsaved changes. Save before exit?",
         "preset_manager": "Preset Manager",
         "preset_desc": "Load, save, and delete skeleton presets.",
         "preset_desc_keep": "Loading keeps current voxel bindings.",
@@ -227,9 +232,11 @@ class UIState:
         self.show_load_dialog = False
         self.show_save_dialog = False
         self.show_preset_dialog = False
+        self.show_exit_dialog = False
         self.load_path_buf = ""
         self.save_path_buf = ""
         self.load_mode = "vox"
+        self.pending_exit_after_save = False
 
         self.trans_bias = 127
         self.show_skeleton_lines = True
@@ -801,12 +808,50 @@ def draw_save_dialog(ui_state, editor_state, skeleton_sticks_ref, WIN_W, WIN_H):
         imgui.same_line()
         if imgui.button(tr(ui_state, "cancel"), width=80 * ui_state.ui_scale):
             ui_state.show_save_dialog = False
+            ui_state.pending_exit_after_save = False
             imgui.close_current_popup()
         if ui_state._save_error:
             imgui.text_colored(tr(ui_state, "error", message=ui_state._save_error), 1.0, 0.3, 0.3, 1.0)
         imgui.end_popup()
     else:
         ui_state.show_save_dialog = False
+
+
+def draw_exit_dialog(ui_state, WIN_W, WIN_H):
+    if not ui_state.show_exit_dialog:
+        return None
+    title = tr(ui_state, "unsaved_changes_title")
+    imgui.open_popup(title)
+    imgui.set_next_window_position(WIN_W // 2 - 220, WIN_H // 2 - 70)
+    imgui.set_next_window_size(440 * ui_state.ui_scale, 140 * ui_state.ui_scale)
+    opened, _ = imgui.begin_popup_modal(title, flags=imgui.WINDOW_NO_RESIZE)
+    if opened:
+        imgui.text_wrapped(tr(ui_state, "unsaved_changes_body"))
+        imgui.separator()
+
+        if imgui.button(tr(ui_state, "save_and_exit"), width=120 * ui_state.ui_scale):
+            ui_state.show_exit_dialog = False
+            imgui.close_current_popup()
+            imgui.end_popup()
+            return "save"
+        imgui.same_line()
+        if imgui.button(tr(ui_state, "discard_and_exit"), width=140 * ui_state.ui_scale):
+            ui_state.show_exit_dialog = False
+            ui_state.pending_exit_after_save = False
+            imgui.close_current_popup()
+            imgui.end_popup()
+            return "discard"
+        imgui.same_line()
+        if imgui.button(tr(ui_state, "cancel_exit"), width=100 * ui_state.ui_scale):
+            ui_state.show_exit_dialog = False
+            ui_state.pending_exit_after_save = False
+            imgui.close_current_popup()
+            imgui.end_popup()
+            return "cancel"
+        imgui.end_popup()
+    else:
+        ui_state.show_exit_dialog = False
+    return None
 
 
 def draw_preset_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WIN_W, WIN_H):
