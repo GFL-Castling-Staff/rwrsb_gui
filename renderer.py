@@ -2,10 +2,10 @@
 renderer.py
 ModernGL instanced rendering for voxels, skeleton lines, and particle handles.
 """
-from pathlib import Path
-
 import moderngl
 import numpy as np
+
+from resource_utils import resource_path
 
 
 _LINE_ALPHA_OCCLUDED = 0.25
@@ -39,7 +39,7 @@ def _make_cube_vbo():
 class VoxelRenderer:
     def __init__(self, ctx: moderngl.Context):
         self.ctx = ctx
-        shader_dir = Path(__file__).parent / "shaders"
+        shader_dir = resource_path("shaders")
 
         vert_src = (shader_dir / "voxel.vert").read_text(encoding="utf-8")
         frag_src = (shader_dir / "voxel.frag").read_text(encoding="utf-8")

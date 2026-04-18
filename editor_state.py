@@ -9,6 +9,8 @@ from pathlib import Path
 
 import numpy as np
 
+from resource_utils import resource_path
+
 
 BONE_COLORS = [
     (0.95, 0.30, 0.30),
@@ -84,7 +86,7 @@ class EditorState:
         self.skeleton_dirty = True
 
     def _preset_dir(self):
-        return Path(__file__).parent / "presets"
+        return resource_path("presets")
 
     def _clone_sticks(self):
         return [stick.clone() for stick in self.sticks]
@@ -197,7 +199,7 @@ class EditorState:
 
     def load_skeleton_preset(self, preset_path=None):
         if preset_path is None:
-            preset_path = Path(__file__).parent / "presets" / "human_skeleton.json"
+            preset_path = resource_path("presets", "human_skeleton.json")
         data = json.loads(Path(preset_path).read_text(encoding="utf-8"))
         self.particles = list(data.get("particles", []))
         self._rebuild_sticks_from_raw(data.get("sticks", []))

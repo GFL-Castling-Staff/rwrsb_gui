@@ -56,6 +56,29 @@ You can also open a file immediately:
 .venv\Scripts\python main.py path\to\model.vox
 ```
 
+## Build EXE
+
+This project is prepared for Windows packaging with PyInstaller.
+
+Build a packaged app:
+
+```bat
+build.bat
+```
+
+Expected output:
+
+```text
+dist\rwrsb_gui\rwrsb_gui.exe
+```
+
+Packaging notes:
+
+- The build includes `shaders/` and `presets/`
+- Directory build is the recommended default
+- OpenGL support still depends on the target machine's graphics driver
+- If `PyInstaller` is missing, `build.bat` will install it into `.venv`
+
 ## Main Workflow
 
 1. Load a `.vox` or `.xml` file.
@@ -199,6 +222,10 @@ __pycache__/
 ```
 
 If these files ever get tracked by mistake again, remove them from the Git index instead of deleting local working files.
+
+## Release
+
+Release instructions are documented in [RELEASE.md](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/RELEASE.md).
 
 ## Known Practical Limitations
 
