@@ -5,7 +5,14 @@ Usage: python main.py [optional_file.vox]
 """
 import sys
 import os
+import logging
+import functools
 from pathlib import Path
+
+# 日志系统必须在其他项目模块之前初始化
+from logger_setup import init_logger
+_LOG_DIR = init_logger()
+
 import numpy as np
 import glfw
 import moderngl
@@ -19,7 +26,10 @@ from renderer     import (VoxelRenderer, pick_voxel, box_select_voxels,
 from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_status_bar, draw_load_dialog, draw_save_dialog,
                           draw_preset_dialog,
-                          draw_box_select_overlay, draw_exit_dialog)
+                          draw_box_select_overlay, draw_exit_dialog,
+                          draw_toasts)
+
+logger = logging.getLogger(__name__)
 
 # ── globals ───────────────────────────────────
 
@@ -676,26 +686,35 @@ def _load_file(path):
             xs = [v[0] for v in g_editor.voxels]
             ys = [v[1] for v in g_editor.voxels]
             zs = [v[2] for v in g_editor.voxels]
-            print(f'[diag] voxel count = {len(g_editor.voxels)}')
-            print(f'[diag] bbox x:[{min(xs):.1f},{max(xs):.1f}]  '
-                  f'y:[{min(ys):.1f},{max(ys):.1f}]  '
-                  f'z:[{min(zs):.1f},{max(zs):.1f}]')
-            print(f'[diag] camera target={g_camera.target}  '
-                  f'distance={g_camera.distance:.1f}')
-            print(f'[diag] camera position={g_camera.get_position()}')
-            # 前 3 个体素原始坐标 + 颜色
+            logger.debug('voxel count = %d', len(g_editor.voxels))
+            logger.debug('bbox x:[%.1f,%.1f]  y:[%.1f,%.1f]  z:[%.1f,%.1f]',
+                         min(xs), max(xs), min(ys), max(ys), min(zs), max(zs))
+            logger.debug('camera target=%s  distance=%.1f',
+                         g_camera.target, g_camera.distance)
+            logger.debug('camera position=%s', g_camera.get_position())
             for i, v in enumerate(g_editor.voxels[:3]):
-                print(f'[diag] voxel[{i}] = {v}')
+                logger.debug('voxel[%d] = %s', i, v)
         else:
-            print('[diag] voxel list is EMPTY after load')
+            logger.debug('voxel list is EMPTY after load')
+        g_ui.push_toast(f"已加载: {Path(path).name}", "success")
     except Exception as e:
-        import traceback
-        print(f'[load] failed: {e}')
-        traceback.print_exc()
+        g_ui.push_toast(f"加载失败: {e}", "error", exc_info=sys.exc_info())
 
 
 # ── GLFW callbacks ────────────────────────────
 
+def _safe_callback(fn):
+    """装饰器：捕获回调里的业务异常，写 log 后 return，不让程序崩。"""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception:
+            logger.exception("GLFW callback %s failed", fn.__name__)
+    return wrapper
+
+
+@_safe_callback
 def on_mouse_button(window, button, action, mods):
     global g_lmb_down, g_brush_active
     # let imgui consume first
@@ -815,6 +834,7 @@ def on_mouse_button(window, button, action, mods):
     g_camera.on_mouse_button(button, action, mods, g_mouse_x, g_mouse_y)
 
 
+@_safe_callback
 def on_cursor_pos(window, xpos, ypos):
     global g_hover_particle_idx
     global g_mouse_x, g_mouse_y
@@ -853,6 +873,7 @@ def on_cursor_pos(window, xpos, ypos):
     g_camera.on_mouse_move(xpos, ypos)
 
 
+@_safe_callback
 def on_scroll(window, dx, dy):
     if g_imgui_impl:
         g_imgui_impl.scroll_callback(window, dx, dy)
@@ -865,6 +886,7 @@ def on_scroll(window, dx, dy):
         g_camera.on_scroll(dy)
 
 
+@_safe_callback
 def on_key(window, key, scancode, action, mods):
     if g_imgui_impl:
         g_imgui_impl.keyboard_callback(window, key, scancode, action, mods)
@@ -895,16 +917,19 @@ def on_key(window, key, scancode, action, mods):
                 g_editor.set_tool_mode('bone_edit')
 
 
+@_safe_callback
 def on_char(window, codepoint):
     if g_imgui_impl:
         g_imgui_impl.char_callback(window, codepoint)
 
 
+@_safe_callback
 def on_drop(window, paths):
     if paths:
         _load_file(paths[0])
 
 
+@_safe_callback
 def on_resize(window, width, height):
     global WIN_W, WIN_H
     WIN_W, WIN_H = width, height
@@ -953,119 +978,143 @@ def main():
     g_imgui_impl = GlfwRenderer(window, attach_callbacks=False)
     _apply_ui_scale()
     if font_path:
-        print(f"[ui] loaded font: {font_path}")
+        logger.info("loaded font: %s", font_path)
     else:
-        print("[ui] using default imgui font")
+        logger.warning("using default imgui font (no CJK font found)")
 
     # load file from argv
     if len(sys.argv) > 1:
         _load_file(sys.argv[1])
 
+    _last_loop_err = (None, None, 0)   # (type_name, msg, repeat_count)
     while not glfw.window_should_close(window):
-        glfw.poll_events()
-        if glfw.window_should_close(window) and g_editor.is_dirty and not g_ui.show_exit_dialog and not g_ui.pending_exit_after_save:
-            glfw.set_window_should_close(window, False)
-            g_ui.show_exit_dialog = True
-        g_imgui_impl.process_inputs()
-        _apply_ui_scale()
-        g_camera.invert_y = g_ui.invert_y_axis
-        if g_ui._language_dirty:
-            glfw.set_window_title(window, _window_title())
-            g_ui._language_dirty = False
+        try:
+            glfw.poll_events()
+            if glfw.window_should_close(window) and g_editor.is_dirty and not g_ui.show_exit_dialog and not g_ui.pending_exit_after_save:
+                glfw.set_window_should_close(window, False)
+                g_ui.show_exit_dialog = True
+            g_imgui_impl.process_inputs()
+            _apply_ui_scale()
+            g_camera.invert_y = g_ui.invert_y_axis
+            if g_ui._language_dirty:
+                glfw.set_window_title(window, _window_title())
+                g_ui._language_dirty = False
 
-        imgui.new_frame()
+            imgui.new_frame()
 
-        _update_grid()
-        _update_mirror_indicator()
-        if g_editor.skeleton_dirty and g_renderer is not None:
-            g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks)
-            g_editor.skeleton_dirty = False
+            _update_grid()
+            _update_mirror_indicator()
+            if g_editor.skeleton_dirty and g_renderer is not None:
+                g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks)
+                g_editor.skeleton_dirty = False
 
-        # update GPU buffers when dirty
-        if g_editor.gpu_dirty and g_editor.voxels:
-            positions, colors, selected = g_editor.build_instance_arrays()
-            g_renderer.upload_voxels(positions, colors, selected)
-            rebuild_positions_cache()
-            if not g_first_upload_logged:
-                print(f'[diag] uploaded {len(positions)} instances to GPU  '
-                      f'(renderer.n_voxels={g_renderer.n_voxels})')
-                g_first_upload_logged = True
+            # update GPU buffers when dirty
+            if g_editor.gpu_dirty and g_editor.voxels:
+                positions, colors, selected = g_editor.build_instance_arrays()
+                g_renderer.upload_voxels(positions, colors, selected)
+                rebuild_positions_cache()
+                if not g_first_upload_logged:
+                    logger.debug('uploaded %d instances to GPU (renderer.n_voxels=%d)',
+                                 len(positions), g_renderer.n_voxels)
+                    g_first_upload_logged = True
 
-        # 3-D scene: 先清整个 framebuffer，再把 viewport 限定在中央 3D 区域
-        fb_w, fb_h = glfw.get_framebuffer_size(window)
-        ctx.viewport = (0, 0, max(fb_w, 1), max(fb_h, 1))
-        ctx.clear(0.15, 0.15, 0.18, 1.0)
+            # 3-D scene: 先清整个 framebuffer，再把 viewport 限定在中央 3D 区域
+            fb_w, fb_h = glfw.get_framebuffer_size(window)
+            ctx.viewport = (0, 0, max(fb_w, 1), max(fb_h, 1))
+            ctx.clear(0.15, 0.15, 0.18, 1.0)
 
-        panel_w, toolbar_h, status_h = _ui_layout_metrics()
-        vp_w = WIN_W - panel_w
-        vp_h = WIN_H - toolbar_h - status_h
+            panel_w, toolbar_h, status_h = _ui_layout_metrics()
+            vp_w = WIN_W - panel_w
+            vp_h = WIN_H - toolbar_h - status_h
 
-        if (g_editor.voxels and vp_w > 0 and vp_h > 0
-                and fb_w > 0 and fb_h > 0):
-            # HiDPI：fb 尺寸可能比窗口尺寸大
-            scale_x = fb_w / WIN_W
-            scale_y = fb_h / WIN_H
-            # OpenGL viewport 原点在左下；3D 区域位于状态栏之上、工具栏之下
-            ctx.viewport = (
-                0,
-                int(status_h * scale_y),
-                int(vp_w * scale_x),
-                int(vp_h * scale_y),
-            )
-            # 相机 aspect 与 viewport 一致，避免拉伸
-            g_camera.resize(vp_w, vp_h)
-            mvp = g_camera.get_mvp()
-            g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
-            g_renderer.render(mvp)
+            if (g_editor.voxels and vp_w > 0 and vp_h > 0
+                    and fb_w > 0 and fb_h > 0):
+                # HiDPI：fb 尺寸可能比窗口尺寸大
+                scale_x = fb_w / WIN_W
+                scale_y = fb_h / WIN_H
+                # OpenGL viewport 原点在左下；3D 区域位于状态栏之上、工具栏之下
+                ctx.viewport = (
+                    0,
+                    int(status_h * scale_y),
+                    int(vp_w * scale_x),
+                    int(vp_h * scale_y),
+                )
+                # 相机 aspect 与 viewport 一致，避免拉伸
+                g_camera.resize(vp_w, vp_h)
+                mvp = g_camera.get_mvp()
+                g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
+                g_renderer.render(mvp)
 
-        # 恢复整个 framebuffer，供 imgui 绘制 UI
-        ctx.viewport = (0, 0, max(fb_w, 1), max(fb_h, 1))
+            # 恢复整个 framebuffer，供 imgui 绘制 UI
+            ctx.viewport = (0, 0, max(fb_w, 1), max(fb_h, 1))
 
-        # UI panels (use a full-screen invisible window for draw list overlay)
-        imgui.set_next_window_position(0, 0)
-        imgui.set_next_window_size(WIN_W, WIN_H)
-        imgui.begin("##overlay",
-                    flags=(imgui.WINDOW_NO_TITLE_BAR | imgui.WINDOW_NO_RESIZE |
-                           imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_BACKGROUND |
-                           imgui.WINDOW_NO_SAVED_SETTINGS |
-                           imgui.WINDOW_NO_INPUTS))
-        draw_box_select_overlay(g_ui)
-        imgui.end()
+            # UI panels (use a full-screen invisible window for draw list overlay)
+            imgui.set_next_window_position(0, 0)
+            imgui.set_next_window_size(WIN_W, WIN_H)
+            imgui.begin("##overlay",
+                        flags=(imgui.WINDOW_NO_TITLE_BAR | imgui.WINDOW_NO_RESIZE |
+                               imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_BACKGROUND |
+                               imgui.WINDOW_NO_SAVED_SETTINGS |
+                               imgui.WINDOW_NO_INPUTS))
+            draw_box_select_overlay(g_ui)
+            draw_list = imgui.get_window_draw_list()
+            _, toolbar_h_toast, _ = _ui_layout_metrics()
+            draw_toasts(g_ui, WIN_W, toolbar_h_toast, g_ui.ui_scale, draw_list)
+            imgui.end()
 
-        draw_toolbar(g_ui, g_editor, g_renderer, g_camera, WIN_W)
-        draw_bone_panel(g_ui, g_editor, WIN_W, WIN_H,
-                        g_renderer, g_skeleton_sticks, g_camera)
-        draw_status_bar(g_ui, g_editor, WIN_W, WIN_H)
+            draw_toolbar(g_ui, g_editor, g_renderer, g_camera, WIN_W)
+            draw_bone_panel(g_ui, g_editor, WIN_W, WIN_H,
+                            g_renderer, g_skeleton_sticks, g_camera)
+            draw_status_bar(g_ui, g_editor, WIN_W, WIN_H)
 
-        draw_load_dialog(g_ui, g_editor, g_renderer,
-                         g_skeleton_sticks, WIN_W, WIN_H)
-        draw_save_dialog(g_ui, g_editor, g_skeleton_sticks, WIN_W, WIN_H)
-        draw_preset_dialog(g_ui, g_editor, g_renderer,
-                           g_skeleton_sticks, WIN_W, WIN_H)
-        exit_action = draw_exit_dialog(g_ui, WIN_W, WIN_H)
-        if exit_action == "discard":
-            glfw.set_window_should_close(window, True)
-        elif exit_action == "save":
-            if g_editor.source_path and g_editor.source_path.lower().endswith(".xml"):
-                try:
-                    g_editor.save_xml(g_editor.source_path, g_skeleton_sticks[0])
-                    glfw.set_window_should_close(window, True)
-                except Exception as exc:
-                    g_ui._save_error = str(exc)
+            draw_load_dialog(g_ui, g_editor, g_renderer,
+                             g_skeleton_sticks, WIN_W, WIN_H)
+            draw_save_dialog(g_ui, g_editor, g_skeleton_sticks, WIN_W, WIN_H)
+            draw_preset_dialog(g_ui, g_editor, g_renderer,
+                               g_skeleton_sticks, WIN_W, WIN_H)
+            exit_action = draw_exit_dialog(g_ui, WIN_W, WIN_H)
+            if exit_action == "discard":
+                glfw.set_window_should_close(window, True)
+            elif exit_action == "save":
+                if g_editor.source_path and g_editor.source_path.lower().endswith(".xml"):
+                    try:
+                        g_editor.save_xml(g_editor.source_path, g_skeleton_sticks[0])
+                        glfw.set_window_should_close(window, True)
+                    except Exception as exc:
+                        g_ui._save_error = str(exc)
+                        _prepare_save_dialog()
+                        g_ui.pending_exit_after_save = True
+                else:
                     _prepare_save_dialog()
                     g_ui.pending_exit_after_save = True
+
+            if g_ui.pending_exit_after_save and not g_editor.is_dirty and not g_ui.show_save_dialog:
+                g_ui.pending_exit_after_save = False
+                glfw.set_window_should_close(window, True)
+
+            imgui.render()
+            g_imgui_impl.render(imgui.get_draw_data())
+
+            glfw.swap_buffers(window)
+
+            # 正常帧：如果之前有累积错误，补写一条汇总
+            if _last_loop_err[2] > 0:
+                logger.error("previous error '%s: %s' repeated %d times",
+                             _last_loop_err[0], _last_loop_err[1], _last_loop_err[2])
+            _last_loop_err = (None, None, 0)
+
+        except Exception as _loop_exc:
+            typ, msg = type(_loop_exc).__name__, str(_loop_exc)
+            if _last_loop_err[0] == typ and _last_loop_err[1] == msg:
+                # 与上一帧相同：累计，不重复写 log
+                _last_loop_err = (typ, msg, _last_loop_err[2] + 1)
             else:
-                _prepare_save_dialog()
-                g_ui.pending_exit_after_save = True
-
-        if g_ui.pending_exit_after_save and not g_editor.is_dirty and not g_ui.show_save_dialog:
-            g_ui.pending_exit_after_save = False
-            glfw.set_window_should_close(window, True)
-
-        imgui.render()
-        g_imgui_impl.render(imgui.get_draw_data())
-
-        glfw.swap_buffers(window)
+                # 新错误：先 flush 之前累积的
+                if _last_loop_err[2] > 0:
+                    logger.error("previous error '%s: %s' repeated %d times",
+                                 _last_loop_err[0], _last_loop_err[1], _last_loop_err[2])
+                logger.exception("main loop error")
+                _last_loop_err = (typ, msg, 0)
 
     g_renderer.release()
     g_imgui_impl.shutdown()
@@ -1077,4 +1126,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception:
+        logger.exception("fatal error in main()")
+        raise

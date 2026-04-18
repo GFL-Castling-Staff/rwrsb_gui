@@ -3,12 +3,15 @@ xml_io.py
 VOX 解析、XML 读写、最终合并输出
 坐标变换 trans_bias 可配置（默认127，武器模型可改49）
 """
+import logging
 import struct
 import re
 import numpy as np
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 # ──────────────────────────────────────────────
@@ -124,7 +127,7 @@ def parse_xml(path):
     raw = Path(path).read_text(encoding='utf-8', errors='replace')
     cleaned = re.sub(r'>([^\r\n<>]+)(?=[\r\n])', '>', raw)
     if cleaned != raw:
-        print(f'[xml_io] 已清理 XML 尾部垃圾字符: {path}')
+        logger.info("已清理 XML 尾部垃圾字符: %s", path)
 
     root = ET.fromstring(cleaned)
 
@@ -232,4 +235,4 @@ def write_xml(path, voxels, skeleton, bindings):
     pretty = '\n'.join(lines)
 
     Path(path).write_text(pretty, encoding='utf-8')
-    print(f'[xml_io] 已写出: {path}  ({len(voxels)} 体素, {len(bindings)} 已绑定)')
+    logger.info("已写出: %s  (%d 体素, %d 已绑定)", path, len(voxels), len(bindings))

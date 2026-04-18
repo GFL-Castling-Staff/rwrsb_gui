@@ -2,8 +2,35 @@
 ui_panels.py
 """
 import os
+import time
+import logging
+from dataclasses import dataclass, field
 
 import imgui
+
+logger = logging.getLogger(__name__)
+
+# ── Toast 通知 ────────────────────────────────
+
+# TTL 常量（显示秒数 + 0.5 秒淡出）
+_TOAST_TTL = {
+    "success": 3.0,
+    "info":    3.0,
+    "error":   5.5,
+}
+_TOAST_FADE_DUR = 0.5
+_TOAST_MAX = 6
+
+
+@dataclass
+class Toast:
+    message: str
+    level: str          # "success" | "info" | "error"
+    created_at: float   # time.time()
+    expires_at: float   # 绝对过期时刻
+    count: int = 1
+    fade_start: float = 0.0   # expires_at - _TOAST_FADE_DUR，alpha 开始衰减
+    _is_hovered: bool = False  # 上一帧是否 hover，用于暂停 TTL
 
 
 _TEXT = {
@@ -330,6 +357,50 @@ class UIState:
         self._load_error = ""
         self._save_error = ""
         self._bone_error = ""
+
+        # Toast 通知面板
+        self.toasts: list = []          # list[Toast]
+        self._toast_last_update: float = 0.0
+
+    def push_toast(self, message: str, level: str = "info",
+                   also_log: bool = True, exc_info=None) -> None:
+        """
+        推送一条 toast 到左上角浮层。
+        相同 message + level 的连续 push 会合并（计数+1），合并时不写 log。
+        """
+        # 合并判定：栈顶（列表第一条）相同就合并
+        if (self.toasts
+                and self.toasts[0].message == message
+                and self.toasts[0].level == level):
+            self.toasts[0].count += 1
+            ttl = _TOAST_TTL.get(level, 3.0)
+            now = time.time()
+            self.toasts[0].expires_at = now + ttl + _TOAST_FADE_DUR
+            self.toasts[0].fade_start = now + ttl
+            return  # 合并时不写 log
+
+        # 新 toast
+        now = time.time()
+        ttl = _TOAST_TTL.get(level, 3.0)
+        toast = Toast(
+            message=message,
+            level=level,
+            created_at=now,
+            expires_at=now + ttl + _TOAST_FADE_DUR,
+            fade_start=now + ttl,
+        )
+        self.toasts.insert(0, toast)
+
+        # 硬顶 6 条：移除最老的（列表末尾）
+        while len(self.toasts) > _TOAST_MAX:
+            self.toasts.pop()
+
+        # 写 log
+        if also_log:
+            if level == "error":
+                logger.error(message, exc_info=exc_info)
+            else:
+                logger.info(message, exc_info=exc_info)
 
 
 FIXED_FLAGS = (
@@ -1176,3 +1247,81 @@ def draw_box_select_overlay(ui_state):
         y1,
         imgui.get_color_u32_rgba(0.4, 0.7, 1.0, 0.12),
     )
+
+
+# 各级别背景 RGB（不含 alpha）
+_TOAST_COLORS = {
+    "success": (0.15, 0.55, 0.20),
+    "info":    (0.20, 0.40, 0.65),
+    "error":   (0.65, 0.20, 0.20),
+}
+
+
+def draw_toasts(ui_state, WIN_W, toolbar_h, ui_scale, draw_list):
+    """
+    在 ##overlay 窗口的 draw_list 上渲染 Toast 通知栏。
+    draw_list 使用屏幕绝对坐标。
+    """
+    now = time.time()
+
+    # hover 暂停：把过期时间向后推 dt
+    dt = (now - ui_state._toast_last_update) if ui_state._toast_last_update > 0 else 0.0
+    for toast in ui_state.toasts:
+        if toast._is_hovered and dt > 0:
+            toast.expires_at += dt
+            toast.fade_start  += dt
+    ui_state._toast_last_update = now
+
+    # 移除已过期
+    ui_state.toasts = [t for t in ui_state.toasts if t.expires_at > now]
+
+    if not ui_state.toasts:
+        return
+
+    font_size = imgui.get_font_size()
+    pad       = 8.0 * ui_scale
+    item_w    = 320.0 * ui_scale
+    item_h    = font_size + pad * 2.0
+    item_gap  = 4.0 * ui_scale
+
+    start_x = 8.0 * ui_scale
+    start_y = float(toolbar_h) + 8.0
+
+    for i, toast in enumerate(ui_state.toasts):
+        x = start_x
+        y = start_y + i * (item_h + item_gap)
+
+        # alpha 淡出
+        if now < toast.fade_start:
+            alpha = 1.0
+        else:
+            alpha = max(0.0, (toast.expires_at - now) / _TOAST_FADE_DUR)
+
+        if alpha <= 0.0:
+            continue
+
+        # 背景
+        r, g, b = _TOAST_COLORS.get(toast.level, (0.20, 0.40, 0.65))
+        bg_col   = imgui.get_color_u32_rgba(r, g, b, 0.85 * alpha)
+        text_col = imgui.get_color_u32_rgba(1.0, 1.0, 1.0, alpha)
+
+        draw_list.add_rect_filled(x, y, x + item_w, y + item_h, bg_col, rounding=4.0)
+
+        # 文字（超长截断，count >= 2 加后缀）
+        msg = toast.message
+        if toast.count >= 2:
+            msg = msg + f" \u00d7{toast.count}"
+        max_chars = 48
+        if len(msg) > max_chars:
+            msg = msg[:47] + "\u2026"
+
+        draw_list.add_text(x + pad, y + pad, text_col, msg)
+
+        # hover 检测（overlay 设了 WINDOW_NO_INPUTS，用 is_mouse_hovering_rect 代替 is_item_hovered）
+        try:
+            hovered = imgui.is_mouse_hovering_rect(x, y, x + item_w, y + item_h)
+        except Exception:
+            io = imgui.get_io()
+            mx, my = io.mouse_pos
+            hovered = (x <= mx <= x + item_w and y <= my <= y + item_h)
+        toast._is_hovered = hovered

@@ -4,12 +4,15 @@ Editing state for voxel binding and skeleton structure.
 """
 import copy
 import json
+import logging
 import re
 from pathlib import Path
 
 import numpy as np
 
 from resource_utils import resource_path
+
+logger = logging.getLogger(__name__)
 
 
 BONE_COLORS = [
@@ -297,7 +300,7 @@ class EditorState:
         self.active_stick_idx = 0
         self.active_particle_idx = -1
         self.skeleton_dirty = True
-        print(f"[state] loaded VOX: {path} ({len(self.voxels)} voxels)")
+        logger.info("loaded VOX: %s (%d voxels)", path, len(self.voxels))
 
     def load_xml(self, path, trans_bias=None):
         from xml_io import parse_xml
@@ -321,10 +324,8 @@ class EditorState:
         self.active_stick_idx = 0
         self.active_particle_idx = -1
 
-        print(
-            f"[state] loaded XML: {path} "
-            f"({len(self.voxels)} voxels, {len(self.particles)} particles, {len(self.sticks)} sticks)"
-        )
+        logger.info("loaded XML: %s (%d voxels, %d particles, %d sticks)",
+                    path, len(self.voxels), len(self.particles), len(self.sticks))
         return skeleton
 
     def load_skeleton_preset(self, preset_path=None):
