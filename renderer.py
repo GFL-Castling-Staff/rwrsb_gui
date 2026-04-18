@@ -22,6 +22,10 @@ _GRID_MINOR_COLOR = (0.28, 0.31, 0.38)
 _GRID_MAJOR_COLOR = (0.52, 0.56, 0.66)
 _MIRROR_PLANE_COLOR = (0.25, 0.90, 0.95)
 _MIRROR_NORMAL_COLOR = (0.20, 1.00, 0.55)
+_MIRROR_ORIGIN_COLOR = (1.0, 0.95, 0.35)
+_MIRROR_ARROW_COLOR = (0.35, 1.0, 0.70)
+_MIRROR_HANDLE_SIZE = 14.0
+_MIRROR_ARROW_SIZE = 18.0
 
 
 def _make_cube_vbo():
@@ -76,6 +80,9 @@ class VoxelRenderer:
         self.mirror_vbo = None
         self.mirror_vao = None
         self.n_mirror_vertices = 0
+        self.mirror_point_vbo = None
+        self.mirror_point_vao = None
+        self.n_mirror_points = 0
 
         self.show_skeleton = True
         self.highlight_stick_idx = -1
@@ -83,6 +90,7 @@ class VoxelRenderer:
         self.highlight_selected_particle_indices = []  # list[int]，F1 多选次亮
         self.show_grid = True
         self.show_mirror_plane = False
+        self.show_mirror_handles = False
 
     def upload_voxels(self, positions, colors, selected):
         n = len(positions)
@@ -286,14 +294,23 @@ class VoxelRenderer:
         )
         self.n_grid_vertices = len(verts) // 7
 
-    def upload_mirror_indicator(self, origin, normal, extent):
+    def upload_mirror_indicator(self, origin, normal, extent, show_handles=False, handle_len=None,
+                                show_grid=False, grid_step=1.0):
         if self.mirror_vbo:
             self.mirror_vbo.release()
             self.mirror_vbo = None
         if self.mirror_vao:
             self.mirror_vao.release()
             self.mirror_vao = None
+        if self.mirror_point_vbo:
+            self.mirror_point_vbo.release()
+            self.mirror_point_vbo = None
+        if self.mirror_point_vao:
+            self.mirror_point_vao.release()
+            self.mirror_point_vao = None
         self.n_mirror_vertices = 0
+        self.n_mirror_points = 0
+        self.show_mirror_handles = bool(show_handles)
 
         normal = np.asarray(normal, dtype=np.float32)
         norm = float(np.linalg.norm(normal))
@@ -318,14 +335,32 @@ class VoxelRenderer:
         c1 = origin - tangent * size + bitangent * size
         c2 = origin - tangent * size - bitangent * size
         c3 = origin + tangent * size - bitangent * size
-        normal_len = max(size * 0.35, 2.0)
+        normal_len = float(handle_len) if handle_len is not None else max(size * 0.35, 2.0)
         n0 = origin - normal * normal_len
         n1 = origin + normal * normal_len
         verts = []
+        point_verts = []
 
         def add_line(a, b, color):
             verts.extend([a[0], a[1], a[2], color[0], color[1], color[2], 1.0])
             verts.extend([b[0], b[1], b[2], color[0], color[1], color[2], 1.0])
+
+        if show_grid and grid_step > 0.0:
+            span = max(size, float(grid_step) * 2.0)
+            line_count = int(span / float(grid_step))
+            for i in range(-line_count, line_count + 1):
+                off = i * float(grid_step)
+                color = _GRID_MAJOR_COLOR if (i % 4) == 0 else _GRID_MINOR_COLOR
+                add_line(
+                    origin + tangent * off - bitangent * span,
+                    origin + tangent * off + bitangent * span,
+                    color,
+                )
+                add_line(
+                    origin + bitangent * off - tangent * span,
+                    origin + bitangent * off + tangent * span,
+                    color,
+                )
 
         add_line(c0, c1, _MIRROR_PLANE_COLOR)
         add_line(c1, c2, _MIRROR_PLANE_COLOR)
@@ -333,7 +368,10 @@ class VoxelRenderer:
         add_line(c3, c0, _MIRROR_PLANE_COLOR)
         add_line(origin - tangent * size, origin + tangent * size, _MIRROR_PLANE_COLOR)
         add_line(origin - bitangent * size, origin + bitangent * size, _MIRROR_PLANE_COLOR)
-        add_line(n0, n1, _MIRROR_NORMAL_COLOR)
+        if show_handles:
+            add_line(origin, n1, _MIRROR_NORMAL_COLOR)
+            point_verts.extend([origin[0], origin[1], origin[2], *_MIRROR_ORIGIN_COLOR, 1.0])
+            point_verts.extend([n1[0], n1[1], n1[2], *_MIRROR_ARROW_COLOR, 1.0])
 
         mirror_arr = np.array(verts, dtype=np.float32)
         self.mirror_vbo = self.ctx.buffer(mirror_arr.tobytes())
@@ -342,6 +380,14 @@ class VoxelRenderer:
             [(self.mirror_vbo, "3f 4f", "in_vert", "in_color")],
         )
         self.n_mirror_vertices = len(verts) // 7
+        if point_verts:
+            point_arr = np.array(point_verts, dtype=np.float32)
+            self.mirror_point_vbo = self.ctx.buffer(point_arr.tobytes())
+            self.mirror_point_vao = self.ctx.vertex_array(
+                self.line_prog,
+                [(self.mirror_point_vbo, "3f 4f", "in_vert", "in_color")],
+            )
+            self.n_mirror_points = len(point_verts) // 7
 
     def render(self, mvp):
         mvp_bytes = mvp.astype(np.float32).T.tobytes()
@@ -357,18 +403,6 @@ class VoxelRenderer:
             self.ctx.line_width = 1.0
             self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 0.55)
             self.grid_vao.render(moderngl.LINES, vertices=self.n_grid_vertices)
-            self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 1.0)
-            self.ctx.disable(moderngl.BLEND)
-            self.ctx.enable(moderngl.DEPTH_TEST)
-
-        if self.show_mirror_plane and self.n_mirror_vertices > 0 and self.mirror_vao:
-            self.line_prog["u_mvp"].write(mvp_bytes)
-            self.ctx.enable(moderngl.BLEND)
-            self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
-            self.ctx.disable(moderngl.DEPTH_TEST)
-            self.ctx.line_width = 2.0
-            self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 0.85)
-            self.mirror_vao.render(moderngl.LINES, vertices=self.n_mirror_vertices)
             self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 1.0)
             self.ctx.disable(moderngl.BLEND)
             self.ctx.enable(moderngl.DEPTH_TEST)
@@ -404,6 +438,23 @@ class VoxelRenderer:
                     self.ctx.line_width = _LINE_WIDTH
 
             self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 1.0)
+            self.ctx.disable(moderngl.BLEND)
+            self.ctx.enable(moderngl.DEPTH_TEST)
+
+        if self.show_mirror_plane and self.n_mirror_vertices > 0 and self.mirror_vao:
+            self.line_prog["u_mvp"].write(mvp_bytes)
+            self.ctx.enable(moderngl.BLEND)
+            self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
+            self.ctx.disable(moderngl.DEPTH_TEST)
+            self.ctx.line_width = 2.0 if not self.show_mirror_handles else 2.5
+            self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 0.55 if not self.show_mirror_handles else 0.9)
+            self.mirror_vao.render(moderngl.LINES, vertices=self.n_mirror_vertices)
+            self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 1.0)
+            if self.show_mirror_handles and self.n_mirror_points > 0 and self.mirror_point_vao:
+                self.ctx.point_size = _MIRROR_HANDLE_SIZE
+                self.mirror_point_vao.render(moderngl.POINTS, vertices=1, first=0)
+                self.ctx.point_size = _MIRROR_ARROW_SIZE
+                self.mirror_point_vao.render(moderngl.POINTS, vertices=1, first=1)
             self.ctx.disable(moderngl.BLEND)
             self.ctx.enable(moderngl.DEPTH_TEST)
 
@@ -455,6 +506,8 @@ class VoxelRenderer:
             self.grid_vao,
             self.mirror_vbo,
             self.mirror_vao,
+            self.mirror_point_vbo,
+            self.mirror_point_vao,
             self.prog,
             self.line_prog,
         ]:

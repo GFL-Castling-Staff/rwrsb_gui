@@ -42,6 +42,9 @@ g_drag_plane_normal = None
 g_drag_grab_offset = None
 g_drag_particle_origin = None
 g_drag_origins = {}  # dict[int, np.ndarray]: F5 多选整体平移的所有选中点初始位置
+g_mirror_edit_drag_mode = None
+g_mirror_edit_plane_normal = None
+g_mirror_edit_grab_offset = None
 g_hover_particle_idx = -1
 g_positions_np = None          # (N,3) float32 cache for picking
 g_renderer     = None          # set in main()
@@ -187,6 +190,14 @@ def grid_step_value():
     if g_ui.grid_mode == 1:
         return 1.0
     return float(max(1, int(g_ui.grid_multiple)))
+
+
+def mirror_grid_step_value():
+    if g_ui.mirror_grid_mode == 0:
+        return 0.5
+    if g_ui.mirror_grid_mode == 1:
+        return 1.0
+    return float(max(1, int(g_ui.mirror_grid_multiple)))
 
 
 # ── interaction helpers ───────────────────────
@@ -338,6 +349,108 @@ def _drag_axis_mask(window):
     return None
 
 
+def _mirror_handle_length():
+    if g_camera.is_ortho:
+        return max(float(g_camera.ortho_size) * 0.35, 4.0)
+    return max(float(g_camera.distance) * 0.18, 4.0)
+
+
+def _mirror_plane_basis():
+    normal = np.asarray(g_editor.mirror_plane_normal, dtype=np.float32)
+    norm = float(np.linalg.norm(normal))
+    if norm < 1e-6:
+        normal = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    else:
+        normal = normal / norm
+    ref = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+    if abs(float(np.dot(ref, normal))) > 0.95:
+        ref = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    tangent = np.cross(normal, ref)
+    tangent /= max(float(np.linalg.norm(tangent)), 1e-6)
+    bitangent = np.cross(normal, tangent)
+    bitangent /= max(float(np.linalg.norm(bitangent)), 1e-6)
+    return tangent, bitangent, normal
+
+
+def _mirror_handle_positions():
+    origin = np.asarray(g_editor.mirror_plane_origin, dtype=np.float32)
+    normal = np.asarray(g_editor.mirror_plane_normal, dtype=np.float32)
+    arrow = origin + normal * _mirror_handle_length()
+    return origin, arrow
+
+
+def _pick_mirror_handle(sx, sy):
+    if not (g_editor.mirror_mode and g_editor.mirror_edit_mode):
+        return None
+    positions = np.vstack(_mirror_handle_positions()).astype(np.float32)
+    panel_w, toolbar_h, status_h = _ui_layout_metrics()
+    vp_w = WIN_W - panel_w
+    vp_h = WIN_H - toolbar_h - status_h
+    mvp = g_camera.get_mvp()
+    idx = pick_particle_screen(mvp, positions, sx, sy - toolbar_h, vp_w, vp_h, radius_px=18.0)
+    if idx == 0:
+        return "origin"
+    if idx == 1:
+        return "normal"
+    return None
+
+
+def _begin_mirror_edit_drag(sx, sy, mode):
+    global g_mirror_edit_drag_mode, g_mirror_edit_plane_normal, g_mirror_edit_grab_offset
+    g_mirror_edit_drag_mode = mode
+    if mode == "origin":
+        g_mirror_edit_plane_normal = np.asarray(g_editor.mirror_plane_normal, dtype=np.float32).copy()
+    else:
+        g_mirror_edit_plane_normal = np.asarray(g_camera.get_view_direction(), dtype=np.float32).copy()
+    origin = np.asarray(g_editor.mirror_plane_origin, dtype=np.float32)
+    _, toolbar_h, _ = _ui_layout_metrics()
+    ray_origin, ray_dir = g_camera.get_ray(sx, sy - toolbar_h)
+    if mode == "origin":
+        hit = _ray_plane_intersection(
+            np.asarray(ray_origin, dtype=np.float32),
+            np.asarray(ray_dir, dtype=np.float32),
+            origin,
+            g_mirror_edit_plane_normal,
+        )
+        g_mirror_edit_grab_offset = origin - hit if hit is not None else np.zeros(3, dtype=np.float32)
+    else:
+        g_mirror_edit_grab_offset = None
+
+
+def _update_mirror_edit_drag(sx, sy):
+    if not g_mirror_edit_drag_mode:
+        return
+    origin = np.asarray(g_editor.mirror_plane_origin, dtype=np.float32)
+    _, toolbar_h, _ = _ui_layout_metrics()
+    ray_origin, ray_dir = g_camera.get_ray(sx, sy - toolbar_h)
+    ray_origin = np.asarray(ray_origin, dtype=np.float32)
+    ray_dir = np.asarray(ray_dir, dtype=np.float32)
+    if g_mirror_edit_drag_mode == "origin":
+        hit = _ray_plane_intersection(ray_origin, ray_dir, origin, g_mirror_edit_plane_normal)
+        if hit is None:
+            return
+        new_origin = hit + g_mirror_edit_grab_offset
+        g_editor.set_mirror_plane_origin(new_origin[0], new_origin[1], new_origin[2])
+        return
+
+    plane_point = np.array([origin[0], origin[1], origin[2]], dtype=np.float32)
+    hit = _ray_plane_intersection(ray_origin, ray_dir, plane_point, g_mirror_edit_plane_normal)
+    if hit is None:
+        return
+    vec = np.array([hit[0] - origin[0], hit[1] - origin[1], hit[2] - origin[2]], dtype=np.float32)
+    length = float(np.linalg.norm(vec))
+    if length < 1e-6:
+        return
+    g_editor.set_mirror_plane_normal(vec[0], vec[1], vec[2])
+
+
+def _end_mirror_edit_drag():
+    global g_mirror_edit_drag_mode, g_mirror_edit_plane_normal, g_mirror_edit_grab_offset
+    g_mirror_edit_drag_mode = None
+    g_mirror_edit_plane_normal = None
+    g_mirror_edit_grab_offset = None
+
+
 def _apply_particle_drag_rules(pos, axis_mask):
     out = np.array(pos, dtype=np.float32)
     if axis_mask == "x":
@@ -372,6 +485,21 @@ def _mirrored_particle_position(pos, axis):
         return mirrored
     offset = mirrored - origin
     return mirrored - 2.0 * np.dot(offset, normal) / denom * normal
+
+
+def _snap_to_mirror_grid(pos):
+    if not (g_editor.mirror_mode and g_ui.snap_to_mirror_grid):
+        return np.asarray(pos, dtype=np.float32)
+    tangent, bitangent, normal = _mirror_plane_basis()
+    origin = np.asarray(g_editor.mirror_plane_origin, dtype=np.float32)
+    rel = np.asarray(pos, dtype=np.float32) - origin
+    u = float(np.dot(rel, tangent))
+    v = float(np.dot(rel, bitangent))
+    w = float(np.dot(rel, normal))
+    step = mirror_grid_step_value()
+    u = round(u / step) * step
+    v = round(v / step) * step
+    return origin + tangent * u + bitangent * v + normal * w
 
 
 def _sync_mirror_pair_from_particle(source_idx, push_undo=True):
@@ -417,6 +545,12 @@ def _update_particle_drag(window, sx, sy):
     pos = hit + g_drag_grab_offset
     # 被直接拖动的点先做轴约束和网格吸附
     pos = _apply_particle_drag_rules(pos, _drag_axis_mask(window))
+    if (
+        g_editor.mirror_mode
+        and g_editor.mirror_pair
+        and g_drag_particle_idx in g_editor.mirror_pair
+    ):
+        pos = _snap_to_mirror_grid(pos)
     # 应用到被拖点
     g_editor.set_particle_position(g_drag_particle_idx, pos[0], pos[1], pos[2], push_undo=False)
     if (
@@ -513,6 +647,10 @@ def _update_mirror_indicator():
         g_editor.mirror_plane_origin,
         g_editor.mirror_plane_normal,
         extent,
+        show_handles=g_editor.mirror_edit_mode,
+        handle_len=_mirror_handle_length(),
+        show_grid=g_ui.show_mirror_grid,
+        grid_step=mirror_grid_step_value(),
     )
 
 
@@ -573,6 +711,12 @@ def on_mouse_button(window, button, action, mods):
     if button == glfw.MOUSE_BUTTON_LEFT:
         g_lmb_down = pressed
         if pressed:
+            mirror_handle = _pick_mirror_handle(g_mouse_x, g_mouse_y)
+            if mirror_handle is not None:
+                _begin_mirror_edit_drag(g_mouse_x, g_mouse_y, mirror_handle)
+                return
+            if g_editor.mirror_mode and g_editor.mirror_edit_mode:
+                return
             hit_particle = _pick_particle(g_mouse_x, g_mouse_y)
             shift = bool(mods & glfw.MOD_SHIFT)
             ctrl = bool(mods & glfw.MOD_CONTROL)
@@ -583,16 +727,26 @@ def on_mouse_button(window, button, action, mods):
                     mirror_pair = set(g_editor.mirror_pair or ())
                     if hit_particle in mirror_pair:
                         g_editor.set_active_particle(hit_particle)
+                        source = g_editor.particles[hit_particle]
+                        current = np.array([source["x"], source["y"], source["z"]], dtype=np.float32)
+                        expected = _mirrored_particle_position(current, g_editor.mirror_axis)
+                        pair_a, pair_b = g_editor.mirror_pair
+                        partner_idx = pair_b if hit_particle == pair_a else pair_a
+                        partner = g_editor.particles[partner_idx]
+                        partner_pos = np.array([partner["x"], partner["y"], partner["z"]], dtype=np.float32)
+                        need_undo = g_ui.allow_particle_edit or (not np.allclose(partner_pos, expected, atol=1e-6))
+                        if need_undo:
+                            g_editor._push_undo()
                         mirrored_now = _sync_mirror_pair_from_particle(
                             hit_particle,
-                            push_undo=not g_ui.allow_particle_edit,
+                            push_undo=False,
                         )
                         if g_ui.allow_particle_edit:
                             _begin_particle_drag(
                                 g_mouse_x,
                                 g_mouse_y,
                                 hit_particle,
-                                push_undo=not mirrored_now,
+                                push_undo=False,
                             )
                     return
                 if hit_particle >= 0:
@@ -647,6 +801,8 @@ def on_mouse_button(window, button, action, mods):
                 g_ui.box_x0 = g_ui.box_x1 = g_mouse_x
                 g_ui.box_y0 = g_ui.box_y1 = g_mouse_y
         else:
+            if g_mirror_edit_drag_mode:
+                _end_mirror_edit_drag()
             if g_particle_drag_active:
                 _end_particle_drag()
             if g_brush_active:
@@ -683,6 +839,9 @@ def on_cursor_pos(window, xpos, ypos):
         else:
             g_renderer.highlight_particle_idx = hover_particle if hover_particle >= 0 else g_editor.active_particle_idx
             g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
+    if g_mirror_edit_drag_mode:
+        _update_mirror_edit_drag(xpos, ypos)
+        return
     if g_particle_drag_active:
         _update_particle_drag(window, xpos, ypos)
         return

@@ -139,6 +139,13 @@ _TEXT = {
         "mirror_from_camera": "From Camera",
         "mirror_use_midpoint": "Use Pair Midpoint",
         "mirror_normalize": "Normalize Normal",
+        "mirror_edit_plane": "Edit Mirror Plane",
+        "mirror_finish_edit": "Done Editing Plane",
+        "mirror_show_grid": "Show Mirror Grid",
+        "mirror_snap_grid": "Snap To Mirror Grid",
+        "mirror_grid_unit": "Mirror Grid Unit",
+        "mirror_grid_n_label": "Mirror Grid N",
+        "mirror_current_step": "Mirror step: {step:.3f}",
     },
     "zh": {
         "open_vox": "打开 VOX",
@@ -267,6 +274,13 @@ _TEXT = {
         "mirror_from_camera": "从当前相机设置",
         "mirror_use_midpoint": "使用当前配对中点",
         "mirror_normalize": "归一化法线",
+        "mirror_edit_plane": "编辑镜像平面",
+        "mirror_finish_edit": "完成平面编辑",
+        "mirror_show_grid": "显示镜像网格",
+        "mirror_snap_grid": "吸附到镜像网格",
+        "mirror_grid_unit": "镜像网格单位",
+        "mirror_grid_n_label": "镜像网格 N",
+        "mirror_current_step": "镜像步长: {step:.3f}",
     },
 }
 
@@ -303,6 +317,10 @@ class UIState:
         self.snap_particles_to_grid = False
         self.grid_mode = 0
         self.grid_multiple = 2
+        self.show_mirror_grid = False
+        self.snap_to_mirror_grid = False
+        self.mirror_grid_mode = 0
+        self.mirror_grid_multiple = 2
         self.language = "zh"
         self.ui_scale = 1.0
         self.invert_y_axis = False
@@ -355,6 +373,14 @@ def _grid_step(ui_state):
     if ui_state.grid_mode == 1:
         return 1.0
     return float(max(1, int(ui_state.grid_multiple)))
+
+
+def _mirror_grid_step(ui_state):
+    if ui_state.mirror_grid_mode == 0:
+        return 0.5
+    if ui_state.mirror_grid_mode == 1:
+        return 1.0
+    return float(max(1, int(ui_state.mirror_grid_multiple)))
 
 
 def draw_toolbar(ui_state, editor_state, renderer, camera, WIN_W):
@@ -714,38 +740,6 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
         else:
             imgui.text_disabled(tr(ui_state, "align_hint"))
 
-        imgui.text(tr(ui_state, "mirror_plane_origin"))
-        origin = editor_state.mirror_plane_origin
-        changed_x, ox = imgui.input_float("##mirror_origin_x", float(origin[0]), format="%.3f")
-        imgui.same_line()
-        changed_y, oy = imgui.input_float("##mirror_origin_y", float(origin[1]), format="%.3f")
-        imgui.same_line()
-        changed_z, oz = imgui.input_float("##mirror_origin_z", float(origin[2]), format="%.3f")
-        if changed_x or changed_y or changed_z:
-            editor_state.set_mirror_plane_origin(
-                ox if changed_x else origin[0],
-                oy if changed_y else origin[1],
-                oz if changed_z else origin[2],
-            )
-
-        imgui.text(tr(ui_state, "mirror_plane_normal"))
-        normal = editor_state.mirror_plane_normal
-        changed_nx, nx = imgui.input_float("##mirror_normal_x", float(normal[0]), format="%.3f")
-        imgui.same_line()
-        changed_ny, ny = imgui.input_float("##mirror_normal_y", float(normal[1]), format="%.3f")
-        imgui.same_line()
-        changed_nz, nz = imgui.input_float("##mirror_normal_z", float(normal[2]), format="%.3f")
-        if changed_nx or changed_ny or changed_nz:
-            try:
-                editor_state.set_mirror_plane_normal(
-                    nx if changed_nx else normal[0],
-                    ny if changed_ny else normal[1],
-                    nz if changed_nz else normal[2],
-                )
-                ui_state._bone_error = ""
-            except Exception as exc:
-                ui_state._bone_error = str(exc)
-
         if imgui.button(tr(ui_state, "mirror_normal_x") + "##mirror_preset_x"):
             editor_state.set_mirror_axis("x")
         imgui.same_line()
@@ -757,8 +751,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
 
         if imgui.button(tr(ui_state, "mirror_from_camera") + "##mirror_from_camera", width=-1):
             try:
-                view_dir = camera.get_view_direction()
-                editor_state.set_mirror_plane_normal(view_dir[0], view_dir[1], view_dir[2])
+                editor_state.set_mirror_plane_from_camera(camera.get_view_direction(), camera.target)
                 ui_state._bone_error = ""
             except Exception as exc:
                 ui_state._bone_error = str(exc)
@@ -774,6 +767,59 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
                 ui_state._bone_error = ""
             except Exception as exc:
                 ui_state._bone_error = str(exc)
+
+        _, ui_state.show_mirror_grid = imgui.checkbox(tr(ui_state, "mirror_show_grid"), ui_state.show_mirror_grid)
+        _, ui_state.snap_to_mirror_grid = imgui.checkbox(tr(ui_state, "mirror_snap_grid"), ui_state.snap_to_mirror_grid)
+        _, ui_state.mirror_grid_mode = imgui.combo(
+            tr(ui_state, "mirror_grid_unit"),
+            ui_state.mirror_grid_mode,
+            [tr(ui_state, "grid_half"), tr(ui_state, "grid_one"), tr(ui_state, "grid_n")],
+        )
+        if ui_state.mirror_grid_mode == 2:
+            _, ui_state.mirror_grid_multiple = imgui.input_int(
+                tr(ui_state, "mirror_grid_n_label"),
+                ui_state.mirror_grid_multiple,
+            )
+            ui_state.mirror_grid_multiple = max(1, ui_state.mirror_grid_multiple)
+        imgui.text(tr(ui_state, "mirror_current_step", step=_mirror_grid_step(ui_state)))
+
+        if editor_state.mirror_mode:
+            label = "mirror_finish_edit" if editor_state.mirror_edit_mode else "mirror_edit_plane"
+            if imgui.button(tr(ui_state, label) + "##mirror_edit_toggle", width=-1):
+                editor_state.set_mirror_edit_mode(not editor_state.mirror_edit_mode)
+
+        if editor_state.mirror_edit_mode:
+            imgui.text(tr(ui_state, "mirror_plane_origin"))
+            origin = editor_state.mirror_plane_origin
+            changed_x, ox = imgui.input_float("##mirror_origin_x", float(origin[0]), format="%.3f")
+            imgui.same_line()
+            changed_y, oy = imgui.input_float("##mirror_origin_y", float(origin[1]), format="%.3f")
+            imgui.same_line()
+            changed_z, oz = imgui.input_float("##mirror_origin_z", float(origin[2]), format="%.3f")
+            if changed_x or changed_y or changed_z:
+                editor_state.set_mirror_plane_origin(
+                    ox if changed_x else origin[0],
+                    oy if changed_y else origin[1],
+                    oz if changed_z else origin[2],
+                )
+
+            imgui.text(tr(ui_state, "mirror_plane_normal"))
+            normal = editor_state.mirror_plane_normal
+            changed_nx, nx = imgui.input_float("##mirror_normal_x", float(normal[0]), format="%.3f")
+            imgui.same_line()
+            changed_ny, ny = imgui.input_float("##mirror_normal_y", float(normal[1]), format="%.3f")
+            imgui.same_line()
+            changed_nz, nz = imgui.input_float("##mirror_normal_z", float(normal[2]), format="%.3f")
+            if changed_nx or changed_ny or changed_nz:
+                try:
+                    editor_state.set_mirror_plane_normal(
+                        nx if changed_nx else normal[0],
+                        ny if changed_ny else normal[1],
+                        nz if changed_nz else normal[2],
+                    )
+                    ui_state._bone_error = ""
+                except Exception as exc:
+                    ui_state._bone_error = str(exc)
 
         if editor_state.mirror_mode:
             imgui.text_colored(

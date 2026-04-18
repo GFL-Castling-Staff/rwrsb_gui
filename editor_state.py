@@ -79,6 +79,7 @@ class EditorState:
         self.active_particle_idx = -1
         self.tool_mode = "brush"
         self.mirror_mode = False
+        self.mirror_edit_mode = False
         self.mirror_axis = "x"
         self.mirror_pair = None
         self.mirror_plane_origin = np.zeros(3, dtype=np.float32)
@@ -159,7 +160,11 @@ class EditorState:
 
     def exit_mirror_mode(self):
         self.mirror_mode = False
+        self.mirror_edit_mode = False
         self.mirror_pair = None
+
+    def set_mirror_edit_mode(self, enabled):
+        self.mirror_edit_mode = bool(enabled) and self.mirror_mode
 
     def set_mirror_axis(self, axis):
         axis = str(axis).lower()
@@ -231,6 +236,20 @@ class EditorState:
             self.active_particle_idx = pair[0]
         self.mirror_pair = pair
         self.mirror_mode = True
+        self.mirror_edit_mode = False
+
+    def set_mirror_plane_from_camera(self, view_dir, target=None):
+        view_dir = np.asarray(view_dir, dtype=np.float32)
+        horizontal = np.array([view_dir[0], 0.0, view_dir[2]], dtype=np.float32)
+        length = float(np.linalg.norm(horizontal))
+        if length < 1e-6:
+            raise ValueError("Camera view is too close to top/bottom for vertical mirror plane")
+        horizontal /= length
+        plane_normal = np.cross(np.array([0.0, 1.0, 0.0], dtype=np.float32), horizontal)
+        self.set_mirror_plane_normal(plane_normal[0], plane_normal[1], plane_normal[2])
+        if target is not None:
+            target = np.asarray(target, dtype=np.float32)
+            self.set_mirror_plane_origin(target[0], target[1], target[2])
 
     def align_selected_particles(self, axis):
         axis = str(axis).lower()
