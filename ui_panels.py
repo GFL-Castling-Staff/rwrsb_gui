@@ -146,6 +146,11 @@ _TEXT = {
         "preset_none": "(no presets)",
         "tooltip_bound_voxels": "bound voxels: {count}",
         "tooltip_unbind_stick": "Unbind all voxels from this stick",
+        "show_all_sticks": "Show all",
+        "hide_all_sticks": "Hide all",
+        "browse": "Browse...",
+        "or_paste_path": "or paste a path below:",
+        "file_dialog_unavailable": "System file dialog unavailable, enter path manually:",
         "selected_particles_count": "Selected particles: {count}",
         "multi_edit": "Multi-select",
         "align_x": "Align X",
@@ -281,6 +286,11 @@ _TEXT = {
         "preset_none": "(没有预设)",
         "tooltip_bound_voxels": "已绑定体素: {count}",
         "tooltip_unbind_stick": "解绑该骨段上的所有体素",
+        "show_all_sticks": "全部显示",
+        "hide_all_sticks": "全部隐藏",
+        "browse": "浏览...",
+        "or_paste_path": "或直接输入/粘贴路径:",
+        "file_dialog_unavailable": "系统对话框不可用，请手动输入路径:",
         "selected_particles_count": "已选粒子: {count}",
         "multi_edit": "多选操作",
         "align_x": "对齐 X",
@@ -454,6 +464,18 @@ def _mirror_grid_step(ui_state):
     return float(max(1, int(ui_state.mirror_grid_multiple)))
 
 
+def _disabled_button(label):
+    """灰显且不可点的按钮（兼容不同 pyimgui 版本）。"""
+    if hasattr(imgui, "begin_disabled"):
+        imgui.begin_disabled()
+        imgui.button(label)
+        imgui.end_disabled()
+    else:
+        imgui.push_style_var(imgui.STYLE_ALPHA, 0.5)
+        imgui.button(label)
+        imgui.pop_style_var()
+
+
 def draw_toolbar(ui_state, editor_state, renderer, camera, WIN_W):
     imgui.set_next_window_position(0, 0)
     imgui.set_next_window_size(WIN_W, 38 * ui_state.ui_scale)
@@ -564,6 +586,18 @@ def _draw_stick_list(ui_state, editor_state):
     sticks = editor_state.sticks
     particles_by_id = {p["id"]: p for p in editor_state.particles}
     to_unbind = -1
+
+    # ── F8: 可视一键切换 ──
+    vis_state = editor_state.all_sticks_visibility_state()
+    if vis_state == "empty":
+        _disabled_button(tr(ui_state, "show_all_sticks"))
+    elif vis_state == "all":
+        if imgui.button(tr(ui_state, "hide_all_sticks") + "##hide_all"):
+            editor_state.set_all_sticks_visible(False)
+    else:  # "none" 或 "mixed"
+        if imgui.button(tr(ui_state, "show_all_sticks") + "##show_all"):
+            editor_state.set_all_sticks_visible(True)
+    imgui.separator()
 
     for idx, stick in enumerate(sticks):
         imgui.push_id(f"stick-{idx}")

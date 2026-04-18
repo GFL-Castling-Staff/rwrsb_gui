@@ -55,7 +55,7 @@ class StickEntry:
             self.name,
             tuple(self.color),
         )
-        cloned.visible = self.visible
+        # visible 是 UI 状态，不进克隆（undo 里靠 _snapshot visible_by_pair 机制保留）
         return cloned
 
 
@@ -108,6 +108,10 @@ class EditorState:
             "bindings": copy.deepcopy(self.bindings),
             "active_stick_idx": self.active_stick_idx,
             "active_particle_idx": self.active_particle_idx,
+            # 独立保留可视状态，按 particle pair 做 key（constraint_index 在 snapshot 间不稳定）
+            "visible_by_pair": {
+                (s.particle_a_id, s.particle_b_id): s.visible for s in self.sticks
+            },
         }
 
     def _restore_snapshot(self, snapshot):
@@ -117,6 +121,17 @@ class EditorState:
         self.active_stick_idx = int(snapshot["active_stick_idx"])
         self.active_particle_idx = int(snapshot.get("active_particle_idx", -1))
         self._normalize_stick_indices()
+
+        # 恢复可视状态（按 particle pair 匹配，不按 constraint_index）
+        vis_map = snapshot.get("visible_by_pair", {})
+        for s in self.sticks:
+            key = (s.particle_a_id, s.particle_b_id)
+            if key in vis_map:
+                s.visible = vis_map[key]
+            elif (s.particle_b_id, s.particle_a_id) in vis_map:
+                s.visible = vis_map[(s.particle_b_id, s.particle_a_id)]
+            # 没匹配到（如新增的 stick）默认保持 True
+
         self._dirty = True
         self.gpu_dirty = True
         self.skeleton_dirty = True
@@ -591,6 +606,23 @@ class EditorState:
         for stick in self.sticks:
             stick.name = _make_stick_name(particles_by_id, stick.particle_a_id, stick.particle_b_id)
         self._mark_skeleton_changed()
+
+    def set_all_sticks_visible(self, visible: bool):
+        """批量设置所有 stick 的 visible。触发 GPU 重传，不入 undo 栈。"""
+        for s in self.sticks:
+            s.visible = bool(visible)
+        self.gpu_dirty = True
+
+    def all_sticks_visibility_state(self):
+        """返回 'all' | 'none' | 'mixed' | 'empty'，用于 UI 三态按钮。"""
+        if not self.sticks:
+            return "empty"
+        vis_count = sum(1 for s in self.sticks if s.visible)
+        if vis_count == 0:
+            return "none"
+        if vis_count == len(self.sticks):
+            return "all"
+        return "mixed"
 
     def unbind_stick_voxels(self, stick_idx):
         if stick_idx < 0 or stick_idx >= len(self.sticks):
