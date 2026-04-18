@@ -1059,16 +1059,71 @@ def draw_status_bar(ui_state, editor_state, WIN_W, WIN_H):
     imgui.end()
 
 
+def _handle_browse_load(ui_state, editor_state, renderer, skeleton_sticks_ref):
+    """调 Windows 原生打开对话框，选中后立即执行加载流程。"""
+    from file_dialogs import open_file_dialog
+    from pathlib import Path
+
+    if ui_state.load_mode == "vox":
+        filters = [("MagicaVoxel files", "*.vox"), ("All files", "*.*")]
+    else:
+        filters = [("XML files", "*.xml"), ("All files", "*.*")]
+
+    t0 = time.time()
+    try:
+        path = open_file_dialog(tr(ui_state, "open_file"), filters,
+                                initial_path=ui_state.load_path_buf)
+    except Exception as exc:
+        ui_state._load_error = str(exc)
+        ui_state.push_toast(f"打开对话框失败: {exc}", "error", exc_info=True)
+        return
+    finally:
+        # 补救：对话框阻塞期间不扣 toast 寿命
+        dt = time.time() - t0
+        for t in ui_state.toasts:
+            t.expires_at += dt
+            t.fade_start += dt
+
+    if path is None:
+        return  # 用户取消，不提示
+
+    try:
+        if ui_state.load_mode == "vox":
+            editor_state.load_vox(path, ui_state.trans_bias)
+        else:
+            sk = editor_state.load_xml(path, ui_state.trans_bias)
+            skeleton_sticks_ref[0] = sk.get("sticks", [])
+            renderer.upload_skeleton_lines(editor_state.particles, editor_state.sticks)
+        editor_state.gpu_dirty = True
+        ui_state._load_error = ""
+        ui_state.show_load_dialog = False
+        imgui.close_current_popup()
+        ui_state.push_toast(f"已加载: {Path(path).name}", "success")
+    except Exception as exc:
+        ui_state._load_error = str(exc)
+        ui_state.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+
+
 def draw_load_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WIN_W, WIN_H):
     if not ui_state.show_load_dialog:
         return
+    from file_dialogs import _is_supported as _file_dialog_supported
     title = tr(ui_state, "open_file")
     imgui.open_popup(title)
-    imgui.set_next_window_position(WIN_W // 2 - 270, WIN_H // 2 - 60)
-    imgui.set_next_window_size(540 * ui_state.ui_scale, 120 * ui_state.ui_scale)
+    imgui.set_next_window_position(WIN_W // 2 - 270, WIN_H // 2 - 80)
+    imgui.set_next_window_size(540 * ui_state.ui_scale, 160 * ui_state.ui_scale)
     opened, _ = imgui.begin_popup_modal(title, flags=imgui.WINDOW_NO_RESIZE)
     if opened:
         fmt = "VOX" if ui_state.load_mode == "vox" else "XML"
+
+        # ── F9: 浏览按钮 ──
+        if _file_dialog_supported():
+            if imgui.button(tr(ui_state, "browse") + "##browse_load", width=-1):
+                _handle_browse_load(ui_state, editor_state, renderer, skeleton_sticks_ref)
+            imgui.text_disabled(tr(ui_state, "or_paste_path"))
+        else:
+            imgui.text_colored(tr(ui_state, "file_dialog_unavailable"), 1.0, 0.8, 0.3, 1.0)
+
         imgui.text(tr(ui_state, "enter_file_path", fmt=fmt))
         imgui.set_next_item_width(-1)
         _, ui_state.load_path_buf = imgui.input_text("##lp", ui_state.load_path_buf, 1024)
@@ -1105,15 +1160,60 @@ def draw_load_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WIN_
         ui_state.show_load_dialog = False
 
 
+def _handle_browse_save(ui_state, editor_state, skeleton_sticks_ref):
+    """调 Windows 原生保存对话框，选中后立即执行保存流程。"""
+    from file_dialogs import save_file_dialog
+    from pathlib import Path
+
+    initial = ui_state.save_path_buf or (editor_state.source_path or "")
+    filters = [("XML files", "*.xml"), ("All files", "*.*")]
+
+    t0 = time.time()
+    try:
+        path = save_file_dialog(tr(ui_state, "save_xml_title"), filters,
+                                initial_path=initial, default_ext="xml")
+    except Exception as exc:
+        ui_state._save_error = str(exc)
+        ui_state.push_toast(f"打开保存对话框失败: {exc}", "error", exc_info=True)
+        return
+    finally:
+        dt = time.time() - t0
+        for t in ui_state.toasts:
+            t.expires_at += dt
+            t.fade_start += dt
+
+    if path is None:
+        return
+
+    try:
+        editor_state.save_xml(path, skeleton_sticks_ref[0])
+        ui_state._save_error = ""
+        ui_state.show_save_dialog = False
+        imgui.close_current_popup()
+        ui_state.push_toast(f"已保存: {Path(path).name}", "success")
+    except Exception as exc:
+        ui_state._save_error = str(exc)
+        ui_state.push_toast(f"保存失败: {exc}", "error", exc_info=True)
+
+
 def draw_save_dialog(ui_state, editor_state, skeleton_sticks_ref, WIN_W, WIN_H):
     if not ui_state.show_save_dialog:
         return
+    from file_dialogs import _is_supported as _file_dialog_supported
     title = tr(ui_state, "save_xml_title")
     imgui.open_popup(title)
-    imgui.set_next_window_position(WIN_W // 2 - 270, WIN_H // 2 - 60)
-    imgui.set_next_window_size(540 * ui_state.ui_scale, 120 * ui_state.ui_scale)
+    imgui.set_next_window_position(WIN_W // 2 - 270, WIN_H // 2 - 80)
+    imgui.set_next_window_size(540 * ui_state.ui_scale, 160 * ui_state.ui_scale)
     opened, _ = imgui.begin_popup_modal(title, flags=imgui.WINDOW_NO_RESIZE)
     if opened:
+        # ── F9: 浏览按钮 ──
+        if _file_dialog_supported():
+            if imgui.button(tr(ui_state, "browse") + "##browse_save", width=-1):
+                _handle_browse_save(ui_state, editor_state, skeleton_sticks_ref)
+            imgui.text_disabled(tr(ui_state, "or_paste_path"))
+        else:
+            imgui.text_colored(tr(ui_state, "file_dialog_unavailable"), 1.0, 0.8, 0.3, 1.0)
+
         imgui.text(tr(ui_state, "output_xml_path"))
         imgui.set_next_item_width(-1)
         _, ui_state.save_path_buf = imgui.input_text("##sp", ui_state.save_path_buf, 1024)
