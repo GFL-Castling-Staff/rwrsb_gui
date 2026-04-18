@@ -12,7 +12,8 @@ _TEXT = {
         "open_xml": "Open XML",
         "save_xml": "Save XML",
         "brush": "Brush [B]",
-        "select": "Select [S]",
+        "voxel_select": "Voxels [V]",
+        "bone_edit": "Bones [E]",
         "skeleton": "Skeleton",
         "undo": "Undo",
         "redo": "Redo",
@@ -86,7 +87,8 @@ _TEXT = {
         "tip_axis": "Shift=X  Ctrl=Y  Alt=Z",
         "status": "  {src}  |  {total} voxels  |  {sticks} sticks  |  bound {bound}  |  {mode}{dirty}",
         "mode_brush": "Brush",
-        "mode_select": "Select",
+        "mode_voxel_select": "Voxels",
+        "mode_bone_edit": "Bones",
         "unsaved": " [unsaved]",
         "open_file": "Open file",
         "enter_file_path": "Enter {fmt} file path (or drag-drop onto window):",
@@ -117,13 +119,15 @@ _TEXT = {
         "preset_none": "(no presets)",
         "tooltip_bound_voxels": "bound voxels: {count}",
         "tooltip_unbind_stick": "Unbind all voxels from this stick",
+        "selected_particles_count": "Selected particles: {count}",
     },
     "zh": {
         "open_vox": "打开 VOX",
         "open_xml": "打开 XML",
         "save_xml": "保存 XML",
         "brush": "涂刷 [B]",
-        "select": "选择 [S]",
+        "voxel_select": "选体素 [V]",
+        "bone_edit": "选骨点 [E]",
         "skeleton": "骨架",
         "undo": "撤销",
         "redo": "重做",
@@ -197,7 +201,8 @@ _TEXT = {
         "tip_axis": "Shift=X  Ctrl=Y  Alt=Z",
         "status": "  {src}  |  {total} 个体素  |  {sticks} 条骨段  |  已绑定 {bound}  |  {mode}{dirty}",
         "mode_brush": "涂刷",
-        "mode_select": "选择",
+        "mode_voxel_select": "选体素",
+        "mode_bone_edit": "选骨点",
         "unsaved": " [未保存]",
         "open_file": "打开文件",
         "enter_file_path": "输入 {fmt} 文件路径（或拖拽到窗口）:",
@@ -223,6 +228,7 @@ _TEXT = {
         "preset_none": "(没有预设)",
         "tooltip_bound_voxels": "已绑定体素: {count}",
         "tooltip_unbind_stick": "解绑该骨段上的所有体素",
+        "selected_particles_count": "已选粒子: {count}",
     },
 }
 
@@ -348,18 +354,28 @@ def draw_toolbar(ui_state, editor_state, renderer, camera, WIN_W):
         _push_green()
     if imgui.button(tr(ui_state, "brush") + "##brush"):
         if ui_state.allow_skeleton_edit:
-            editor_state.tool_mode = "brush"
+            editor_state.set_tool_mode("brush")
     if is_brush:
         imgui.pop_style_color()
 
     imgui.same_line()
-    is_sel = editor_state.tool_mode == "select"
-    if is_sel:
+    is_vsel = editor_state.tool_mode == "voxel_select"
+    if is_vsel:
         _push_blue()
-    if imgui.button(tr(ui_state, "select") + "##select"):
+    if imgui.button(tr(ui_state, "voxel_select") + "##voxel_select"):
         if ui_state.allow_skeleton_edit:
-            editor_state.tool_mode = "select"
-    if is_sel:
+            editor_state.set_tool_mode("voxel_select")
+    if is_vsel:
+        imgui.pop_style_color()
+
+    imgui.same_line()
+    is_bone = editor_state.tool_mode == "bone_edit"
+    if is_bone:
+        _push_blue()  # 可以换个颜色；本轮先复用
+    if imgui.button(tr(ui_state, "bone_edit") + "##bone_edit"):
+        if ui_state.allow_skeleton_edit:
+            editor_state.set_tool_mode("bone_edit")
+    if is_bone:
         imgui.pop_style_color()
 
     imgui.same_line()
@@ -625,6 +641,8 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
     if 0 <= editor_state.active_particle_idx < len(editor_state.particles):
         active_particle = editor_state.particles[editor_state.active_particle_idx]
         imgui.text(tr(ui_state, "active_particle", name=active_particle["name"], pid=active_particle["id"]))
+        if editor_state.tool_mode == "bone_edit" and editor_state.selected_particles:
+            imgui.text(tr(ui_state, "selected_particles_count", count=len(editor_state.selected_particles)))
     else:
         imgui.text(tr(ui_state, "active_particle_none"))
     imgui.separator()
@@ -632,7 +650,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
     _draw_stick_list(ui_state, editor_state)
 
     imgui.separator()
-    if editor_state.tool_mode == "select" and editor_state.selected_voxels:
+    if editor_state.tool_mode == "voxel_select" and editor_state.selected_voxels:
         imgui.text(tr(ui_state, "selected", count=len(editor_state.selected_voxels)))
         if imgui.button(tr(ui_state, "bind_to_active"), width=-1):
             editor_state.bind_selection(editor_state.active_stick_idx)
@@ -647,7 +665,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
 
     if imgui.button(tr(ui_state, "select_unbound"), width=-1):
         if ui_state.allow_skeleton_edit:
-            editor_state.tool_mode = "select"
+            editor_state.set_tool_mode("voxel_select")
             editor_state.select_unbound()
 
     imgui.separator()
@@ -661,7 +679,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
         if not ui_state.allow_skeleton_edit:
             ui_state.allow_stick_edit = False
             ui_state.allow_particle_edit = False
-            editor_state.tool_mode = "select"
+            editor_state.set_tool_mode("voxel_select")
             editor_state.clear_selection()
         else:
             if not ui_state.allow_stick_edit and not ui_state.allow_particle_edit:
@@ -730,7 +748,12 @@ def draw_status_bar(ui_state, editor_state, WIN_W, WIN_H):
     src = editor_state.source_path or "(no file)"
     bound, total = editor_state.stats()
     ns = len(editor_state.sticks)
-    mode = tr(ui_state, "mode_brush") if editor_state.tool_mode == "brush" else tr(ui_state, "mode_select")
+    if editor_state.tool_mode == "brush":
+        mode = tr(ui_state, "mode_brush")
+    elif editor_state.tool_mode == "voxel_select":
+        mode = tr(ui_state, "mode_voxel_select")
+    else:
+        mode = tr(ui_state, "mode_bone_edit")
     dirty = tr(ui_state, "unsaved") if editor_state.is_dirty else ""
     imgui.text(tr(ui_state, "status", src=src, total=total, sticks=ns, bound=bound, mode=mode, dirty=dirty))
     imgui.end()

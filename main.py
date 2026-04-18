@@ -14,7 +14,8 @@ from imgui.integrations.glfw import GlfwRenderer
 
 from camera       import OrbitCamera
 from editor_state import EditorState
-from renderer     import VoxelRenderer, pick_voxel, box_select_voxels, pick_particle_screen
+from renderer     import (VoxelRenderer, pick_voxel, box_select_voxels,
+                          pick_particle_screen, box_select_particles)
 from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_status_bar, draw_load_dialog, draw_save_dialog,
                           draw_preset_dialog,
@@ -40,6 +41,7 @@ g_drag_particle_idx = -1
 g_drag_plane_normal = None
 g_drag_grab_offset = None
 g_drag_particle_origin = None
+g_drag_origins = {}  # dict[int, np.ndarray]: F5 多选整体平移的所有选中点初始位置
 g_hover_particle_idx = -1
 g_positions_np = None          # (N,3) float32 cache for picking
 g_renderer     = None          # set in main()
@@ -205,22 +207,52 @@ def _do_brush_paint(sx, sy):
 
 
 def _finish_box_select():
-    if g_positions_np is None or len(g_positions_np) == 0:
-        return
-    mvp  = g_camera.get_mvp()
     panel_w, toolbar_h, status_h = _ui_layout_metrics()
     vp_w = WIN_W - panel_w
     vp_h = WIN_H - toolbar_h - status_h
-    indices = box_select_voxels(
-        mvp, g_positions_np,
-        g_ui.box_x0, g_ui.box_y0 - toolbar_h,
-        g_ui.box_x1, g_ui.box_y1 - toolbar_h,
-        vp_w, vp_h)
+    mvp = g_camera.get_mvp()
     io = imgui.get_io()
-    if not io.key_shift:
-        g_editor.selected_voxels.clear()
-    g_editor.selected_voxels.update(indices)
-    g_editor.gpu_dirty = True
+    shift = io.key_shift
+    ctrl = io.key_ctrl
+
+    if g_editor.tool_mode == 'bone_edit':
+        # F3: 粒子框选
+        positions = particle_positions_np()
+        if len(positions) == 0:
+            return
+        indices = box_select_particles(
+            mvp, positions,
+            g_ui.box_x0, g_ui.box_y0 - toolbar_h,
+            g_ui.box_x1, g_ui.box_y1 - toolbar_h,
+            vp_w, vp_h)
+        if ctrl:
+            # Ctrl: toggle
+            for i in indices:
+                if i in g_editor.selected_particles:
+                    g_editor.selected_particles.discard(i)
+                else:
+                    g_editor.selected_particles.add(i)
+        elif shift:
+            g_editor.selected_particles.update(indices)
+        else:
+            g_editor.replace_selected_particles(indices)
+        # active 更新为框选结果中的任一
+        if g_editor.selected_particles:
+            if g_editor.active_particle_idx not in g_editor.selected_particles:
+                g_editor.set_active_particle(next(iter(g_editor.selected_particles)))
+    elif g_editor.tool_mode == 'voxel_select':
+        # 原 select 行为
+        if g_positions_np is None or len(g_positions_np) == 0:
+            return
+        indices = box_select_voxels(
+            mvp, g_positions_np,
+            g_ui.box_x0, g_ui.box_y0 - toolbar_h,
+            g_ui.box_x1, g_ui.box_y1 - toolbar_h,
+            vp_w, vp_h)
+        if not shift:
+            g_editor.selected_voxels.clear()
+        g_editor.selected_voxels.update(indices)
+        g_editor.gpu_dirty = True
 
 
 def _ray_plane_intersection(origin, direction, plane_point, plane_normal):
@@ -243,7 +275,7 @@ def _pick_particle(sx, sy):
 
 
 def _begin_particle_drag(sx, sy, particle_idx):
-    global g_particle_drag_active, g_drag_particle_idx, g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin
+    global g_particle_drag_active, g_drag_particle_idx, g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin, g_drag_origins
     particle = g_editor.particles[particle_idx]
     plane_point = np.array([particle['x'], particle['y'], particle['z']], dtype=np.float32)
     cam_pos = np.asarray(g_camera.get_position(), dtype=np.float32)
@@ -272,7 +304,14 @@ def _begin_particle_drag(sx, sy, particle_idx):
     g_drag_plane_normal = plane_normal
     g_drag_grab_offset = plane_point - hit
     g_drag_particle_origin = plane_point.copy()
-
+    # F5: 记录所有需要整体平移的粒子的起点
+    global g_drag_origins
+    drag_set = set(g_editor.selected_particles) if particle_idx in g_editor.selected_particles else {particle_idx}
+    g_drag_origins = {
+        i: np.array([g_editor.particles[i]['x'], g_editor.particles[i]['y'], g_editor.particles[i]['z']],
+                    dtype=np.float32)
+        for i in drag_set
+    }
 
 def _drag_axis_mask(window):
     shift = (
@@ -337,8 +376,20 @@ def _update_particle_drag(window, sx, sy):
     if hit is None:
         return
     pos = hit + g_drag_grab_offset
+    # 被直接拖动的点先做轴约束和网格吸附
     pos = _apply_particle_drag_rules(pos, _drag_axis_mask(window))
+    # 应用到被拖点
     g_editor.set_particle_position(g_drag_particle_idx, pos[0], pos[1], pos[2], push_undo=False)
+    # F5: 其他选中点按相同 delta 跟随（不做各自吸附，以保持组内相对位置）
+    if len(g_drag_origins) > 1:
+        anchor_origin = g_drag_origins.get(g_drag_particle_idx)
+        if anchor_origin is not None:
+            delta = pos - anchor_origin
+            for idx, origin_pos in g_drag_origins.items():
+                if idx == g_drag_particle_idx:
+                    continue
+                new_p = origin_pos + delta
+                g_editor.set_particle_position(idx, new_p[0], new_p[1], new_p[2], push_undo=False)
 
 
 def _end_particle_drag():
@@ -348,6 +399,7 @@ def _end_particle_drag():
     g_drag_plane_normal = None
     g_drag_grab_offset = None
     g_drag_particle_origin = None
+    g_drag_origins.clear()
 
 
 def _update_grid():
@@ -445,13 +497,59 @@ def on_mouse_button(window, button, action, mods):
         g_lmb_down = pressed
         if pressed:
             hit_particle = _pick_particle(g_mouse_x, g_mouse_y)
-            if hit_particle >= 0 and g_ui.allow_particle_edit:
-                _begin_particle_drag(g_mouse_x, g_mouse_y, hit_particle)
-            elif g_ui.allow_skeleton_edit and g_editor.tool_mode == 'brush' and g_editor.sticks:
+            shift = bool(mods & glfw.MOD_SHIFT)
+            ctrl = bool(mods & glfw.MOD_CONTROL)
+
+            # ── bone_edit 模式：点击粒子 → 选择 or 拖动 ──
+            if g_editor.tool_mode == 'bone_edit' and g_ui.allow_skeleton_edit:
+                if hit_particle >= 0:
+                    if shift:
+                        # Shift+点击：追加到选中，设为 active
+                        g_editor.add_selected_particle(hit_particle)
+                        g_editor.set_active_particle(hit_particle)
+                    elif ctrl:
+                        # Ctrl+点击：toggle，如新加入则设 active；如移除且是 active 则回退
+                        was_added = g_editor.toggle_selected_particle(hit_particle)
+                        if was_added:
+                            g_editor.set_active_particle(hit_particle)
+                        elif g_editor.active_particle_idx == hit_particle:
+                            # 从集合里任选一个作为新 active（或 -1）
+                            if g_editor.selected_particles:
+                                g_editor.set_active_particle(next(iter(g_editor.selected_particles)))
+                            else:
+                                g_editor.active_particle_idx = -1
+                    else:
+                        # 普通点击：若点中当前多选成员则保留集合以支持整体拖拽，否则切换为单选
+                        preserve_group = hit_particle in g_editor.selected_particles
+                        if not preserve_group:
+                            g_editor.replace_selected_particles([hit_particle])
+                        if g_ui.allow_particle_edit:
+                            _begin_particle_drag(g_mouse_x, g_mouse_y, hit_particle)
+                        else:
+                            g_editor.set_active_particle(hit_particle)
+                else:
+                    # 未命中粒子
+                    if shift or ctrl:
+                        # 起始框选（Shift/Ctrl 语义延续到 _finish_box_select）
+                        g_ui.box_selecting = True
+                        g_ui.box_x0 = g_ui.box_x1 = g_mouse_x
+                        g_ui.box_y0 = g_ui.box_y1 = g_mouse_y
+                    else:
+                        # 普通点击空白：清空选择，同时起框选（用户可能想框选）
+                        g_editor.clear_selected_particles()
+                        g_editor.active_particle_idx = -1
+                        g_ui.box_selecting = True
+                        g_ui.box_x0 = g_ui.box_x1 = g_mouse_x
+                        g_ui.box_y0 = g_ui.box_y1 = g_mouse_y
+
+            # ── brush 模式：点粒子无反应、未命中则涂刷 ──
+            elif g_editor.tool_mode == 'brush' and g_ui.allow_skeleton_edit and g_editor.sticks:
                 g_editor.begin_brush_stroke()
                 _do_brush_paint(g_mouse_x, g_mouse_y)
                 g_brush_active = True
-            elif g_ui.allow_skeleton_edit and g_editor.tool_mode == 'select':
+
+            # ── voxel_select 模式：体素框选（原 select 行为，点粒子无反应）──
+            elif g_editor.tool_mode == 'voxel_select' and g_ui.allow_skeleton_edit:
                 g_ui.box_selecting = True
                 g_ui.box_x0 = g_ui.box_x1 = g_mouse_x
                 g_ui.box_y0 = g_ui.box_y1 = g_mouse_y
@@ -481,20 +579,23 @@ def on_cursor_pos(window, xpos, ypos):
         g_hover_particle_idx = -1
         if g_renderer is not None:
             g_renderer.highlight_particle_idx = g_editor.active_particle_idx
+            g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
         return
     hover_particle = _pick_particle(xpos, ypos)
     g_hover_particle_idx = hover_particle
     if g_renderer is not None:
         if g_particle_drag_active:
             g_renderer.highlight_particle_idx = g_drag_particle_idx
+            g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
         else:
             g_renderer.highlight_particle_idx = hover_particle if hover_particle >= 0 else g_editor.active_particle_idx
+            g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
     if g_particle_drag_active:
         _update_particle_drag(window, xpos, ypos)
         return
     if g_ui.allow_skeleton_edit and g_lmb_down and g_brush_active and g_editor.tool_mode == 'brush':
         _do_brush_paint(xpos, ypos)
-    if g_ui.allow_skeleton_edit and g_lmb_down and g_ui.box_selecting and g_editor.tool_mode == 'select':
+    if g_ui.allow_skeleton_edit and g_lmb_down and g_ui.box_selecting and g_editor.tool_mode in ('voxel_select', 'bone_edit'):
         g_ui.box_x1 = xpos
         g_ui.box_y1 = ypos
     g_camera.on_mouse_move(xpos, ypos)
@@ -526,14 +627,19 @@ def on_key(window, key, scancode, action, mods):
             g_editor.redo()
         elif key == glfw.KEY_ESCAPE:
             g_editor.clear_selection()
+            if g_editor.tool_mode == 'bone_edit':
+                g_editor.clear_selected_particles()
         elif key == glfw.KEY_F:
             g_camera.reset_to_model(g_editor.voxels)
         elif key == glfw.KEY_B:
             if g_ui.allow_skeleton_edit:
-                g_editor.tool_mode = 'brush'
-        elif key == glfw.KEY_S and not ctrl:
+                g_editor.set_tool_mode('brush')
+        elif key == glfw.KEY_V:
             if g_ui.allow_skeleton_edit:
-                g_editor.tool_mode = 'select'
+                g_editor.set_tool_mode('voxel_select')
+        elif key == glfw.KEY_E:
+            if g_ui.allow_skeleton_edit:
+                g_editor.set_tool_mode('bone_edit')
 
 
 def on_char(window, codepoint):
@@ -655,6 +761,7 @@ def main():
             # 相机 aspect 与 viewport 一致，避免拉伸
             g_camera.resize(vp_w, vp_h)
             mvp = g_camera.get_mvp()
+            g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
             g_renderer.render(mvp)
 
         # 恢复整个 framebuffer，供 imgui 绘制 UI

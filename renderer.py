@@ -16,6 +16,8 @@ _HIGHLIGHT_COLOR = (1.0, 0.95, 0.25)
 _PARTICLE_COLOR = (0.95, 0.35, 0.20)
 _PARTICLE_SIZE = 10.0
 _PARTICLE_SIZE_HIGHLIGHT = 16.0
+_PARTICLE_SIZE_SELECTED = 13.0
+_PARTICLE_SELECTED_COLOR = (1.0, 0.85, 0.35, 1.0)  # 次亮淡黄
 _GRID_MINOR_COLOR = (0.28, 0.31, 0.38)
 _GRID_MAJOR_COLOR = (0.52, 0.56, 0.66)
 
@@ -73,6 +75,7 @@ class VoxelRenderer:
         self.show_skeleton = True
         self.highlight_stick_idx = -1
         self.highlight_particle_idx = -1
+        self.highlight_selected_particle_indices = []  # list[int]，F1 多选次亮
         self.show_grid = True
 
     def upload_voxels(self, positions, colors, selected):
@@ -167,9 +170,9 @@ class VoxelRenderer:
                 particle["x"],
                 particle["y"],
                 particle["z"],
-                _PARTICLE_COLOR[0],
-                _PARTICLE_COLOR[1],
-                _PARTICLE_COLOR[2],
+                1.0,
+                1.0,
+                1.0,
                 1.0,
             ]
 
@@ -335,15 +338,31 @@ class VoxelRenderer:
             self.ctx.enable(moderngl.BLEND)
             self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
             self.ctx.disable(moderngl.DEPTH_TEST)
+
+            # 1) 全量默认色
             self.ctx.point_size = _PARTICLE_SIZE
-            self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 0.95)
+            self.line_prog["u_color_mult"].value = (
+                _PARTICLE_COLOR[0],
+                _PARTICLE_COLOR[1],
+                _PARTICLE_COLOR[2],
+                0.95,
+            )
             self.point_vao.render(moderngl.POINTS, vertices=self.n_points)
+
+            # 2) selected 次亮（比 active 小一点、淡黄）
+            if self.highlight_selected_particle_indices:
+                self.ctx.point_size = _PARTICLE_SIZE_SELECTED
+                self.line_prog["u_color_mult"].value = _PARTICLE_SELECTED_COLOR
+                for idx in self.highlight_selected_particle_indices:
+                    if 0 <= idx < self.n_points:
+                        self.point_vao.render(moderngl.POINTS, vertices=1, first=idx)
+
+            # 3) active 最亮（原有逻辑不动）
             if 0 <= self.highlight_particle_idx < self.n_points:
                 self.ctx.point_size = _PARTICLE_SIZE_HIGHLIGHT
                 self.line_prog["u_color_mult"].value = (1.0, 1.0, 0.25, 1.0)
                 self.point_vao.render(moderngl.POINTS, vertices=1, first=self.highlight_particle_idx)
-            self.ctx.point_size = 1.0
-            self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 1.0)
+                
             self.ctx.disable(moderngl.BLEND)
             self.ctx.enable(moderngl.DEPTH_TEST)
 
@@ -457,3 +476,32 @@ def pick_particle_screen(vp_matrix, positions, screen_x, screen_y, screen_w, scr
     if float(dist2[best]) > float(radius_px * radius_px):
         return -1
     return best
+
+def box_select_particles(vp_matrix, positions, box_x0, box_y0, box_x1, box_y1, screen_w, screen_h):
+    """
+    Particle 版框选。算法和 box_select_voxels 一致：NDC → 屏幕坐标 → 盒内筛选。
+    返回 particle 的 index 列表。
+    """
+    if len(positions) == 0:
+        return []
+
+    n = len(positions)
+    ones = np.ones((n, 1), dtype=np.float32)
+    pos_h = np.hstack([positions, ones])
+    clip = (vp_matrix @ pos_h.T).T
+    w = clip[:, 3:4]
+    w = np.where(np.abs(w) < 1e-6, 1e-6, w)
+    ndc = clip[:, :3] / w
+
+    sx = (ndc[:, 0] + 1.0) * 0.5 * screen_w
+    sy = (1.0 - ndc[:, 1]) * 0.5 * screen_h
+    x0, x1 = min(box_x0, box_x1), max(box_x0, box_x1)
+    y0, y1 = min(box_y0, box_y1), max(box_y0, box_y1)
+
+    in_box = (
+        (sx >= x0) & (sx <= x1)
+        & (sy >= y0) & (sy <= y1)
+        & (w[:, 0] > 0)
+        & (ndc[:, 2] > -1.0) & (ndc[:, 2] < 1.0)
+    )
+    return list(np.where(in_box)[0])

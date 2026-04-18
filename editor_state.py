@@ -74,9 +74,13 @@ class EditorState:
         self.source_path = None
         self.trans_bias = 127
         self.selected_voxels = set()
+        self.selected_particles = set()
         self.active_stick_idx = 0
         self.active_particle_idx = -1
         self.tool_mode = "brush"
+        self.mirror_mode = False
+        self.mirror_axis = "x"
+        self.mirror_pair = None
 
         self._undo_stack = []
         self._redo_stack = []
@@ -151,6 +155,51 @@ class EditorState:
             self.sticks.append(StickEntry(ci, pa_id, pb_id, name))
         self.skeleton_dirty = True
 
+    def exit_mirror_mode(self):
+        self.mirror_mode = False
+        self.mirror_pair = None
+
+    def set_mirror_axis(self, axis):
+        axis = str(axis).lower()
+        if axis in ("x", "y", "z"):
+            self.mirror_axis = axis
+
+    def enter_mirror_mode(self):
+        if len(self.selected_particles) != 2:
+            raise ValueError("Mirror mode requires exactly 2 selected particles")
+        pair = tuple(sorted(self.selected_particles))
+        self.selected_particles = set(pair)
+        if self.active_particle_idx not in self.selected_particles:
+            self.active_particle_idx = pair[0]
+        self.mirror_pair = pair
+        self.mirror_mode = True
+
+    def align_selected_particles(self, axis):
+        axis = str(axis).lower()
+        if axis not in ("x", "y", "z"):
+            raise ValueError(f"Unsupported axis: {axis}")
+        if len(self.selected_particles) < 2:
+            raise ValueError("Need at least 2 selected particles")
+        if self.active_particle_idx not in self.selected_particles:
+            raise ValueError("Active particle must be part of the selection")
+
+        anchor = float(self.particles[self.active_particle_idx][axis])
+        self._push_undo()
+        for idx in sorted(self.selected_particles):
+            self.particles[idx][axis] = anchor
+        self._mark_skeleton_changed()
+        
+    def set_tool_mode(self, mode):
+        """切换工具模式。离开 bone_edit 时清空 selected_particles。"""
+        valid = ("brush", "voxel_select", "bone_edit")
+        if mode not in valid:
+            return
+        if self.tool_mode == "bone_edit" and mode != "bone_edit":
+            self.selected_particles.clear()
+            self.active_particle_idx = -1
+            self.exit_mirror_mode()
+        self.tool_mode = mode
+
     def load_vox(self, path, trans_bias=None):
         from xml_io import parse_vox
 
@@ -159,6 +208,8 @@ class EditorState:
         self.voxels = parse_vox(path, self.trans_bias)
         self.bindings = {}
         self.selected_voxels = set()
+        self.selected_particles = set()
+        self.exit_mirror_mode()
         self.source_path = str(path)
         self._undo_stack.clear()
         self._redo_stack.clear()
@@ -180,6 +231,8 @@ class EditorState:
         self.voxels = voxels
         self.bindings = bindings
         self.selected_voxels = set()
+        self.selected_particles = set()
+        self.exit_mirror_mode()
         self.source_path = str(path)
         self._undo_stack.clear()
         self._redo_stack.clear()
@@ -205,6 +258,7 @@ class EditorState:
         self._rebuild_sticks_from_raw(data.get("sticks", []))
         self.active_stick_idx = 0
         self.active_particle_idx = -1
+        self.exit_mirror_mode()
         self.gpu_dirty = True
         self.skeleton_dirty = True
         return data
@@ -279,6 +333,28 @@ class EditorState:
             self.active_particle_idx = int(particle_index)
         else:
             self.active_particle_idx = -1
+            
+    def clear_selected_particles(self):
+        self.selected_particles.clear()
+
+    def toggle_selected_particle(self, idx):
+        """Ctrl+点击语义：如果已选则移除，否则加入。返回最终是否在集合里。"""
+        if idx < 0 or idx >= len(self.particles):
+            return False
+        if idx in self.selected_particles:
+            self.selected_particles.remove(idx)
+            return False
+        self.selected_particles.add(idx)
+        return True
+
+    def add_selected_particle(self, idx):
+        """Shift+点击语义：追加到集合（不 toggle）。"""
+        if 0 <= idx < len(self.particles):
+            self.selected_particles.add(idx)
+
+    def replace_selected_particles(self, indices):
+        """普通点击/普通框选语义：替换整个集合。"""
+        self.selected_particles = {i for i in indices if 0 <= i < len(self.particles)}        
 
     def set_particle_position(self, particle_index, x, y, z, push_undo=False):
         if particle_index < 0 or particle_index >= len(self.particles):
@@ -359,6 +435,19 @@ class EditorState:
         self.bindings = {vi: remap[ci] for vi, ci in self.bindings.items() if ci in remap}
         self.rename_sticks_from_particles(push_undo=False)
         self._normalize_stick_indices()
+        # 清理 selected_particles，移除被删的 index，并对剩余 index 做重映射
+        new_selected = set()
+        for old_idx in self.selected_particles:
+            if old_idx == particle_index:
+                continue
+            new_selected.add(old_idx - 1 if old_idx > particle_index else old_idx)
+        self.selected_particles = new_selected
+        if self.active_particle_idx == particle_index:
+            self.active_particle_idx = -1
+        elif self.active_particle_idx > particle_index:
+            self.active_particle_idx -= 1
+        if self.mirror_pair and particle_index in self.mirror_pair:
+            self.exit_mirror_mode()
         self._mark_skeleton_changed()
 
     def add_stick(self, particle_a_id, particle_b_id, name=None):
