@@ -5,6 +5,7 @@ import os
 import time
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import imgui
 
@@ -672,6 +673,7 @@ def _draw_particle_editor(ui_state, editor_state):
             ui_state._bone_error = ""
         except Exception as exc:
             ui_state._bone_error = str(exc)
+            ui_state.push_toast(f"添加粒子失败: {exc}", "error", exc_info=True)
 
     for idx, particle in enumerate(editor_state.particles):
         imgui.push_id(f"particle-{idx}")
@@ -700,6 +702,7 @@ def _draw_particle_editor(ui_state, editor_state):
                     ui_state._bone_error = ""
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
+                    ui_state.push_toast(f"更新粒子失败: {exc}", "error", exc_info=True)
 
             _push_red()
             if imgui.button(tr(ui_state, "delete_particle"), width=-1):
@@ -749,6 +752,7 @@ def _draw_active_stick_editor(ui_state, editor_state):
             ui_state._bone_error = ""
         except Exception as exc:
             ui_state._bone_error = str(exc)
+            ui_state.push_toast(f"更新骨段失败: {exc}", "error", exc_info=True)
 
     if imgui.button(tr(ui_state, "auto_rename"), width=-1):
         editor_state.rename_sticks_from_particles()
@@ -786,6 +790,7 @@ def _draw_add_stick(ui_state, editor_state):
             ui_state._bone_error = ""
         except Exception as exc:
             ui_state._bone_error = str(exc)
+            ui_state.push_toast(f"添加骨段失败: {exc}", "error", exc_info=True)
 
 
 def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sticks_ref, camera):
@@ -828,6 +833,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
                     ui_state._bone_error = ""
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
+                    ui_state.push_toast(f"对齐失败: {exc}", "error", exc_info=True)
             imgui.same_line()
             if imgui.button(tr(ui_state, "align_y") + "##align_y"):
                 try:
@@ -835,6 +841,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
                     ui_state._bone_error = ""
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
+                    ui_state.push_toast(f"对齐失败: {exc}", "error", exc_info=True)
             imgui.same_line()
             if imgui.button(tr(ui_state, "align_z") + "##align_z"):
                 try:
@@ -842,6 +849,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
                     ui_state._bone_error = ""
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
+                    ui_state.push_toast(f"对齐失败: {exc}", "error", exc_info=True)
         else:
             imgui.text_disabled(tr(ui_state, "align_hint"))
 
@@ -860,18 +868,21 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
                 ui_state._bone_error = ""
             except Exception as exc:
                 ui_state._bone_error = str(exc)
+                ui_state.push_toast(f"设置镜像平面失败: {exc}", "error", exc_info=True)
         if imgui.button(tr(ui_state, "mirror_use_midpoint") + "##mirror_midpoint", width=-1):
             try:
                 editor_state.set_mirror_origin_from_pair_midpoint()
                 ui_state._bone_error = ""
             except Exception as exc:
                 ui_state._bone_error = str(exc)
+                ui_state.push_toast(f"设置镜像平面失败: {exc}", "error", exc_info=True)
         if imgui.button(tr(ui_state, "mirror_normalize") + "##mirror_normalize", width=-1):
             try:
                 editor_state.normalize_mirror_plane_normal()
                 ui_state._bone_error = ""
             except Exception as exc:
                 ui_state._bone_error = str(exc)
+                ui_state.push_toast(f"归一化失败: {exc}", "error", exc_info=True)
 
         _, ui_state.show_mirror_grid = imgui.checkbox(tr(ui_state, "mirror_show_grid"), ui_state.show_mirror_grid)
         _, ui_state.snap_to_mirror_grid = imgui.checkbox(tr(ui_state, "mirror_snap_grid"), ui_state.snap_to_mirror_grid)
@@ -925,6 +936,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
                     ui_state._bone_error = ""
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
+                    ui_state.push_toast(f"设置镜像法线失败: {exc}", "error", exc_info=True)
 
         if editor_state.mirror_mode:
             imgui.text_colored(
@@ -934,6 +946,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
             imgui.text_disabled(tr(ui_state, "mirror_locked"))
             if imgui.button(tr(ui_state, "mirror_mode_exit") + "##mirror_exit", width=-1):
                 editor_state.exit_mirror_mode()
+                ui_state.push_toast("已退出镜像模式", "info")
         else:
             can_enter_mirror = len(editor_state.selected_particles) == 2
             if imgui.button(tr(ui_state, "mirror_mode_enter") + "##mirror_enter", width=-1):
@@ -941,8 +954,10 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
                     try:
                         editor_state.enter_mirror_mode()
                         ui_state._bone_error = ""
+                        ui_state.push_toast(f"进入镜像模式: {editor_state.mirror_axis} 轴", "info")
                     except Exception as exc:
                         ui_state._bone_error = str(exc)
+                        ui_state.push_toast(f"进入镜像模式失败: {exc}", "error", exc_info=True)
             if not can_enter_mirror:
                 imgui.text_disabled(tr(ui_state, "mirror_requires_two"))
     imgui.separator()
@@ -1062,7 +1077,6 @@ def draw_status_bar(ui_state, editor_state, WIN_W, WIN_H):
 def _handle_browse_load(ui_state, editor_state, renderer, skeleton_sticks_ref):
     """调 Windows 原生打开对话框，选中后立即执行加载流程。"""
     from file_dialogs import open_file_dialog
-    from pathlib import Path
 
     if ui_state.load_mode == "vox":
         filters = [("MagicaVoxel files", "*.vox"), ("All files", "*.*")]
@@ -1142,9 +1156,12 @@ def draw_load_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WIN_
                     ui_state._load_error = ""
                 except Exception as exc:
                     ui_state._load_error = str(exc)
+                    ui_state.push_toast(f"加载失败: {exc}", "error", exc_info=True)
             else:
                 ui_state._load_error = tr(ui_state, "file_not_found")
+                ui_state.push_toast(tr(ui_state, "file_not_found"), "error")
             if not ui_state._load_error:
+                ui_state.push_toast(f"已加载: {Path(path).name}", "success")
                 ui_state.show_load_dialog = False
                 imgui.close_current_popup()
 
@@ -1163,7 +1180,6 @@ def draw_load_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WIN_
 def _handle_browse_save(ui_state, editor_state, skeleton_sticks_ref):
     """调 Windows 原生保存对话框，选中后立即执行保存流程。"""
     from file_dialogs import save_file_dialog
-    from pathlib import Path
 
     initial = ui_state.save_path_buf or (editor_state.source_path or "")
     filters = [("XML files", "*.xml"), ("All files", "*.*")]
@@ -1226,8 +1242,10 @@ def draw_save_dialog(ui_state, editor_state, skeleton_sticks_ref, WIN_W, WIN_H):
                     ui_state._save_error = ""
                     ui_state.show_save_dialog = False
                     imgui.close_current_popup()
+                    ui_state.push_toast(f"已保存: {Path(path).name}", "success")
                 except Exception as exc:
                     ui_state._save_error = str(exc)
+                    ui_state.push_toast(f"保存失败: {exc}", "error", exc_info=True)
         imgui.same_line()
         if imgui.button(tr(ui_state, "cancel"), width=80 * ui_state.ui_scale):
             ui_state.show_save_dialog = False
@@ -1304,23 +1322,29 @@ def draw_preset_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WI
 
         if imgui.button(tr(ui_state, "load_selected"), width=140 * ui_state.ui_scale):
             if presets:
+                _preset = presets[ui_state.preset_selected]
                 try:
-                    data = editor_state.load_skeleton_preset(presets[ui_state.preset_selected]["path"])
+                    data = editor_state.load_skeleton_preset(_preset["path"])
                     skeleton_sticks_ref[0] = data.get("sticks", [])
                     renderer.upload_skeleton_lines(editor_state.particles, editor_state.sticks)
                     editor_state.gpu_dirty = True
                     ui_state._bone_error = ""
+                    ui_state.push_toast(f"已加载预设: {_preset['name']}", "success")
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
+                    ui_state.push_toast(f"加载预设失败: {exc}", "error", exc_info=True)
         imgui.same_line()
         if imgui.button(tr(ui_state, "delete_selected"), width=140 * ui_state.ui_scale):
             if presets:
+                _preset = presets[ui_state.preset_selected]
                 try:
-                    editor_state.delete_skeleton_preset(presets[ui_state.preset_selected]["path"])
+                    editor_state.delete_skeleton_preset(_preset["path"])
                     ui_state.preset_selected = max(0, ui_state.preset_selected - 1)
                     ui_state._bone_error = ""
+                    ui_state.push_toast(f"已删除预设: {_preset['name']}", "success")
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
+                    ui_state.push_toast(f"删除预设失败: {exc}", "error", exc_info=True)
 
         imgui.separator()
         imgui.text(tr(ui_state, "save_preset_as"))
@@ -1328,24 +1352,30 @@ def draw_preset_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WI
         _, ui_state.preset_name_buf = imgui.input_text("##preset_name", ui_state.preset_name_buf, 128)
 
         if imgui.button(tr(ui_state, "save_new_preset"), width=140 * ui_state.ui_scale):
+            _pname = ui_state.preset_name_buf or "Custom Skeleton"
             try:
-                editor_state.save_skeleton_preset(ui_state.preset_name_buf or "Custom Skeleton", overwrite=False)
+                editor_state.save_skeleton_preset(_pname, overwrite=False)
                 ui_state._bone_error = ""
+                ui_state.push_toast(f"已保存预设: {_pname}", "success")
             except Exception as exc:
                 ui_state._bone_error = str(exc)
+                ui_state.push_toast(f"保存预设失败: {exc}", "error", exc_info=True)
         imgui.same_line()
         if imgui.button(tr(ui_state, "overwrite_selected"), width=140 * ui_state.ui_scale):
             if presets:
                 try:
                     selected = presets[ui_state.preset_selected]
+                    _pname = ui_state.preset_name_buf or selected["name"]
                     editor_state.save_skeleton_preset(
-                        ui_state.preset_name_buf or selected["name"],
+                        _pname,
                         file_name=selected["file"],
                         overwrite=True,
                     )
                     ui_state._bone_error = ""
+                    ui_state.push_toast(f"已保存预设: {_pname}", "success")
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
+                    ui_state.push_toast(f"保存预设失败: {exc}", "error", exc_info=True)
 
         if ui_state._bone_error:
             imgui.separator()
