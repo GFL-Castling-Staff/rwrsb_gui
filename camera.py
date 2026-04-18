@@ -33,6 +33,7 @@ class OrbitCamera:
         self._last_mouse = None
         self._rotating = False
         self._panning = False
+        self.invert_y = False
 
         self._dirty = True
 
@@ -66,10 +67,11 @@ class OrbitCamera:
         dx = xpos - self._last_mouse[0]
         dy = ypos - self._last_mouse[1]
         self._last_mouse = (xpos, ypos)
+        orbit_dy = -dy if self.invert_y else dy
 
         if self._rotating:
             self.azimuth   -= dx * 0.4
-            self.elevation -= dy * 0.4
+            self.elevation -= orbit_dy * 0.4
             self.elevation  = max(-89.0, min(89.0, self.elevation))
             self._dirty = True
 

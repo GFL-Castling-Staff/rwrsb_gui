@@ -5,6 +5,7 @@ Usage: python main.py [optional_file.vox]
 """
 import sys
 import os
+from pathlib import Path
 import numpy as np
 import glfw
 import moderngl
@@ -43,8 +44,105 @@ g_hover_particle_idx = -1
 g_positions_np = None          # (N,3) float32 cache for picking
 g_renderer     = None          # set in main()
 g_imgui_impl   = None          # GlfwRenderer set in main()
+g_style_snapshot = None
 
 g_first_upload_logged = False  # 诊断用：只在第一次 upload 时 log
+
+
+def _ui_layout_metrics():
+    scale = max(0.8, min(1.75, getattr(g_ui, "ui_scale", 1.0)))
+    panel_w = int(round(PANEL_W * scale))
+    toolbar_h = int(round(TOOLBAR_H * scale))
+    status_h = int(round(STATUS_H * scale))
+    return panel_w, toolbar_h, status_h
+
+
+def _configure_imgui_fonts():
+    io = imgui.get_io()
+    candidates = [
+        Path("C:/Windows/Fonts/msyh.ttc"),
+        Path("C:/Windows/Fonts/msyh.ttf"),
+        Path("C:/Windows/Fonts/simhei.ttf"),
+        Path("C:/Windows/Fonts/simsun.ttc"),
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            try:
+                io.fonts.add_font_from_file_ttf(
+                    str(candidate),
+                    16,
+                    glyph_ranges=io.fonts.get_glyph_ranges_chinese_full(),
+                )
+                return str(candidate)
+            except Exception:
+                continue
+    io.fonts.add_font_default()
+    return None
+
+
+def _apply_ui_scale():
+    global g_style_snapshot
+    scale = max(0.8, min(1.75, g_ui.ui_scale))
+    if g_ui._applied_scale == scale:
+        return
+    imgui.style_colors_dark()
+    style = imgui.get_style()
+    if g_style_snapshot is None:
+        g_style_snapshot = {}
+        for name in [
+            "window_padding",
+            "window_rounding",
+            "window_border_size",
+            "window_min_size",
+            "window_title_align",
+            "child_rounding",
+            "child_border_size",
+            "popup_rounding",
+            "popup_border_size",
+            "frame_padding",
+            "frame_rounding",
+            "frame_border_size",
+            "item_spacing",
+            "item_inner_spacing",
+            "cell_padding",
+            "touch_extra_padding",
+            "indent_spacing",
+            "columns_min_spacing",
+            "scrollbar_size",
+            "scrollbar_rounding",
+            "grab_min_size",
+            "grab_rounding",
+            "log_slider_deadzone",
+            "tab_rounding",
+            "tab_border_size",
+            "tab_min_width_for_close_button",
+            "button_text_align",
+            "selectable_text_align",
+            "display_window_padding",
+            "display_safe_area_padding",
+            "mouse_cursor_scale",
+        ]:
+            if hasattr(style, name):
+                value = getattr(style, name)
+                g_style_snapshot[name] = tuple(value) if isinstance(value, (tuple, list)) else value
+
+    for name, value in g_style_snapshot.items():
+        if isinstance(value, tuple):
+            setattr(style, name, tuple(float(v) * scale for v in value))
+        else:
+            try:
+                setattr(style, name, float(value) * scale)
+            except Exception:
+                setattr(style, name, value)
+
+    imgui.get_io().font_global_scale = scale
+    g_ui._applied_scale = scale
+
+
+def _window_title():
+    if g_ui.language == "zh":
+        return "rwrsb v2.0 -- RWR 骨架绑定编辑器"
+    return "rwrsb v2.0 -- RWR Skeleton Binder"
 
 
 def rebuild_positions_cache():
@@ -57,9 +155,10 @@ def rebuild_positions_cache():
 
 
 def is_over_viewport(x, y):
-    return (x < WIN_W - PANEL_W and
-            y > TOOLBAR_H and
-            y < WIN_H - STATUS_H)
+    panel_w, toolbar_h, status_h = _ui_layout_metrics()
+    return (x < WIN_W - panel_w and
+            y > toolbar_h and
+            y < WIN_H - status_h)
 
 
 def particle_positions_np():
@@ -88,7 +187,8 @@ def _do_brush_paint(sx, sy):
         return
     # 窗口坐标 → viewport 坐标（camera 的 width/height 每帧设为 vp_w/vp_h）
     vx = sx
-    vy = sy - TOOLBAR_H
+    _, toolbar_h, _ = _ui_layout_metrics()
+    vy = sy - toolbar_h
     origin, direction = g_camera.get_ray(vx, vy)
     hit = pick_voxel(origin, direction, g_positions_np)
     if hit >= 0:
@@ -99,12 +199,13 @@ def _finish_box_select():
     if g_positions_np is None or len(g_positions_np) == 0:
         return
     mvp  = g_camera.get_mvp()
-    vp_w = WIN_W - PANEL_W
-    vp_h = WIN_H - TOOLBAR_H - STATUS_H
+    panel_w, toolbar_h, status_h = _ui_layout_metrics()
+    vp_w = WIN_W - panel_w
+    vp_h = WIN_H - toolbar_h - status_h
     indices = box_select_voxels(
         mvp, g_positions_np,
-        g_ui.box_x0, g_ui.box_y0 - TOOLBAR_H,
-        g_ui.box_x1, g_ui.box_y1 - TOOLBAR_H,
+        g_ui.box_x0, g_ui.box_y0 - toolbar_h,
+        g_ui.box_x1, g_ui.box_y1 - toolbar_h,
         vp_w, vp_h)
     io = imgui.get_io()
     if not io.key_shift:
@@ -125,10 +226,11 @@ def _pick_particle(sx, sy):
     positions = particle_positions_np()
     if len(positions) == 0:
         return -1
-    vp_w = WIN_W - PANEL_W
-    vp_h = WIN_H - TOOLBAR_H - STATUS_H
+    panel_w, toolbar_h, status_h = _ui_layout_metrics()
+    vp_w = WIN_W - panel_w
+    vp_h = WIN_H - toolbar_h - status_h
     mvp = g_camera.get_mvp()
-    return pick_particle_screen(mvp, positions, sx, sy - TOOLBAR_H, vp_w, vp_h)
+    return pick_particle_screen(mvp, positions, sx, sy - toolbar_h, vp_w, vp_h)
 
 
 def _begin_particle_drag(sx, sy, particle_idx):
@@ -143,7 +245,8 @@ def _begin_particle_drag(sx, sy, particle_idx):
     else:
         plane_normal /= norm
 
-    origin, direction = g_camera.get_ray(sx, sy - TOOLBAR_H)
+    _, toolbar_h, _ = _ui_layout_metrics()
+    origin, direction = g_camera.get_ray(sx, sy - toolbar_h)
     hit = _ray_plane_intersection(
         np.asarray(origin, dtype=np.float32),
         np.asarray(direction, dtype=np.float32),
@@ -214,7 +317,8 @@ def _update_particle_drag(window, sx, sy):
         return
     particle = g_editor.particles[g_drag_particle_idx]
     plane_point = np.array([particle['x'], particle['y'], particle['z']], dtype=np.float32)
-    origin, direction = g_camera.get_ray(sx, sy - TOOLBAR_H)
+    _, toolbar_h, _ = _ui_layout_metrics()
+    origin, direction = g_camera.get_ray(sx, sy - toolbar_h)
     hit = _ray_plane_intersection(
         np.asarray(origin, dtype=np.float32),
         np.asarray(direction, dtype=np.float32),
@@ -453,7 +557,7 @@ def main():
     glfw.window_hint(glfw.SAMPLES, 4)
 
     window = glfw.create_window(
-        WIN_W, WIN_H, "rwrsb v2.0 -- RWR Skeleton Binder", None, None)
+        WIN_W, WIN_H, _window_title(), None, None)
     if not window:
         glfw.terminate()
         raise RuntimeError("Window creation failed")
@@ -477,7 +581,13 @@ def main():
 
     # pyimgui
     imgui.create_context()
+    font_path = _configure_imgui_fonts()
     g_imgui_impl = GlfwRenderer(window, attach_callbacks=False)
+    _apply_ui_scale()
+    if font_path:
+        print(f"[ui] loaded font: {font_path}")
+    else:
+        print("[ui] using default imgui font")
 
     # load file from argv
     if len(sys.argv) > 1:
@@ -486,6 +596,11 @@ def main():
     while not glfw.window_should_close(window):
         glfw.poll_events()
         g_imgui_impl.process_inputs()
+        _apply_ui_scale()
+        g_camera.invert_y = g_ui.invert_y_axis
+        if g_ui._language_dirty:
+            glfw.set_window_title(window, _window_title())
+            g_ui._language_dirty = False
 
         imgui.new_frame()
 
@@ -509,8 +624,9 @@ def main():
         ctx.viewport = (0, 0, max(fb_w, 1), max(fb_h, 1))
         ctx.clear(0.15, 0.15, 0.18, 1.0)
 
-        vp_w = WIN_W - PANEL_W
-        vp_h = WIN_H - TOOLBAR_H - STATUS_H
+        panel_w, toolbar_h, status_h = _ui_layout_metrics()
+        vp_w = WIN_W - panel_w
+        vp_h = WIN_H - toolbar_h - status_h
 
         if (g_editor.voxels and vp_w > 0 and vp_h > 0
                 and fb_w > 0 and fb_h > 0):
@@ -520,7 +636,7 @@ def main():
             # OpenGL viewport 原点在左下；3D 区域位于状态栏之上、工具栏之下
             ctx.viewport = (
                 0,
-                int(STATUS_H * scale_y),
+                int(status_h * scale_y),
                 int(vp_w * scale_x),
                 int(vp_h * scale_y),
             )
@@ -546,7 +662,7 @@ def main():
         draw_toolbar(g_ui, g_editor, g_renderer, g_camera, WIN_W)
         draw_bone_panel(g_ui, g_editor, WIN_W, WIN_H,
                         g_renderer, g_skeleton_sticks)
-        draw_status_bar(g_editor, WIN_W, WIN_H)
+        draw_status_bar(g_ui, g_editor, WIN_W, WIN_H)
 
         draw_load_dialog(g_ui, g_editor, g_renderer,
                          g_skeleton_sticks, WIN_W, WIN_H)
