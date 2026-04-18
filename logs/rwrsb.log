@@ -1,0 +1,6 @@
+2026-04-18 19:01:10 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-18 19:01:10 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-18 19:01:10 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-18 19:01:20 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_hvy_mk153_3.xml
+2026-04-18 19:01:20 [INFO] editor_state: loaded XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_hvy_mk153_3.xml (4657 voxels, 15 particles, 17 sticks)
+2026-04-18 19:01:20 [INFO] ui_panels: 已加载: gkd_hvy_mk153_3.xml

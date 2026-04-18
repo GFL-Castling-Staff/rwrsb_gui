@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import ast, sys; files=['main.py','ui_panels.py','editor_state.py','xml_io.py','logger_setup.py']; [ast.parse\\(open\\(f\\).read\\(\\)\\) or print\\(f, 'OK'\\) for f in files]\")",
+      "Bash(python -c ':*)"
+    ]
+  }
+}
