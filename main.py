@@ -1161,13 +1161,13 @@ def main():
 
             glfw.swap_buffers(window)
             
-            _fps_frames += 1
-            _now = time.time()
-            if _now - _fps_accum_t >= 1.0:
-                logger.info("FPS=%d extent_active=%s", _fps_frames,
-                            "yes" if g_editor.active_particle_idx >= 0 else "no")
-                _fps_frames = 0
-                _fps_accum_t = _now
+            # _fps_frames += 1
+            # _now = time.time()
+            # if _now - _fps_accum_t >= 1.0:
+            #     logger.info("FPS=%d extent_active=%s", _fps_frames,
+            #                 "yes" if g_editor.active_particle_idx >= 0 else "no")
+            #     _fps_frames = 0
+            #     _fps_accum_t = _now
 
             # 正常帧：如果之前有累积错误，补写一条汇总
             if _last_loop_err[2] > 0:
