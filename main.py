@@ -29,6 +29,13 @@ from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_box_select_overlay, draw_exit_dialog,
                           draw_toasts)
 
+import time
+import math
+line_count_est = 0
+_grid_log_counter = 0
+_grid_sig_cache = None
+_mirror_sig_cache = None
+
 logger = logging.getLogger(__name__)
 
 # ── globals ───────────────────────────────────
@@ -598,13 +605,38 @@ def _end_particle_drag():
 
 
 def _update_grid():
+    global _grid_sig_cache
     if g_renderer is None:
         return
     g_renderer.show_grid = g_ui.show_grid
+
     if not g_ui.show_grid:
-        g_renderer.upload_grid((0.0, 0.0, 0.0), 0.0, 0.0, 1, False, False, False)
+        # 网格关闭：只在状态翻转时清一次
+        if _grid_sig_cache != "OFF":
+            g_renderer.upload_grid((0.0, 0.0, 0.0), 0.0, 0.0, 1, False, False, False)
+            _grid_sig_cache = "OFF"
         return
 
+    # 算签名：包括所有会影响 upload_grid 输出的输入
+    active_pos = None
+    if 0 <= g_editor.active_particle_idx < len(g_editor.particles):
+        p = g_editor.particles[g_editor.active_particle_idx]
+        active_pos = (round(p['x'], 3), round(p['y'], 3), round(p['z'], 3))
+
+    sig = (
+        bool(g_ui.show_grid_xz), bool(g_ui.show_grid_xy), bool(g_ui.show_grid_yz),
+        int(g_ui.grid_mode), int(g_ui.grid_multiple),
+        bool(g_ui.snap_particles_to_grid),
+        len(g_editor.voxels), len(g_editor.particles),
+        int(g_editor.active_particle_idx), active_pos,
+        round(float(g_camera.ortho_size), 3),
+        round(float(g_camera.distance), 3),
+    )
+    if sig == _grid_sig_cache:
+        return
+    _grid_sig_cache = sig
+
+    # —— 以下是原有的实际计算逻辑，保持不变 ——
     points = []
     points.extend([(v[0], v[1], v[2]) for v in g_editor.voxels])
     points.extend([(p['x'], p['y'], p['z']) for p in g_editor.particles])
@@ -635,13 +667,34 @@ def _update_grid():
 
 
 def _update_mirror_indicator():
+    global _mirror_sig_cache
     if g_renderer is None:
         return
     g_renderer.show_mirror_plane = bool(g_editor.mirror_mode)
+
     if not g_editor.mirror_mode:
-        g_renderer.upload_mirror_indicator((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 0.0)
+        # 镜像关闭：只在状态翻转时清一次
+        if _mirror_sig_cache != "OFF":
+            g_renderer.upload_mirror_indicator((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 0.0)
+            _mirror_sig_cache = "OFF"
         return
 
+    # 签名：包括所有影响 upload_mirror_indicator 输出的输入
+    sig = (
+        tuple(round(float(x), 3) for x in g_editor.mirror_plane_origin),
+        tuple(round(float(x), 3) for x in g_editor.mirror_plane_normal),
+        bool(g_editor.mirror_edit_mode),
+        bool(g_ui.show_mirror_grid),
+        round(float(mirror_grid_step_value()), 3),
+        int(g_ui.mirror_grid_mode), int(g_ui.mirror_grid_multiple),
+        len(g_editor.voxels), len(g_editor.particles),
+        round(float(_mirror_handle_length()), 3),
+    )
+    if sig == _mirror_sig_cache:
+        return
+    _mirror_sig_cache = sig
+
+    # —— 以下是原有的实际计算逻辑，保持不变 ——
     points = []
     points.extend([(v[0], v[1], v[2]) for v in g_editor.voxels])
     points.extend([(p['x'], p['y'], p['z']) for p in g_editor.particles])
@@ -697,6 +750,10 @@ def _load_file(path):
         else:
             logger.debug('voxel list is EMPTY after load')
         g_ui.push_toast(f"已加载: {Path(path).name}", "success")
+        # _load_file try 块的成功分支末尾（诊断日志之前或之后都行）
+        global _grid_sig_cache, _mirror_sig_cache
+        _grid_sig_cache = None
+        _mirror_sig_cache = None
     except Exception as e:
         g_ui.push_toast(f"加载失败: {e}", "error", exc_info=sys.exc_info())
 
@@ -987,6 +1044,13 @@ def main():
         _load_file(sys.argv[1])
 
     _last_loop_err = (None, None, 0)   # (type_name, msg, repeat_count)
+    # 放在 while 循环开始之前，和 _last_loop_err 那行附近
+    _fps_accum_t = time.time()
+    _fps_frames = 0
+    # grid / mirror indicator 的脏检查签名缓存
+    _grid_sig_cache = None
+    _mirror_sig_cache = None
+
     while not glfw.window_should_close(window):
         try:
             glfw.poll_events()
@@ -1096,6 +1160,14 @@ def main():
             g_imgui_impl.render(imgui.get_draw_data())
 
             glfw.swap_buffers(window)
+            
+            _fps_frames += 1
+            _now = time.time()
+            if _now - _fps_accum_t >= 1.0:
+                logger.info("FPS=%d extent_active=%s", _fps_frames,
+                            "yes" if g_editor.active_particle_idx >= 0 else "no")
+                _fps_frames = 0
+                _fps_accum_t = _now
 
             # 正常帧：如果之前有累积错误，补写一条汇总
             if _last_loop_err[2] > 0:
