@@ -81,6 +81,8 @@ class EditorState:
         self.mirror_mode = False
         self.mirror_axis = "x"
         self.mirror_pair = None
+        self.mirror_plane_origin = np.zeros(3, dtype=np.float32)
+        self.mirror_plane_normal = np.array([1.0, 0.0, 0.0], dtype=np.float32)
 
         self._undo_stack = []
         self._redo_stack = []
@@ -163,6 +165,62 @@ class EditorState:
         axis = str(axis).lower()
         if axis in ("x", "y", "z"):
             self.mirror_axis = axis
+            if axis == "x":
+                self.mirror_plane_normal = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+            elif axis == "y":
+                self.mirror_plane_normal = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+            else:
+                self.mirror_plane_normal = np.array([0.0, 0.0, 1.0], dtype=np.float32)
+
+    def set_mirror_plane_origin(self, x=None, y=None, z=None):
+        origin = np.array(self.mirror_plane_origin, dtype=np.float32)
+        if x is not None:
+            origin[0] = float(x)
+        if y is not None:
+            origin[1] = float(y)
+        if z is not None:
+            origin[2] = float(z)
+        self.mirror_plane_origin = origin
+
+    def set_mirror_plane_normal(self, x=None, y=None, z=None):
+        normal = np.array(self.mirror_plane_normal, dtype=np.float32)
+        if x is not None:
+            normal[0] = float(x)
+        if y is not None:
+            normal[1] = float(y)
+        if z is not None:
+            normal[2] = float(z)
+        length = float(np.linalg.norm(normal))
+        if length < 1e-6:
+            raise ValueError("Mirror plane normal cannot be zero")
+        self.mirror_plane_normal = normal / length
+        axis_map = {0: "x", 1: "y", 2: "z"}
+        dominant = int(np.argmax(np.abs(self.mirror_plane_normal)))
+        axis_value = abs(float(self.mirror_plane_normal[dominant]))
+        self.mirror_axis = axis_map[dominant] if axis_value > 0.999 else "custom"
+
+    def normalize_mirror_plane_normal(self):
+        self.set_mirror_plane_normal(
+            self.mirror_plane_normal[0],
+            self.mirror_plane_normal[1],
+            self.mirror_plane_normal[2],
+        )
+
+    def set_mirror_origin_from_pair_midpoint(self):
+        pair = self.mirror_pair if self.mirror_pair else tuple(sorted(self.selected_particles))
+        if len(pair) != 2:
+            raise ValueError("Need exactly 2 particles to use pair midpoint")
+        pa = self.particles[pair[0]]
+        pb = self.particles[pair[1]]
+        midpoint = np.array(
+            [
+                (float(pa["x"]) + float(pb["x"])) * 0.5,
+                (float(pa["y"]) + float(pb["y"])) * 0.5,
+                (float(pa["z"]) + float(pb["z"])) * 0.5,
+            ],
+            dtype=np.float32,
+        )
+        self.mirror_plane_origin = midpoint
 
     def enter_mirror_mode(self):
         if len(self.selected_particles) != 2:

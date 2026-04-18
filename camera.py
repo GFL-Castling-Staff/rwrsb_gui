@@ -34,8 +34,14 @@ class OrbitCamera:
         self._rotating = False
         self._panning = False
         self.invert_y = False
+        self._last_view_button = None
+        self._last_view_flipped = False
 
         self._dirty = True
+
+    def _reset_view_button_cycle(self):
+        self._last_view_button = None
+        self._last_view_flipped = False
 
     def _view_up(self):
         if self.elevation >= 89.999:
@@ -58,6 +64,8 @@ class OrbitCamera:
         if button == 2:  # 中键平移
             self._panning = (action == 1)
         if action == 1:
+            if button in (1, 2):
+                self._reset_view_button_cycle()
             self._last_mouse = (xpos, ypos)
 
     def on_mouse_move(self, xpos, ypos):
@@ -90,6 +98,7 @@ class OrbitCamera:
             self._dirty = True
 
     def on_scroll(self, dy):
+        self._reset_view_button_cycle()
         factor = 0.9 if dy > 0 else 1.1
         self.distance *= factor
         self.distance = max(5.0, min(2000.0, self.distance))
@@ -131,6 +140,14 @@ class OrbitCamera:
         ]) * self.distance
         return self.target + offset
 
+    def get_view_direction(self):
+        pos = self.get_position()
+        direction = self.target - pos
+        norm = np.linalg.norm(direction)
+        if norm < 1e-6:
+            return np.array([0.0, 0.0, -1.0], dtype=np.float32)
+        return (direction / norm).astype(np.float32)
+
     def get_view_matrix(self):
         pos = self.get_position()
         return look_at(pos, self.target, self._view_up())
@@ -161,28 +178,62 @@ class OrbitCamera:
         self.target = np.array([cx, cy, cz])
         self.distance = span * 1.8
         self.ortho_size = span * 0.6  # 让正交下初始视野约等于透视下画面
+        self._reset_view_button_cycle()
         self._dirty = True
+
+    def set_ortho_enabled(self, enabled):
+        enabled = bool(enabled)
+        if self.is_ortho != enabled:
+            self.is_ortho = enabled
+            self._reset_view_button_cycle()
+            self._dirty = True
+
+    def _apply_view_preset(self, preset):
+        if preset == 'front':
+            self.azimuth = 0.0
+            self.elevation = 0.0
+        elif preset == 'back':
+            self.azimuth = 180.0
+            self.elevation = 0.0
+        elif preset == 'side':
+            self.azimuth = 90.0
+            self.elevation = 0.0
+        elif preset == 'back_side':
+            self.azimuth = -90.0
+            self.elevation = 0.0
+        elif preset == 'top':
+            self.azimuth = 0.0
+            self.elevation = 90.0
+        elif preset == 'bottom':
+            self.azimuth = 0.0
+            self.elevation = -90.0
+        elif preset == 'perspective':
+            self.azimuth = 45.0
+            self.elevation = 25.0
 
     def set_view_preset(self, preset):
         """
         切换到指定视图预设。不改变 target 和 distance/ortho_size,仅改 azimuth/elevation。
-        preset: 'front' | 'side' | 'top' | 'perspective'
+        对 front/side/top 按钮支持二次点击翻到反面。
         """
-        if preset == 'front':
-            # 从 +Z 看向 -Z
-            self.azimuth = 0.0
-            self.elevation = 0.0
-        elif preset == 'side':
-            # 从 +X 看向 -X(角色右侧视角)
-            self.azimuth = 90.0
-            self.elevation = 0.0
-        elif preset == 'top':
-            # 俯视
-            self.azimuth = 0.0
-            self.elevation = 90.0
-        elif preset == 'perspective':
-            self.azimuth = 45.0
-            self.elevation = 25.0
+        opposite = {
+            "front": "back",
+            "side": "back_side",
+            "top": "bottom",
+        }
+        if preset in opposite:
+            if self._last_view_button == preset:
+                self._last_view_flipped = not self._last_view_flipped
+            else:
+                self._last_view_button = preset
+                self._last_view_flipped = False
+            target_preset = opposite[preset] if self._last_view_flipped else preset
+        else:
+            self._last_view_button = preset
+            self._last_view_flipped = False
+            target_preset = preset
+
+        self._apply_view_preset(target_preset)
         self._dirty = True
 
     # ── 屏幕坐标 → 射线(用于点选)────────────

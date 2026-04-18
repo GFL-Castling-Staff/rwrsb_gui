@@ -120,6 +120,25 @@ _TEXT = {
         "tooltip_bound_voxels": "bound voxels: {count}",
         "tooltip_unbind_stick": "Unbind all voxels from this stick",
         "selected_particles_count": "Selected particles: {count}",
+        "multi_edit": "Multi-select",
+        "align_x": "Align X",
+        "align_y": "Align Y",
+        "align_z": "Align Z",
+        "align_hint": "Need 2+ selected particles and an active particle inside the selection",
+        "mirror_axis": "Mirror axis",
+        "mirror_mode_enter": "Enter Mirror Mode",
+        "mirror_mode_exit": "Exit Mirror Mode",
+        "mirror_requires_two": "Mirror mode requires exactly 2 selected particles",
+        "mirror_locked": "Mirror mode locks the active pair for editing",
+        "mirror_active": "Mirror mode: {axis}-axis",
+        "mirror_plane_origin": "Plane origin",
+        "mirror_plane_normal": "Plane normal",
+        "mirror_normal_x": "Normal X",
+        "mirror_normal_y": "Normal Y",
+        "mirror_normal_z": "Normal Z",
+        "mirror_from_camera": "From Camera",
+        "mirror_use_midpoint": "Use Pair Midpoint",
+        "mirror_normalize": "Normalize Normal",
     },
     "zh": {
         "open_vox": "打开 VOX",
@@ -229,6 +248,25 @@ _TEXT = {
         "tooltip_bound_voxels": "已绑定体素: {count}",
         "tooltip_unbind_stick": "解绑该骨段上的所有体素",
         "selected_particles_count": "已选粒子: {count}",
+        "multi_edit": "多选操作",
+        "align_x": "对齐 X",
+        "align_y": "对齐 Y",
+        "align_z": "对齐 Z",
+        "align_hint": "需要至少 2 个已选粒子，且当前粒子必须在选择集中",
+        "mirror_axis": "镜像轴",
+        "mirror_mode_enter": "进入镜像模式",
+        "mirror_mode_exit": "退出镜像模式",
+        "mirror_requires_two": "镜像模式需要恰好选中 2 个粒子",
+        "mirror_locked": "镜像模式会锁定当前这一对粒子",
+        "mirror_active": "镜像模式: {axis} 轴",
+        "mirror_plane_origin": "镜像平面原点",
+        "mirror_plane_normal": "镜像平面法线",
+        "mirror_normal_x": "法线 X",
+        "mirror_normal_y": "法线 Y",
+        "mirror_normal_z": "法线 Z",
+        "mirror_from_camera": "从当前相机设置",
+        "mirror_use_midpoint": "使用当前配对中点",
+        "mirror_normalize": "归一化法线",
     },
 }
 
@@ -405,8 +443,7 @@ def draw_toolbar(ui_state, editor_state, renderer, camera, WIN_W):
     if is_ortho:
         _push_blue()
     if imgui.button(tr(ui_state, "ortho") + "##ortho"):
-        camera.is_ortho = not camera.is_ortho
-        camera._dirty = True
+        camera.set_ortho_enabled(not camera.is_ortho)
     if is_ortho:
         imgui.pop_style_color()
     imgui.same_line()
@@ -620,7 +657,7 @@ def _draw_add_stick(ui_state, editor_state):
             ui_state._bone_error = str(exc)
 
 
-def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sticks_ref):
+def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sticks_ref, camera):
     panel_w = int(280 * ui_state.ui_scale)
     toolbar_h = int(38 * ui_state.ui_scale)
     status_h = int(24 * ui_state.ui_scale)
@@ -645,6 +682,118 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
             imgui.text(tr(ui_state, "selected_particles_count", count=len(editor_state.selected_particles)))
     else:
         imgui.text(tr(ui_state, "active_particle_none"))
+
+    if editor_state.tool_mode == "bone_edit":
+        imgui.separator()
+        imgui.text(tr(ui_state, "multi_edit"))
+        can_align = (
+            len(editor_state.selected_particles) >= 2
+            and editor_state.active_particle_idx in editor_state.selected_particles
+        )
+        if can_align:
+            if imgui.button(tr(ui_state, "align_x") + "##align_x"):
+                try:
+                    editor_state.align_selected_particles("x")
+                    ui_state._bone_error = ""
+                except Exception as exc:
+                    ui_state._bone_error = str(exc)
+            imgui.same_line()
+            if imgui.button(tr(ui_state, "align_y") + "##align_y"):
+                try:
+                    editor_state.align_selected_particles("y")
+                    ui_state._bone_error = ""
+                except Exception as exc:
+                    ui_state._bone_error = str(exc)
+            imgui.same_line()
+            if imgui.button(tr(ui_state, "align_z") + "##align_z"):
+                try:
+                    editor_state.align_selected_particles("z")
+                    ui_state._bone_error = ""
+                except Exception as exc:
+                    ui_state._bone_error = str(exc)
+        else:
+            imgui.text_disabled(tr(ui_state, "align_hint"))
+
+        imgui.text(tr(ui_state, "mirror_plane_origin"))
+        origin = editor_state.mirror_plane_origin
+        changed_x, ox = imgui.input_float("##mirror_origin_x", float(origin[0]), format="%.3f")
+        imgui.same_line()
+        changed_y, oy = imgui.input_float("##mirror_origin_y", float(origin[1]), format="%.3f")
+        imgui.same_line()
+        changed_z, oz = imgui.input_float("##mirror_origin_z", float(origin[2]), format="%.3f")
+        if changed_x or changed_y or changed_z:
+            editor_state.set_mirror_plane_origin(
+                ox if changed_x else origin[0],
+                oy if changed_y else origin[1],
+                oz if changed_z else origin[2],
+            )
+
+        imgui.text(tr(ui_state, "mirror_plane_normal"))
+        normal = editor_state.mirror_plane_normal
+        changed_nx, nx = imgui.input_float("##mirror_normal_x", float(normal[0]), format="%.3f")
+        imgui.same_line()
+        changed_ny, ny = imgui.input_float("##mirror_normal_y", float(normal[1]), format="%.3f")
+        imgui.same_line()
+        changed_nz, nz = imgui.input_float("##mirror_normal_z", float(normal[2]), format="%.3f")
+        if changed_nx or changed_ny or changed_nz:
+            try:
+                editor_state.set_mirror_plane_normal(
+                    nx if changed_nx else normal[0],
+                    ny if changed_ny else normal[1],
+                    nz if changed_nz else normal[2],
+                )
+                ui_state._bone_error = ""
+            except Exception as exc:
+                ui_state._bone_error = str(exc)
+
+        if imgui.button(tr(ui_state, "mirror_normal_x") + "##mirror_preset_x"):
+            editor_state.set_mirror_axis("x")
+        imgui.same_line()
+        if imgui.button(tr(ui_state, "mirror_normal_y") + "##mirror_preset_y"):
+            editor_state.set_mirror_axis("y")
+        imgui.same_line()
+        if imgui.button(tr(ui_state, "mirror_normal_z") + "##mirror_preset_z"):
+            editor_state.set_mirror_axis("z")
+
+        if imgui.button(tr(ui_state, "mirror_from_camera") + "##mirror_from_camera", width=-1):
+            try:
+                view_dir = camera.get_view_direction()
+                editor_state.set_mirror_plane_normal(view_dir[0], view_dir[1], view_dir[2])
+                ui_state._bone_error = ""
+            except Exception as exc:
+                ui_state._bone_error = str(exc)
+        if imgui.button(tr(ui_state, "mirror_use_midpoint") + "##mirror_midpoint", width=-1):
+            try:
+                editor_state.set_mirror_origin_from_pair_midpoint()
+                ui_state._bone_error = ""
+            except Exception as exc:
+                ui_state._bone_error = str(exc)
+        if imgui.button(tr(ui_state, "mirror_normalize") + "##mirror_normalize", width=-1):
+            try:
+                editor_state.normalize_mirror_plane_normal()
+                ui_state._bone_error = ""
+            except Exception as exc:
+                ui_state._bone_error = str(exc)
+
+        if editor_state.mirror_mode:
+            imgui.text_colored(
+                tr(ui_state, "mirror_active", axis=editor_state.mirror_axis.upper()),
+                0.95, 0.85, 0.30, 1.0,
+            )
+            imgui.text_disabled(tr(ui_state, "mirror_locked"))
+            if imgui.button(tr(ui_state, "mirror_mode_exit") + "##mirror_exit", width=-1):
+                editor_state.exit_mirror_mode()
+        else:
+            can_enter_mirror = len(editor_state.selected_particles) == 2
+            if imgui.button(tr(ui_state, "mirror_mode_enter") + "##mirror_enter", width=-1):
+                if can_enter_mirror:
+                    try:
+                        editor_state.enter_mirror_mode()
+                        ui_state._bone_error = ""
+                    except Exception as exc:
+                        ui_state._bone_error = str(exc)
+            if not can_enter_mirror:
+                imgui.text_disabled(tr(ui_state, "mirror_requires_two"))
     imgui.separator()
     imgui.text(tr(ui_state, "stick_list"))
     _draw_stick_list(ui_state, editor_state)

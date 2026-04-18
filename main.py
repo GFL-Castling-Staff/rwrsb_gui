@@ -216,6 +216,8 @@ def _finish_box_select():
     ctrl = io.key_ctrl
 
     if g_editor.tool_mode == 'bone_edit':
+        if g_editor.mirror_mode:
+            return
         # F3: 粒子框选
         positions = particle_positions_np()
         if len(positions) == 0:
@@ -274,7 +276,7 @@ def _pick_particle(sx, sy):
     return pick_particle_screen(mvp, positions, sx, sy - toolbar_h, vp_w, vp_h)
 
 
-def _begin_particle_drag(sx, sy, particle_idx):
+def _begin_particle_drag(sx, sy, particle_idx, push_undo=True):
     global g_particle_drag_active, g_drag_particle_idx, g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin, g_drag_origins
     particle = g_editor.particles[particle_idx]
     plane_point = np.array([particle['x'], particle['y'], particle['z']], dtype=np.float32)
@@ -297,7 +299,8 @@ def _begin_particle_drag(sx, sy, particle_idx):
     if hit is None:
         hit = plane_point.copy()
 
-    g_editor._push_undo()
+    if push_undo:
+        g_editor._push_undo()
     g_editor.set_active_particle(particle_idx)
     g_particle_drag_active = True
     g_drag_particle_idx = particle_idx
@@ -360,6 +363,42 @@ def _apply_particle_drag_rules(pos, axis_mask):
     return out
 
 
+def _mirrored_particle_position(pos, axis):
+    mirrored = np.array(pos, dtype=np.float32)
+    normal = np.asarray(g_editor.mirror_plane_normal, dtype=np.float32)
+    origin = np.asarray(g_editor.mirror_plane_origin, dtype=np.float32)
+    denom = float(np.dot(normal, normal))
+    if denom < 1e-6:
+        return mirrored
+    offset = mirrored - origin
+    return mirrored - 2.0 * np.dot(offset, normal) / denom * normal
+
+
+def _sync_mirror_pair_from_particle(source_idx, push_undo=True):
+    if (
+        not g_editor.mirror_mode
+        or not g_editor.mirror_pair
+        or source_idx not in g_editor.mirror_pair
+    ):
+        return False
+
+    pair_a, pair_b = g_editor.mirror_pair
+    partner_idx = pair_b if source_idx == pair_a else pair_a
+    source = g_editor.particles[source_idx]
+    current = np.array([source["x"], source["y"], source["z"]], dtype=np.float32)
+    mirrored = _mirrored_particle_position(current, g_editor.mirror_axis)
+    partner = g_editor.particles[partner_idx]
+    partner_pos = np.array([partner["x"], partner["y"], partner["z"]], dtype=np.float32)
+    if np.allclose(partner_pos, mirrored, atol=1e-6):
+        return False
+
+    if push_undo:
+        g_editor._push_undo()
+    g_editor.set_particle_position(partner_idx, mirrored[0], mirrored[1], mirrored[2], push_undo=False)
+    g_editor.set_active_particle(source_idx)
+    return True
+
+
 def _update_particle_drag(window, sx, sy):
     if not g_particle_drag_active or g_drag_particle_idx < 0:
         return
@@ -380,6 +419,17 @@ def _update_particle_drag(window, sx, sy):
     pos = _apply_particle_drag_rules(pos, _drag_axis_mask(window))
     # 应用到被拖点
     g_editor.set_particle_position(g_drag_particle_idx, pos[0], pos[1], pos[2], push_undo=False)
+    if (
+        g_editor.mirror_mode
+        and g_editor.mirror_pair
+        and g_drag_particle_idx in g_editor.mirror_pair
+    ):
+        pair_a, pair_b = g_editor.mirror_pair
+        partner_idx = pair_b if g_drag_particle_idx == pair_a else pair_a
+        mirrored = _mirrored_particle_position(pos, g_editor.mirror_axis)
+        g_editor.set_particle_position(partner_idx, mirrored[0], mirrored[1], mirrored[2], push_undo=False)
+        g_editor.set_active_particle(g_drag_particle_idx)
+        return
     # F5: 其他选中点按相同 delta 跟随（不做各自吸附，以保持组内相对位置）
     if len(g_drag_origins) > 1:
         anchor_origin = g_drag_origins.get(g_drag_particle_idx)
@@ -390,6 +440,7 @@ def _update_particle_drag(window, sx, sy):
                     continue
                 new_p = origin_pos + delta
                 g_editor.set_particle_position(idx, new_p[0], new_p[1], new_p[2], push_undo=False)
+    g_editor.set_active_particle(g_drag_particle_idx)
 
 
 def _end_particle_drag():
@@ -436,6 +487,32 @@ def _update_grid():
     g_renderer.upload_grid(
         center, extent, step, major_every,
         g_ui.show_grid_xz, g_ui.show_grid_xy, g_ui.show_grid_yz
+    )
+
+
+def _update_mirror_indicator():
+    if g_renderer is None:
+        return
+    g_renderer.show_mirror_plane = bool(g_editor.mirror_mode)
+    if not g_editor.mirror_mode:
+        g_renderer.upload_mirror_indicator((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 0.0)
+        return
+
+    points = []
+    points.extend([(v[0], v[1], v[2]) for v in g_editor.voxels])
+    points.extend([(p['x'], p['y'], p['z']) for p in g_editor.particles])
+    if points:
+        arr = np.array(points, dtype=np.float32)
+        mins = arr.min(axis=0)
+        maxs = arr.max(axis=0)
+        extent = max(float(np.max(maxs - mins)) * 0.75, 8.0)
+    else:
+        extent = 16.0
+
+    g_renderer.upload_mirror_indicator(
+        g_editor.mirror_plane_origin,
+        g_editor.mirror_plane_normal,
+        extent,
     )
 
 
@@ -502,6 +579,22 @@ def on_mouse_button(window, button, action, mods):
 
             # ── bone_edit 模式：点击粒子 → 选择 or 拖动 ──
             if g_editor.tool_mode == 'bone_edit' and g_ui.allow_skeleton_edit:
+                if g_editor.mirror_mode:
+                    mirror_pair = set(g_editor.mirror_pair or ())
+                    if hit_particle in mirror_pair:
+                        g_editor.set_active_particle(hit_particle)
+                        mirrored_now = _sync_mirror_pair_from_particle(
+                            hit_particle,
+                            push_undo=not g_ui.allow_particle_edit,
+                        )
+                        if g_ui.allow_particle_edit:
+                            _begin_particle_drag(
+                                g_mouse_x,
+                                g_mouse_y,
+                                hit_particle,
+                                push_undo=not mirrored_now,
+                            )
+                    return
                 if hit_particle >= 0:
                     if shift:
                         # Shift+点击：追加到选中，设为 active
@@ -629,6 +722,7 @@ def on_key(window, key, scancode, action, mods):
             g_editor.clear_selection()
             if g_editor.tool_mode == 'bone_edit':
                 g_editor.clear_selected_particles()
+                g_editor.exit_mirror_mode()
         elif key == glfw.KEY_F:
             g_camera.reset_to_model(g_editor.voxels)
         elif key == glfw.KEY_B:
@@ -723,6 +817,7 @@ def main():
         imgui.new_frame()
 
         _update_grid()
+        _update_mirror_indicator()
         if g_editor.skeleton_dirty and g_renderer is not None:
             g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks)
             g_editor.skeleton_dirty = False
@@ -780,7 +875,7 @@ def main():
 
         draw_toolbar(g_ui, g_editor, g_renderer, g_camera, WIN_W)
         draw_bone_panel(g_ui, g_editor, WIN_W, WIN_H,
-                        g_renderer, g_skeleton_sticks)
+                        g_renderer, g_skeleton_sticks, g_camera)
         draw_status_bar(g_ui, g_editor, WIN_W, WIN_H)
 
         draw_load_dialog(g_ui, g_editor, g_renderer,
