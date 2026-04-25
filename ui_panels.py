@@ -201,8 +201,8 @@ _TEXT = {
         "anim_length_dev_none": "All sticks within threshold",
         "grid_btn": "Grid...",
         "grid_popup_title": "Grid options",
-        "settings_btn": "Settings...",
-        "settings_popup_title": "Settings",
+        "settings_btn": "View...",
+        "settings_popup_title": "View settings",
         "show_origin": "Show origin gizmo",
         "show_voxels": "Show voxels (if loaded)",
         "show_original_colors": "Original voxel colors",
@@ -284,7 +284,7 @@ _TEXT = {
         "rotate_disabled_no_sel": "Select at least 1 particle to rotate",
         "rotate_disabled_active_not_in_sel": "Active particle must be in the selection",
         # ── 拖动 Settings popup（P3）──
-        "drag_settings_btn": "Settings...",
+        "drag_settings_btn": "Options...",
         "move_settings_title": "Move settings",
         "move_length_clamp": "Length clamp",
         "move_length_clamp_hint": "Stop sticks from being stretched while dragging",
@@ -462,8 +462,8 @@ _TEXT = {
         "anim_length_dev_none": "所有骨段均在阈值内",
         "grid_btn": "网格...",
         "grid_popup_title": "网格选项",
-        "settings_btn": "设置...",
-        "settings_popup_title": "设置",
+        "settings_btn": "视图...",
+        "settings_popup_title": "视图设置",
         "show_origin": "显示原点坐标轴",
         "show_voxels": "显示体素（如已加载）",
         "show_original_colors": "显示原始体素颜色",
@@ -545,7 +545,7 @@ _TEXT = {
         "rotate_disabled_no_sel": "至少选择 1 个粒子",
         "rotate_disabled_active_not_in_sel": "Active 粒子必须在选择集中",
         # ── 拖动 Settings popup（P3）──
-        "drag_settings_btn": "设置...",
+        "drag_settings_btn": "选项...",
         "move_settings_title": "平移设置",
         "move_length_clamp": "长度约束",
         "move_length_clamp_hint": "拖动时阻止 stick 被拉长",
@@ -1988,6 +1988,17 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
             imgui.pop_style_color(3)
         imgui.same_line()
 
+    # 拖动模式选项（与 Move/Rotate 同组）
+    if imgui.button(tr(ui_state, "drag_settings_btn") + "##anim_drag_settings_btn"):
+        imgui.open_popup("##anim_drag_settings_popup")
+    if imgui.begin_popup("##anim_drag_settings_popup"):
+        if ui_state.anim_drag_mode == "move":
+            _draw_move_settings_section(ui_state, editor_state)
+        else:
+            _draw_rotate_settings_section(ui_state, editor_state)
+        imgui.end_popup()
+    imgui.same_line()
+
     imgui.text("|")
     imgui.same_line()
 
@@ -1999,8 +2010,6 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
     imgui.same_line()
     if imgui.button(tr(ui_state, "save_anim_as") + "##anim_save"):
         _anim_action_save_animation(ui_state, editor_state)
-    imgui.same_line()
-    _disabled_button(tr(ui_state, "import_mixamo") + "##anim_mixamo")
     imgui.same_line()
 
     imgui.text("|")
@@ -2085,15 +2094,6 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
         imgui.text_disabled(tr(ui_state, "tip_axis"))
         if ui_state.anim_drag_mode == "rotate":
             imgui.text_disabled(tr(ui_state, "drag_rotate_hint"))
-        imgui.end_popup()
-    imgui.same_line()
-    if imgui.button(tr(ui_state, "drag_settings_btn") + "##anim_drag_settings_btn"):
-        imgui.open_popup("##anim_drag_settings_popup")
-    if imgui.begin_popup("##anim_drag_settings_popup"):
-        if ui_state.anim_drag_mode == "move":
-            _draw_move_settings_section(ui_state, editor_state)
-        else:
-            _draw_rotate_settings_section(ui_state, editor_state)
         imgui.end_popup()
     imgui.same_line()
 

@@ -719,7 +719,7 @@ def main():
     glfw.set_key_callback(window, on_key)
     glfw.set_char_callback(window, on_char)
     glfw.set_drop_callback(window, on_drop)
-    glfw.set_framebuffer_size_callback(window, on_resize)
+    glfw.set_window_size_callback(window, on_resize)   # 逻辑尺寸（imgui 坐标系使用逻辑像素）
     glfw.set_window_close_callback(window, on_close)
 
     ctx = moderngl.create_context()
