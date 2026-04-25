@@ -2236,9 +2236,8 @@ def _draw_anim_timeline(ui_state, editor_state, WIN_W):
 
     # invisible_button 抓取该区域的鼠标输入
     diamond_size = 6
-    hit_pad = diamond_size + 2
+    hit_pad = diamond_size * 2 + 4  # 改成 16 像素，给足余量
 
-    # invisible_button 比时间线宽一点，给最后一帧菱形留 hit 空间
     imgui.invisible_button("##anim_timeline", timeline_w + hit_pad, timeline_h)
     is_hovered = imgui.is_item_hovered()
     is_active = imgui.is_item_active()
@@ -2278,6 +2277,10 @@ def _draw_anim_timeline(ui_state, editor_state, WIN_W):
         # 命中检测（鼠标在区域内 + 距离 <= diamond_size）
         if is_hovered and abs(rel_x - (fx - tx)) < diamond_size + 2:
             hit_frame_idx = fi
+            
+        if is_hovered and abs(rel_x - (fx - tx)) < 50:  # 50 像素内就报
+            logger.debug(f"frame {fi}: fx={fx:.1f} rel_x={rel_x:.1f} mouse_x={mouse_x:.1f} tx={tx:.1f} dist={rel_x - (fx-tx):.1f} hit_radius={diamond_size+2}")
+            
 
     # 鼠标交互
     if is_hovered and imgui.is_mouse_clicked(0):
