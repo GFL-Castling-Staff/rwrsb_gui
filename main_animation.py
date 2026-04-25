@@ -280,12 +280,20 @@ def _start_rotate_drag(particle_idx):
     g_rotate_drag_active = True
 
 
-def _update_rotate_drag(mx):
-    """旋转拖动每帧更新：从快照重算旋转，直接写入粒子坐标。"""
+def _update_rotate_drag(window, mx):
+    """旋转拖动每帧更新：从快照重算旋转，直接写入粒子坐标。
+    按住 Ctrl 时以 15° 为步长吸附。
+    """
     if not g_rotate_drag_active or g_rotate_drag_pivot is None:
         return
     from editor_state import _rotation_matrix
     angle_deg = (mx - g_rotate_drag_start_mx) * 1.0   # 1px = 1°
+    ctrl = (
+        glfw.get_key(window, glfw.KEY_LEFT_CONTROL) == glfw.PRESS
+        or glfw.get_key(window, glfw.KEY_RIGHT_CONTROL) == glfw.PRESS
+    )
+    if ctrl:
+        angle_deg = round(angle_deg / 15.0) * 15.0
     R = _rotation_matrix(g_rotate_drag_axis, float(np.radians(angle_deg)))
     pivot = g_rotate_drag_pivot
     for idx, p_orig in g_rotate_drag_snapshot.items():
@@ -530,7 +538,7 @@ def on_cursor_pos(window, xpos, ypos):
     if g_particle_drag_active:
         _update_particle_drag(window, xpos, ypos)
     if g_rotate_drag_active:
-        _update_rotate_drag(xpos)
+        _update_rotate_drag(window, xpos)
     if g_ui.box_selecting:
         g_ui.box_x1 = xpos
         g_ui.box_y1 = ypos
