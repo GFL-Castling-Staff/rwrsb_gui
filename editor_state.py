@@ -385,7 +385,40 @@ class EditorState:
         self.gpu_dirty = True
         self.skeleton_dirty = True
         return data
+    
+    def load_skeleton_xml(self, path):
+        """从 RWR XML 文件加载 skeleton（particles + sticks），
+        丢弃 voxels 和 bindings。仅供动画工具用于异形骨场景。
 
+        如果当前在动画模式，会先 force-exit。
+        """
+        from xml_io import parse_xml
+
+        if self.animation_mode:
+            self.exit_animation_mode(force=True)
+
+        _voxels, skeleton, _bindings = parse_xml(path)
+        # 丢弃 voxels / bindings（动画工具不关心体素）
+        self.voxels = []
+        self.bindings = {}
+        self.selected_voxels = set()
+        self.selected_particles = set()
+        self.exit_mirror_mode()
+        self.source_path = str(path)
+        self._undo_stack.clear()
+        self._redo_stack.clear()
+        self._dirty = False
+        self.gpu_dirty = True
+
+        self.particles = list(skeleton.get("particles", []))
+        self._rebuild_sticks_from_raw(skeleton.get("sticks", []))
+        self.active_stick_idx = 0
+        self.active_particle_idx = -1
+
+        logger.info("loaded skeleton-only XML: %s (%d particles, %d sticks)",
+                    path, len(self.particles), len(self.sticks))
+        return skeleton
+    
     def list_skeleton_presets(self):
         preset_dir = self._preset_dir()
         preset_dir.mkdir(parents=True, exist_ok=True)
@@ -956,3 +989,150 @@ class EditorState:
         frame.positions = [
             (float(p['x']), float(p['y']), float(p['z'])) for p in self.particles
         ]
+        
+    # ──────────────────────────────────────────────
+    # 动画编辑：关键帧 / 时间 / header / control 事件
+    # ──────────────────────────────────────────────
+
+    def anim_set_header(self, name=None, end=None, speed=None, loop=None,
+                        speed_spread=None):
+        """改 animation header 字段（push undo + 标 dirty）。"""
+        if not self.animation_mode or not self.current_animation:
+            return
+        a = self.current_animation
+        if (name is not None and name == a.name and
+                end is not None and abs(end - a.end) < 1e-9 and
+                speed is not None and abs(speed - a.speed) < 1e-9 and
+                loop is not None and bool(loop) == bool(a.loop)):
+            return  # no-op，避免每帧拖 slider 都 push undo
+        self._anim_push_undo()
+        if name is not None:
+            a.name = str(name)
+        if end is not None:
+            a.end = float(max(0.0, end))
+        if speed is not None:
+            a.speed = float(speed)
+        if loop is not None:
+            a.loop = bool(loop)
+        if speed_spread is not None:
+            a.speed_spread = float(speed_spread) if speed_spread != 0 else None
+
+    def anim_add_frame_at(self, time):
+        """在指定 time 处加一帧，positions = 当前 particle 姿态。
+        返回新帧的 sorted-after index（current_frame_idx 切到该帧）。"""
+        from animation_io import AnimationFrame
+        if not self.animation_mode or not self.current_animation:
+            return -1
+        self._anim_push_undo()
+        positions = [
+            (float(p['x']), float(p['y']), float(p['z'])) for p in self.particles
+        ]
+        new_frame = AnimationFrame(time=float(time), positions=positions)
+        self.current_animation.frames.append(new_frame)
+        self.current_animation.frames.sort(key=lambda f: f.time)
+        new_idx = self.current_animation.frames.index(new_frame)
+        self.current_frame_idx = new_idx
+        return new_idx
+
+    def anim_delete_frame(self, frame_idx):
+        """删除指定帧。最后一帧禁删（返回 False）。"""
+        if not self.animation_mode or not self.current_animation:
+            return False
+        frames = self.current_animation.frames
+        if len(frames) <= 1:
+            return False
+        if frame_idx < 0 or frame_idx >= len(frames):
+            return False
+        self._anim_push_undo()
+        del frames[frame_idx]
+        # 调整 current_frame_idx
+        if self.current_frame_idx >= len(frames):
+            self.current_frame_idx = len(frames) - 1
+        self._apply_frame_to_particles(self.current_frame_idx)
+        return True
+
+    def anim_set_frame_time(self, frame_idx, new_time):
+        """改某帧的 time，结束后排序并校正 current_frame_idx。"""
+        if not self.animation_mode or not self.current_animation:
+            return
+        frames = self.current_animation.frames
+        if frame_idx < 0 or frame_idx >= len(frames):
+            return
+        if abs(frames[frame_idx].time - float(new_time)) < 1e-9:
+            return
+        self._anim_push_undo()
+        target_frame = frames[frame_idx]
+        target_frame.time = float(max(0.0, new_time))
+        frames.sort(key=lambda f: f.time)
+        self.current_frame_idx = frames.index(target_frame)
+
+    def anim_select_frame(self, frame_idx):
+        """选中某帧，把 particle 应用到该帧（不入 undo）。"""
+        if not self.animation_mode or not self.current_animation:
+            return
+        if frame_idx < 0 or frame_idx >= len(self.current_animation.frames):
+            return
+        self.current_frame_idx = frame_idx
+        self.playback_time = self.current_animation.frames[frame_idx].time
+        self._apply_frame_to_particles(frame_idx)
+
+    def anim_duplicate_current_frame(self):
+        """复制当前帧（time 在原基础上 +0.05s，避免重叠）。"""
+        from animation_io import AnimationFrame
+        if not self.animation_mode or not self.current_animation:
+            return
+        frames = self.current_animation.frames
+        if self.current_frame_idx < 0 or self.current_frame_idx >= len(frames):
+            return
+        src = frames[self.current_frame_idx]
+        new_time = src.time + 0.05
+        # 如果会和现有帧 time 重叠，找一个不冲突的
+        existing_times = {round(f.time, 6) for f in frames}
+        while round(new_time, 6) in existing_times:
+            new_time += 0.05
+        self._anim_push_undo()
+        new_frame = AnimationFrame(
+            time=new_time,
+            positions=list(src.positions),
+            controls=list(src.controls),
+        )
+        frames.append(new_frame)
+        frames.sort(key=lambda f: f.time)
+        self.current_frame_idx = frames.index(new_frame)
+        self._apply_frame_to_particles(self.current_frame_idx)
+
+    def anim_add_control(self, frame_idx, key="shoot", value=1):
+        if not self.animation_mode or not self.current_animation:
+            return
+        frames = self.current_animation.frames
+        if frame_idx < 0 or frame_idx >= len(frames):
+            return
+        self._anim_push_undo()
+        frames[frame_idx].controls.append((str(key), int(value)))
+
+    def anim_remove_control(self, frame_idx, control_idx):
+        if not self.animation_mode or not self.current_animation:
+            return
+        frames = self.current_animation.frames
+        if frame_idx < 0 or frame_idx >= len(frames):
+            return
+        if control_idx < 0 or control_idx >= len(frames[frame_idx].controls):
+            return
+        self._anim_push_undo()
+        del frames[frame_idx].controls[control_idx]
+
+    def anim_set_control(self, frame_idx, control_idx, key=None, value=None):
+        if not self.animation_mode or not self.current_animation:
+            return
+        frames = self.current_animation.frames
+        if frame_idx < 0 or frame_idx >= len(frames):
+            return
+        if control_idx < 0 or control_idx >= len(frames[frame_idx].controls):
+            return
+        old_key, old_value = frames[frame_idx].controls[control_idx]
+        new_key = old_key if key is None else str(key)
+        new_value = old_value if value is None else int(value)
+        if new_key == old_key and new_value == old_value:
+            return
+        self._anim_push_undo()
+        frames[frame_idx].controls[control_idx] = (new_key, new_value)

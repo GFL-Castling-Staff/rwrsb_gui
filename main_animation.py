@@ -1,14 +1,6 @@
 """
 main_animation.py  --  rwrsb_anim 动画工具入口
-
-和 rwrsb_gui.exe 同代码库,但启动后:
-  - app_mode = "animation"
-  - 自动加载 vanilla 标准 skeleton(presets/human_skeleton.json)
-  - 自动进入动画模式(空白 animation)
-  - 不渲染体素(voxels 列表始终为空,VoxelRenderer.render 内部守卫自动跳过)
-
-本文件刻意复制 main.py 的大部分基础设施(GLFW 回调 / 字体 / 错误恢复 / overlay)
-而不抽公共代码,避免两个 entry 互相牵扯。如果将来真的需要再抽。
+Commit 4: 粒子拾取/拖动 + drop 加载 + 关窗 dirty 守卫 + panel 布局调整
 """
 import sys
 import os
@@ -51,11 +43,12 @@ WIN_W, WIN_H  = 1280, 800
 PANEL_W       = 280
 TOOLBAR_H     = 38
 STATUS_H      = 24
+ANIM_PANEL_H  = 200
 
 g_editor          = EditorState()
 g_camera          = OrbitCamera(WIN_W, WIN_H)
 g_ui              = UIState()
-g_skeleton_sticks = [None]   # mutable ref: g_skeleton_sticks[0]
+g_skeleton_sticks = [None]
 
 g_mouse_x = g_mouse_y = 0.0
 g_lmb_down    = False
@@ -64,18 +57,23 @@ g_drag_particle_idx = -1
 g_drag_plane_normal = None
 g_drag_grab_offset = None
 g_drag_particle_origin = None
-g_drag_origins = {}  # dict[int, np.ndarray]: 多选整体平移的所有选中点初始位置
+g_drag_origins = {}
 g_hover_particle_idx = -1
-g_positions_np = None          # (N,3) float32 cache for picking
-g_renderer     = None          # set in main()
-g_imgui_impl   = None          # GlfwRenderer set in main()
+g_positions_np = None
+g_renderer     = None
+g_imgui_impl   = None
 
 
 def _ui_layout_metrics():
     scale = max(0.8, min(1.75, getattr(g_ui, "ui_scale", 1.0)))
-    panel_w = int(round(PANEL_W * scale))
+    panel_w = 0 if g_ui.app_mode == "animation" else int(round(PANEL_W * scale))
     toolbar_h = int(round(TOOLBAR_H * scale))
-    status_h = int(round(STATUS_H * scale))
+    status_h_base = int(round(STATUS_H * scale))
+    if g_ui.app_mode == "animation":
+        # 视口底部留出空间给状态栏 + 动画面板
+        status_h = status_h_base + int(round(ANIM_PANEL_H * scale))
+    else:
+        status_h = status_h_base
     return panel_w, toolbar_h, status_h
 
 
@@ -113,7 +111,8 @@ def _apply_ui_scale():
 def _window_title():
     base = "RWR Animation Editor (rwrsb_anim)"
     if g_editor.current_animation:
-        return f"{base} — {g_editor.current_animation.name}"
+        dirty = "*" if g_editor._anim_dirty else ""
+        return f"{base} - {g_editor.current_animation.name}{dirty}"
     return base
 
 
@@ -128,11 +127,10 @@ def rebuild_positions_cache():
     if not g_editor.particles:
         g_positions_np = None
         return
-    arr = np.array(
+    g_positions_np = np.array(
         [(p["x"], p["y"], p["z"]) for p in g_editor.particles],
         dtype=np.float32,
     )
-    g_positions_np = arr
 
 
 def _pick_particle(mx, my):
@@ -143,17 +141,122 @@ def _pick_particle(mx, my):
     vp_h = WIN_H - toolbar_h - status_h
     if vp_w <= 0 or vp_h <= 0:
         return -1
-    # 把视口空间坐标转给 picker
     local_x = mx
     local_y = my - toolbar_h
     mvp = g_camera.get_mvp()
     return pick_particle_screen(mvp, g_positions_np, local_x, local_y, vp_w, vp_h)
 
 
+# ── 粒子拖动 ──────────────────────────────────
+
+def _ray_plane_hit(ray_o, ray_d, plane_pt, plane_normal):
+    ray_o = np.asarray(ray_o, dtype=np.float32)
+    ray_d = np.asarray(ray_d, dtype=np.float32)
+    plane_pt = np.asarray(plane_pt, dtype=np.float32)
+    plane_normal = np.asarray(plane_normal, dtype=np.float32)
+    denom = float(np.dot(plane_normal, ray_d))
+    if abs(denom) < 1e-7:
+        return None
+    t = float(np.dot(plane_normal, plane_pt - ray_o)) / denom
+    if t < 0:
+        return None
+    return ray_o + ray_d * t
+
+
+def _start_particle_drag(mx, my, particle_idx):
+    global g_particle_drag_active, g_drag_particle_idx
+    global g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin
+    global g_drag_origins
+
+    if g_editor.animation_mode and g_editor.playback_playing:
+        g_editor.playback_playing = False
+
+    p = g_editor.particles[particle_idx]
+    g_drag_particle_origin = np.array([p["x"], p["y"], p["z"]], dtype=np.float32)
+
+    # 拖动平面 = 过粒子、法线指向相机的平面（与 main.py _begin_particle_drag 一致）
+    cam_pos = np.asarray(g_camera.get_position(), dtype=np.float32)
+    plane_normal = g_drag_particle_origin - cam_pos
+    norm = float(np.linalg.norm(plane_normal))
+    if norm < 1e-6:
+        plane_normal = np.array([0.0, 0.0, 1.0], dtype=np.float32)
+    else:
+        plane_normal = plane_normal / norm
+    g_drag_plane_normal = plane_normal
+
+    # 多选拖动：备份所有选中点初始位置
+    drag_set = (set(g_editor.selected_particles)
+                if particle_idx in g_editor.selected_particles
+                else {particle_idx})
+    g_drag_origins = {}
+    for idx in drag_set:
+        if 0 <= idx < len(g_editor.particles):
+            pp = g_editor.particles[idx]
+            g_drag_origins[idx] = np.array(
+                [pp["x"], pp["y"], pp["z"]], dtype=np.float32)
+
+    # 屏幕到 3D 的初始 grab offset（OrbitCamera.get_ray 只需 sx, sy）
+    _, toolbar_h, _ = _ui_layout_metrics()
+    ray_o, ray_d = g_camera.get_ray(mx, my - toolbar_h)
+    hit = _ray_plane_hit(
+        np.asarray(ray_o, dtype=np.float32),
+        np.asarray(ray_d, dtype=np.float32),
+        g_drag_particle_origin,
+        g_drag_plane_normal,
+    )
+    g_drag_grab_offset = (g_drag_particle_origin - hit) if hit is not None else np.zeros(3)
+
+    g_drag_particle_idx = particle_idx
+    g_particle_drag_active = True
+
+
+def _update_particle_drag(mx, my):
+    if not g_particle_drag_active or g_drag_particle_origin is None:
+        return
+    _, toolbar_h, _ = _ui_layout_metrics()
+    ray_o, ray_d = g_camera.get_ray(mx, my - toolbar_h)
+    hit = _ray_plane_hit(
+        np.asarray(ray_o, dtype=np.float32),
+        np.asarray(ray_d, dtype=np.float32),
+        g_drag_particle_origin,
+        g_drag_plane_normal,
+    )
+    if hit is None:
+        return
+    # grab_offset = origin - initial_hit  →  new_anchor = hit + grab_offset
+    new_anchor = hit + g_drag_grab_offset
+    delta = new_anchor - g_drag_particle_origin
+    for idx, origin in g_drag_origins.items():
+        if 0 <= idx < len(g_editor.particles):
+            target = origin + delta
+            g_editor.particles[idx]["x"] = float(target[0])
+            g_editor.particles[idx]["y"] = float(target[1])
+            g_editor.particles[idx]["z"] = float(target[2])
+    g_editor.skeleton_dirty = True
+
+
+def _end_particle_drag():
+    global g_particle_drag_active, g_drag_particle_idx
+    global g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin
+    global g_drag_origins
+
+    if g_editor.animation_mode:
+        try:
+            g_editor.commit_particle_move_to_frame()
+        except Exception:
+            logger.exception("commit_particle_move_to_frame failed")
+
+    g_particle_drag_active = False
+    g_drag_particle_idx = -1
+    g_drag_plane_normal = None
+    g_drag_grab_offset = None
+    g_drag_particle_origin = None
+    g_drag_origins = {}
+
+
 # ── GLFW callbacks ────────────────────────────
 
 def _safe_callback(fn):
-    """装饰器：捕获回调里的业务异常，写 log 后 return，不让程序崩。"""
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         try:
@@ -166,7 +269,6 @@ def _safe_callback(fn):
 @_safe_callback
 def on_mouse_button(window, button, action, mods):
     global g_lmb_down
-    # let imgui consume first
     if g_imgui_impl:
         g_imgui_impl.mouse_callback(window, button, action, mods)
     io = imgui.get_io()
@@ -176,9 +278,29 @@ def on_mouse_button(window, button, action, mods):
         return
 
     pressed = (action == glfw.PRESS)
+
     if button == glfw.MOUSE_BUTTON_LEFT:
         g_lmb_down = pressed
-        # commit 4 在这里实现粒子拾取/拖动/box select；commit 3 暂不接
+        if pressed:
+            shift = bool(mods & glfw.MOD_SHIFT)
+            ctrl = bool(mods & glfw.MOD_CONTROL)
+            hit = _pick_particle(g_mouse_x, g_mouse_y)
+            if hit >= 0:
+                if shift:
+                    g_editor.add_selected_particle(hit)
+                    g_editor.set_active_particle(hit)
+                elif ctrl:
+                    in_set = g_editor.toggle_selected_particle(hit)
+                    if in_set:
+                        g_editor.set_active_particle(hit)
+                else:
+                    if hit not in g_editor.selected_particles:
+                        g_editor.replace_selected_particles({hit})
+                    g_editor.set_active_particle(hit)
+                    _start_particle_drag(g_mouse_x, g_mouse_y, hit)
+        else:
+            if g_particle_drag_active:
+                _end_particle_drag()
 
     g_camera.on_mouse_button(button, action, mods, g_mouse_x, g_mouse_y)
 
@@ -188,6 +310,8 @@ def on_cursor_pos(window, xpos, ypos):
     global g_mouse_x, g_mouse_y, g_hover_particle_idx
     g_mouse_x = xpos
     g_mouse_y = ypos
+    if g_particle_drag_active:
+        _update_particle_drag(xpos, ypos)
     if is_over_viewport(xpos, ypos):
         hover_particle = _pick_particle(xpos, ypos)
         g_hover_particle_idx = hover_particle
@@ -225,8 +349,6 @@ def on_key(window, key, scancode, action, mods):
         elif key == glfw.KEY_ESCAPE:
             g_editor.clear_selected_particles()
         elif key == glfw.KEY_F:
-            # 居中到 skeleton bbox（voxels 为空，reset_to_model 会 no-op，
-            # 这里手工算 skeleton bbox 当作居中）
             if g_editor.particles:
                 xs = [p["x"] for p in g_editor.particles]
                 ys = [p["y"] for p in g_editor.particles]
@@ -238,7 +360,9 @@ def on_key(window, key, scancode, action, mods):
                 g_camera.target = np.array([cx, cy, cz])
                 g_camera.distance = span * 1.8
                 g_camera.ortho_size = span * 0.6
-                g_camera._dirty = True
+        elif key == glfw.KEY_SPACE:
+            if g_editor.animation_mode:
+                g_editor.playback_playing = not g_editor.playback_playing
 
 
 @_safe_callback
@@ -249,9 +373,42 @@ def on_char(window, codepoint):
 
 @_safe_callback
 def on_drop(window, paths):
-    # commit 4 实现：拖入 .xml 自动判定（skeleton XML / animation XML）
-    if paths:
-        logger.info("drop received: %s (handler not yet implemented)", paths[0])
+    if not paths:
+        return
+    path = paths[0]
+    if not str(path).lower().endswith(".xml"):
+        g_ui.push_toast("仅支持 .xml 文件", "warning")
+        return
+
+    def do_load_anim_or_skel():
+        # 优先尝试当作 animation 文件
+        try:
+            doc = parse_animation_index(path)
+            if doc.names:
+                if len(doc.names) == 1:
+                    anim = parse_first_animation(path)
+                    g_editor.enter_animation_mode(anim)
+                    g_ui.push_toast(f"已加载动画: {anim.name}", "success")
+                else:
+                    g_ui._anim_picker_doc = doc
+                    g_ui._anim_picker_filter = ""
+                    g_ui._anim_picker_selected = 0
+                return
+        except Exception:
+            logger.info("not an animation file, try as skeleton: %s", path)
+        # 不是 animation 文件 → 当作 skeleton XML
+        try:
+            g_editor.load_skeleton_xml(path)
+            g_editor.enter_animation_mode(
+                Animation(name="new_animation", end=1.0, speed=1.0))
+            g_ui.push_toast(f"已加载骨架", "success")
+        except Exception as exc:
+            g_ui.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+
+    if g_editor.animation_mode and g_editor._anim_dirty:
+        g_ui._anim_dirty_pending = do_load_anim_or_skel
+    else:
+        do_load_anim_or_skel()
 
 
 @_safe_callback
@@ -261,12 +418,18 @@ def on_resize(window, width, height):
     g_camera.resize(width, height)
 
 
+@_safe_callback
+def on_close(window):
+    if g_editor.animation_mode and g_editor._anim_dirty:
+        g_ui._anim_dirty_pending = lambda: glfw.set_window_should_close(window, True)
+        glfw.set_window_should_close(window, False)
+
+
 # ── main ──────────────────────────────────────
 
 def main():
     global g_renderer, g_imgui_impl, WIN_W, WIN_H
 
-    # 显式声明这是动画工具 entry
     g_ui.app_mode = "animation"
 
     if not glfw.init():
@@ -277,8 +440,7 @@ def main():
     glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
     glfw.window_hint(glfw.SAMPLES, 4)
 
-    window = glfw.create_window(
-        WIN_W, WIN_H, _window_title(), None, None)
+    window = glfw.create_window(WIN_W, WIN_H, _window_title(), None, None)
     if not window:
         glfw.terminate()
         raise RuntimeError("Window creation failed")
@@ -293,14 +455,13 @@ def main():
     glfw.set_char_callback(window, on_char)
     glfw.set_drop_callback(window, on_drop)
     glfw.set_framebuffer_size_callback(window, on_resize)
+    glfw.set_window_close_callback(window, on_close)
 
-    # ModernGL (shares the GLFW context)
     ctx = moderngl.create_context()
     ctx.enable(moderngl.DEPTH_TEST)
 
     g_renderer = VoxelRenderer(ctx)
 
-    # pyimgui
     imgui.create_context()
     font_path = _configure_imgui_fonts()
     g_imgui_impl = GlfwRenderer(window, attach_callbacks=False)
@@ -310,7 +471,7 @@ def main():
     else:
         logger.warning("using default imgui font (no CJK font found)")
 
-    # ── 启动时自动加载 vanilla skeleton ──
+    # 启动时自动加载 vanilla skeleton
     try:
         preset_path = resource_path("presets", "human_skeleton.json")
         g_editor.load_skeleton_preset(preset_path)
@@ -320,16 +481,14 @@ def main():
         logger.exception("failed to load default skeleton")
         g_ui.push_toast(f"加载默认骨架失败: {exc}", "error", exc_info=True)
 
-    # ── 自动进入动画模式 ──
+    # 自动进入动画模式
     try:
         new_anim = Animation(name="new_animation", loop=False, end=1.0, speed=1.0)
-        # enter_animation_mode 会自动加第 0 帧
         g_editor.enter_animation_mode(new_anim)
     except Exception as exc:
         logger.exception("failed to enter animation mode")
         g_ui.push_toast(f"进入动画模式失败: {exc}", "error", exc_info=True)
 
-    # ── 居中到 skeleton ──
     if g_editor.particles:
         xs = [p["x"] for p in g_editor.particles]
         ys = [p["y"] for p in g_editor.particles]
@@ -355,13 +514,11 @@ def main():
             g_imgui_impl.process_inputs()
             _apply_ui_scale()
             g_camera.invert_y = g_ui.invert_y_axis
-            if g_ui._language_dirty:
-                glfw.set_window_title(window, _window_title())
-                g_ui._language_dirty = False
+
+            glfw.set_window_title(window, _window_title())
 
             imgui.new_frame()
 
-            # ── commit 4：动画播放推进 ──
             if g_editor.animation_mode and g_editor.playback_playing:
                 anim = g_editor.current_animation
                 if anim:
@@ -375,13 +532,11 @@ def main():
                         g_editor.playback_playing = False
                     g_editor._apply_interpolated_to_particles(g_editor.playback_time)
 
-            # 上传 skeleton lines（如果 dirty）
             if g_editor.skeleton_dirty and g_renderer is not None:
                 g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks)
                 rebuild_positions_cache()
                 g_editor.skeleton_dirty = False
 
-            # ── 3D 场景 ──
             fb_w, fb_h = glfw.get_framebuffer_size(window)
             ctx.viewport = (0, 0, max(fb_w, 1), max(fb_h, 1))
             ctx.clear(0.15, 0.15, 0.18, 1.0)
@@ -401,8 +556,6 @@ def main():
                 )
                 g_camera.resize(vp_w, vp_h)
                 mvp = g_camera.get_mvp()
-                # 动画模式下 g_editor.voxels 永远为空，render() 内部 n_voxels=0 守卫
-                # 自动跳过体素绘制；skeleton 正常渲染。
                 g_renderer.highlight_selected_particle_indices = list(
                     g_editor.selected_particles
                 )
@@ -410,8 +563,7 @@ def main():
 
             ctx.viewport = (0, 0, max(fb_w, 1), max(fb_h, 1))
 
-            # ── UI ──
-            # overlay（toast / box select 浮层）
+            # overlay
             imgui.set_next_window_position(0, 0)
             imgui.set_next_window_size(WIN_W, WIN_H)
             imgui.begin("##overlay",
@@ -425,24 +577,15 @@ def main():
             draw_toasts(g_ui, WIN_W, toolbar_h_toast, g_ui.ui_scale, draw_list)
             imgui.end()
 
-            # 工具栏（内部按 app_mode 分流）
             draw_toolbar(g_ui, g_editor, g_renderer, g_camera, WIN_W)
-
-            # bone panel：动画模式下内部 early return
             draw_bone_panel(g_ui, g_editor, WIN_W, WIN_H,
                             g_renderer, g_skeleton_sticks, g_camera)
 
-            # 动画面板（commit 4 实现主体）
             draw_animation_panel(g_ui, g_editor, WIN_W, WIN_H)
             draw_anim_source_picker(g_ui, g_editor)
             draw_anim_exit_confirm(g_ui, g_editor)
 
             draw_status_bar(g_ui, g_editor, WIN_W, WIN_H)
-
-            # 复用现有对话框（commit 4 改造为接 anim 的 source_path / save_path）
-            draw_load_dialog(g_ui, g_editor, g_renderer,
-                             g_skeleton_sticks, WIN_W, WIN_H)
-            draw_save_dialog(g_ui, g_editor, g_skeleton_sticks, WIN_W, WIN_H)
 
             imgui.render()
             g_imgui_impl.render(imgui.get_draw_data())
@@ -465,7 +608,8 @@ def main():
                 logger.exception("main loop error")
                 _last_loop_err = (typ, msg, 0)
 
-    g_renderer.release() if hasattr(g_renderer, "release") else None
+    if hasattr(g_renderer, "release"):
+        g_renderer.release()
     g_imgui_impl.shutdown()
     try:
         imgui.destroy_context()

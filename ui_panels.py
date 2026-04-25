@@ -158,6 +158,43 @@ _TEXT = {
         "load_anim": "Load Animation...",
         "save_anim_as": "Save Animation As...",
         "import_mixamo": "Import Mixamo... (TODO)",
+        # ── animation panel ──
+        "anim_name": "Name",
+        "anim_loop": "Loop",
+        "anim_end": "End (s)",
+        "anim_speed": "Speed",
+        "anim_play": "Play",
+        "anim_pause": "Pause",
+        "anim_stop": "Stop",
+        "anim_loop_preview": "Loop preview",
+        "anim_time": "Time",
+        "anim_frame_n_of_m": "Frame {n}/{m}",
+        "anim_frame_time": "Frame time (s)",
+        "anim_prev_frame": "Prev",
+        "anim_next_frame": "Next",
+        "anim_dup_frame": "Duplicate",
+        "anim_del_frame": "Delete frame",
+        "anim_cant_del_last_frame": "Cannot delete the last remaining frame",
+        "anim_no_frame_selected": "No frame selected",
+        "anim_controls_header": "Control events",
+        "anim_add_control": "Add control",
+        "anim_control_key": "key",
+        "anim_control_value": "value",
+        "anim_control_custom": "(custom)",
+        "anim_picker_title": "Choose animation",
+        "anim_picker_help": "{count} animations in file. Pick one:",
+        "anim_picker_open": "Open",
+        "anim_dirty_title": "Unsaved animation changes",
+        "anim_dirty_body": "You have unsaved changes to the current animation.",
+        "anim_dirty_save": "Save and continue",
+        "anim_dirty_discard": "Discard and continue",
+        "anim_dirty_cancel": "Cancel",
+        "anim_loaded": "Loaded animation: {name}",
+        "anim_saved": "Saved: {path}",
+        "anim_indexing": "Indexing animations...",
+        "anim_skeleton_loaded": "Loaded skeleton ({n} particles)",
+        "anim_skeleton_wrong_count": "Skeleton must have {expected} particles, got {actual}",
+        "anim_no_anim_loaded": "No animation loaded",
         "selected_particles_count": "Selected particles: {count}",
         "multi_edit": "Multi-select",
         "align_x": "Align X",
@@ -304,6 +341,43 @@ _TEXT = {
         "load_anim": "加载动画...",
         "save_anim_as": "导出动画...",
         "import_mixamo": "导入 Mixamo... (待实现)",
+        # ── 动画面板 ──
+        "anim_name": "名称",
+        "anim_loop": "循环",
+        "anim_end": "总时长 (秒)",
+        "anim_speed": "速度",
+        "anim_play": "播放",
+        "anim_pause": "暂停",
+        "anim_stop": "停止",
+        "anim_loop_preview": "循环预览",
+        "anim_time": "时间",
+        "anim_frame_n_of_m": "帧 {n}/{m}",
+        "anim_frame_time": "当前帧时间 (秒)",
+        "anim_prev_frame": "上一帧",
+        "anim_next_frame": "下一帧",
+        "anim_dup_frame": "复制",
+        "anim_del_frame": "删除帧",
+        "anim_cant_del_last_frame": "不能删除最后一帧",
+        "anim_no_frame_selected": "未选中帧",
+        "anim_controls_header": "Control 事件",
+        "anim_add_control": "添加 control",
+        "anim_control_key": "key",
+        "anim_control_value": "value",
+        "anim_control_custom": "(自定义)",
+        "anim_picker_title": "选择动画",
+        "anim_picker_help": "文件包含 {count} 个动画，请选择:",
+        "anim_picker_open": "打开",
+        "anim_dirty_title": "未保存的动画修改",
+        "anim_dirty_body": "当前动画有未保存的修改。",
+        "anim_dirty_save": "保存并继续",
+        "anim_dirty_discard": "丢弃并继续",
+        "anim_dirty_cancel": "取消",
+        "anim_loaded": "已加载动画: {name}",
+        "anim_saved": "已保存: {path}",
+        "anim_indexing": "正在索引动画...",
+        "anim_skeleton_loaded": "已加载骨架 ({n} 粒子)",
+        "anim_skeleton_wrong_count": "骨架需要 {expected} 个粒子，当前 {actual}",
+        "anim_no_anim_loaded": "未加载动画",
         "selected_particles_count": "已选粒子: {count}",
         "multi_edit": "多选操作",
         "align_x": "对齐 X",
@@ -388,6 +462,15 @@ class UIState:
         # 应用模式：rwrsb_gui.exe = "skeleton"，rwrsb_anim.exe = "animation"
         # 由各自 entry 的 main 函数显式设置
         self.app_mode = "skeleton"
+        
+        # ── 动画工具临时 UI 状态 ──
+        self._anim_picker_doc = None        # AnimationDocIndex | None：等待用户选 animation 的文件
+        self._anim_picker_filter = ""       # 名字过滤
+        self._anim_picker_selected = -1     # 当前高亮选项
+        self._anim_dirty_pending = None     # callable | None：dirty confirm 用户选 continue 后执行的回调
+        self._anim_save_target_path = ""    # 用于"保存并继续"流程
+        self._anim_drag_frame_idx = -1      # 时间线上拖动中的帧 index（-1 = 没拖）
+        self._anim_drag_frame_started_at = 0.0  # 拖动起始 time（用于 push_undo 阈值）
 
     def push_toast(self, message: str, level: str = "info",
                    also_log: bool = True, exc_info=None) -> None:
@@ -491,64 +574,6 @@ def _disabled_button(label):
         imgui.push_style_var(imgui.STYLE_ALPHA, 0.5)
         imgui.button(label)
         imgui.pop_style_var()
-
-def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
-    """动画模式工具栏。文件操作 / undo / 视图预设。
-
-    本函数假设调用方已经 imgui.begin("##toolbar") 且会负责 imgui.end()。
-    """
-    # ── 文件操作（commit 4 接事件，本 commit 占位即可）──
-    if imgui.button(tr(ui_state, "open_skeleton") + "##anim_open_skel"):
-        # commit 4 实现
-        pass
-    imgui.same_line()
-    if imgui.button(tr(ui_state, "load_anim") + "##anim_load"):
-        # commit 4 实现
-        pass
-    imgui.same_line()
-    if imgui.button(tr(ui_state, "save_anim_as") + "##anim_save"):
-        # commit 4 实现
-        pass
-    imgui.same_line()
-    _disabled_button(tr(ui_state, "import_mixamo") + "##anim_mixamo")
-    imgui.same_line()
-
-    imgui.text("|")
-    imgui.same_line()
-
-    # ── undo / redo（commit 4 改成走 anim_undo/redo；commit 3 暂时直接调）──
-    if imgui.button(tr(ui_state, "undo") + "##anim_undo"):
-        undo_fn, _ = editor_state.get_effective_undo_redo()
-        undo_fn()
-    imgui.same_line()
-    if imgui.button(tr(ui_state, "redo") + "##anim_redo"):
-        _, redo_fn = editor_state.get_effective_undo_redo()
-        redo_fn()
-    imgui.same_line()
-
-    imgui.text("|")
-    imgui.same_line()
-
-    # ── 视图预设（和绑骨工具栏一致）──
-    if imgui.button(tr(ui_state, "center") + "##anim_center"):
-        camera.reset_to_model(editor_state.voxels)  # voxels 为空时 no-op
-    imgui.same_line()
-    changed_ortho, ortho_v = imgui.checkbox(
-        tr(ui_state, "ortho") + "##anim_ortho", camera.is_ortho)
-    if changed_ortho:
-        camera.set_ortho_enabled(ortho_v)
-    imgui.same_line()
-    if imgui.button(tr(ui_state, "front") + "##anim_front"):
-        camera.set_view_preset("front")
-    imgui.same_line()
-    if imgui.button(tr(ui_state, "side") + "##anim_side"):
-        camera.set_view_preset("side")
-    imgui.same_line()
-    if imgui.button(tr(ui_state, "top") + "##anim_top"):
-        camera.set_view_preset("top")
-    imgui.same_line()
-    if imgui.button(tr(ui_state, "perspective") + "##anim_persp"):
-        camera.set_view_preset("perspective")
 
 def draw_toolbar(ui_state, editor_state, renderer, camera, WIN_W):
     imgui.set_next_window_position(0, 0)
@@ -1505,31 +1530,6 @@ _TOAST_COLORS = {
     "error":   (0.65, 0.20, 0.20),
 }
 
-def draw_animation_panel(ui_state, editor_state, WIN_W, WIN_H):
-    """动画面板（视口底部时间线 + 关键帧 + control 事件）。
-
-    Commit 4 实现主体。本 commit 仅占位。
-    """
-    if not editor_state.animation_mode:
-        return
-    # commit 4 实现
-
-
-def draw_anim_source_picker(ui_state, editor_state):
-    """加载多 animation 文件时的选择对话框。
-
-    Commit 4 实现。
-    """
-    pass
-
-
-def draw_anim_exit_confirm(ui_state, editor_state):
-    """动画模式下脏状态退出确认对话框。
-
-    Commit 4 实现。
-    """
-    pass
-
 def draw_toasts(ui_state, WIN_W, toolbar_h, ui_scale, draw_list):
     """
     在 ##overlay 窗口的 draw_list 上渲染 Toast 通知栏。
@@ -1598,3 +1598,580 @@ def draw_toasts(ui_state, WIN_W, toolbar_h, ui_scale, draw_list):
             mx, my = io.mouse_pos
             hovered = (x <= mx <= x + item_w and y <= my <= y + item_h)
         toast._is_hovered = hovered
+        
+# ============================================================
+# 动画工具：工具栏 / 面板 / 选择对话框 / dirty 确认
+# ============================================================
+
+# 常用 control key（vanilla 见过的 14 个 + 自定义占位）
+_ANIM_CONTROL_KEYS = [
+    "action", "bounce", "cycle", "cycle_part", "effect", "hit_ground",
+    "magazine", "push", "reload", "shoot", "stop", "strong_hand",
+    "swing", "weak_hand",
+]
+
+
+def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
+    """动画模式工具栏。文件操作 / undo / 视图预设。"""
+    if imgui.button(tr(ui_state, "open_skeleton") + "##anim_open_skel"):
+        _anim_action_open_skeleton(ui_state, editor_state)
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "load_anim") + "##anim_load"):
+        _anim_action_load_animation(ui_state, editor_state)
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "save_anim_as") + "##anim_save"):
+        _anim_action_save_animation(ui_state, editor_state)
+    imgui.same_line()
+    _disabled_button(tr(ui_state, "import_mixamo") + "##anim_mixamo")
+    imgui.same_line()
+
+    imgui.text("|")
+    imgui.same_line()
+
+    if imgui.button(tr(ui_state, "undo") + "##anim_undo"):
+        undo_fn, _ = editor_state.get_effective_undo_redo()
+        undo_fn()
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "redo") + "##anim_redo"):
+        _, redo_fn = editor_state.get_effective_undo_redo()
+        redo_fn()
+    imgui.same_line()
+
+    imgui.text("|")
+    imgui.same_line()
+
+    if imgui.button(tr(ui_state, "front") + "##anim_front"):
+        camera.set_view_preset("front")
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "side") + "##anim_side"):
+        camera.set_view_preset("side")
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "top") + "##anim_top"):
+        camera.set_view_preset("top")
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "perspective") + "##anim_persp"):
+        camera.set_view_preset("perspective")
+    imgui.same_line()
+    changed_ortho, ortho_v = imgui.checkbox(
+        tr(ui_state, "ortho") + "##anim_ortho", camera.is_ortho)
+    if changed_ortho:
+        camera.set_ortho_enabled(ortho_v)
+
+
+# ── 工具栏按钮：操作实现 ──────────────────────────
+
+def _anim_check_dirty_or_run(ui_state, editor_state, action):
+    """通用 dirty 守卫：dirty 时存 pending action 并 return False；不 dirty 直接执行 action 并 return True。"""
+    if editor_state.animation_mode and editor_state._anim_dirty:
+        ui_state._anim_dirty_pending = action
+        return False
+    action()
+    return True
+
+
+def _anim_action_open_skeleton(ui_state, editor_state):
+    """加载用户自定义 skeleton XML（异形骨场景）。"""
+    def do():
+        from file_dialogs import open_file_dialog, _is_supported as _fd_supported
+        if not _fd_supported():
+            ui_state.push_toast("系统对话框不可用", "error")
+            return
+        try:
+            path = open_file_dialog(
+                tr(ui_state, "open_skeleton"),
+                [("XML files", "*.xml"), ("All files", "*.*")],
+            )
+        except Exception as exc:
+            ui_state.push_toast(f"打开对话框失败: {exc}", "error", exc_info=True)
+            return
+        if not path:
+            return
+        try:
+            editor_state.load_skeleton_xml(path)
+        except Exception as exc:
+            ui_state.push_toast(f"加载骨架失败: {exc}", "error", exc_info=True)
+            return
+        # 加载完后尝试自动进入空动画
+        try:
+            from animation_io import Animation
+            new_anim = Animation(name="new_animation", loop=False, end=1.0, speed=1.0)
+            editor_state.enter_animation_mode(new_anim)
+            ui_state.push_toast(
+                tr(ui_state, "anim_skeleton_loaded", n=len(editor_state.particles)),
+                "info",
+            )
+        except ValueError as exc:
+            ui_state.push_toast(str(exc), "error")
+        except Exception as exc:
+            ui_state.push_toast(f"进入动画模式失败: {exc}", "error", exc_info=True)
+    _anim_check_dirty_or_run(ui_state, editor_state, do)
+
+
+def _anim_action_load_animation(ui_state, editor_state):
+    """加载现有 animation XML。单 anim 直接进入；多 anim 弹选择对话框。"""
+    def do():
+        from file_dialogs import open_file_dialog, _is_supported as _fd_supported
+        from animation_io import (parse_animation_index, parse_single_animation,
+                                  parse_first_animation)
+        if not _fd_supported():
+            ui_state.push_toast("系统对话框不可用", "error")
+            return
+        try:
+            path = open_file_dialog(
+                tr(ui_state, "load_anim"),
+                [("XML files", "*.xml"), ("All files", "*.*")],
+            )
+        except Exception as exc:
+            ui_state.push_toast(f"打开对话框失败: {exc}", "error", exc_info=True)
+            return
+        if not path:
+            return
+        ui_state.push_toast(tr(ui_state, "anim_indexing"), "info")
+        try:
+            doc = parse_animation_index(path)
+        except Exception as exc:
+            ui_state.push_toast(f"解析动画文件失败: {exc}", "error", exc_info=True)
+            return
+        if len(doc.names) == 0:
+            ui_state.push_toast("文件不包含 animation", "error")
+            return
+        if len(doc.names) == 1:
+            try:
+                anim = parse_first_animation(path)
+                editor_state.enter_animation_mode(anim)
+                ui_state.push_toast(
+                    tr(ui_state, "anim_loaded", name=anim.name), "success")
+            except Exception as exc:
+                ui_state.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+            return
+        # 多 animation：弹选择对话框
+        ui_state._anim_picker_doc = doc
+        ui_state._anim_picker_filter = ""
+        ui_state._anim_picker_selected = 0
+    _anim_check_dirty_or_run(ui_state, editor_state, do)
+
+
+def _anim_action_save_animation(ui_state, editor_state):
+    """导出当前 animation 到 XML。"""
+    if not editor_state.animation_mode or not editor_state.current_animation:
+        ui_state.push_toast(tr(ui_state, "anim_no_anim_loaded"), "error")
+        return
+    from file_dialogs import save_file_dialog, _is_supported as _fd_supported
+    from animation_io import write_single_animation
+    if not _fd_supported():
+        ui_state.push_toast("系统对话框不可用", "error")
+        return
+    initial = f"{editor_state.current_animation.name}.xml"
+    try:
+        path = save_file_dialog(
+            tr(ui_state, "save_anim_as"),
+            [("XML files", "*.xml"), ("All files", "*.*")],
+            initial_path=initial, default_ext="xml",
+        )
+    except Exception as exc:
+        ui_state.push_toast(f"打开保存对话框失败: {exc}", "error", exc_info=True)
+        return
+    if not path:
+        return
+    try:
+        write_single_animation(path, editor_state.current_animation)
+        editor_state._anim_dirty = False
+        ui_state.push_toast(tr(ui_state, "anim_saved", path=path), "success")
+    except Exception as exc:
+        ui_state.push_toast(f"保存失败: {exc}", "error", exc_info=True)
+
+
+# ── 选择对话框 (多 animation 文件) ────────────────
+
+def draw_anim_source_picker(ui_state, editor_state):
+    """加载多 animation 文件后弹出的选择对话框。"""
+    if ui_state._anim_picker_doc is None:
+        return
+    from animation_io import parse_single_animation
+
+    doc = ui_state._anim_picker_doc
+    title = tr(ui_state, "anim_picker_title")
+    imgui.open_popup(title)
+    imgui.set_next_window_size(420, 480)
+    opened, _ = imgui.begin_popup_modal(title, flags=imgui.WINDOW_NO_RESIZE)
+    if opened:
+        imgui.text(tr(ui_state, "anim_picker_help", count=len(doc.names)))
+        imgui.set_next_item_width(-1)
+        _, ui_state._anim_picker_filter = imgui.input_text(
+            "##filter", ui_state._anim_picker_filter, 128)
+
+        flt = ui_state._anim_picker_filter.lower().strip()
+        # 过滤 + 限制最多显示 1000 个（极端 1069 文件下不卡）
+        filtered = [(i, n) for i, n in enumerate(doc.names)
+                    if not flt or flt in n.lower()][:1000]
+
+        imgui.begin_child("##list", 0, 350, border=True)
+        for display_idx, (orig_idx, name) in enumerate(filtered):
+            is_sel = (ui_state._anim_picker_selected == orig_idx)
+            clicked, _ = imgui.selectable(
+                f"{name}##{orig_idx}", is_sel,
+                flags=imgui.SELECTABLE_ALLOW_DOUBLE_CLICK,
+            )
+            if clicked:
+                ui_state._anim_picker_selected = orig_idx
+                if imgui.is_mouse_double_clicked(0):
+                    _open_picker_choice(ui_state, editor_state)
+                    imgui.end_child()
+                    imgui.end_popup()
+                    return
+        imgui.end_child()
+
+        if imgui.button(tr(ui_state, "anim_picker_open") + "##picker_ok"):
+            _open_picker_choice(ui_state, editor_state)
+            imgui.end_popup()
+            return
+        imgui.same_line()
+        if imgui.button(tr(ui_state, "cancel") + "##picker_cancel"):
+            ui_state._anim_picker_doc = None
+            imgui.close_current_popup()
+
+        imgui.end_popup()
+
+
+def _open_picker_choice(ui_state, editor_state):
+    from animation_io import parse_single_animation
+    doc = ui_state._anim_picker_doc
+    sel = ui_state._anim_picker_selected
+    if doc is None or sel < 0 or sel >= len(doc.names):
+        return
+    try:
+        anim = parse_single_animation(doc.path, sel)
+        editor_state.enter_animation_mode(anim)
+        editor_state.animation_source_doc = doc
+        editor_state.animation_source_idx = sel
+        ui_state.push_toast(
+            tr(ui_state, "anim_loaded", name=anim.name), "success")
+    except Exception as exc:
+        ui_state.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+    ui_state._anim_picker_doc = None
+
+
+# ── dirty 确认对话框 ──────────────────────────────
+
+def draw_anim_exit_confirm(ui_state, editor_state):
+    """动画模式下脏状态退出确认对话框。"""
+    if ui_state._anim_dirty_pending is None:
+        return
+    title = tr(ui_state, "anim_dirty_title")
+    imgui.open_popup(title)
+    imgui.set_next_window_size(420, 160)
+    opened, _ = imgui.begin_popup_modal(title, flags=imgui.WINDOW_NO_RESIZE)
+    if opened:
+        imgui.text(tr(ui_state, "anim_dirty_body"))
+        imgui.spacing()
+
+        if imgui.button(tr(ui_state, "anim_dirty_save"), width=-1):
+            # 调用 save 流程；如果用户 cancel save 对话框，pending 不清，下次还是 dirty
+            _anim_action_save_animation(ui_state, editor_state)
+            if not editor_state._anim_dirty:
+                pending = ui_state._anim_dirty_pending
+                ui_state._anim_dirty_pending = None
+                imgui.close_current_popup()
+                if pending:
+                    pending()
+                imgui.end_popup()
+                return
+        if imgui.button(tr(ui_state, "anim_dirty_discard"), width=-1):
+            editor_state._anim_dirty = False
+            pending = ui_state._anim_dirty_pending
+            ui_state._anim_dirty_pending = None
+            imgui.close_current_popup()
+            if pending:
+                pending()
+            imgui.end_popup()
+            return
+        if imgui.button(tr(ui_state, "anim_dirty_cancel"), width=-1):
+            ui_state._anim_dirty_pending = None
+            imgui.close_current_popup()
+
+        imgui.end_popup()
+
+
+# ── 动画面板（视口底部）─────────────────────────
+
+def draw_animation_panel(ui_state, editor_state, WIN_W, WIN_H):
+    """动画面板：header / 播放控件 / 时间线 / 当前帧编辑 / control 事件。"""
+    if not editor_state.animation_mode:
+        return
+    panel_h = int(200 * ui_state.ui_scale)
+    status_h = int(24 * ui_state.ui_scale)
+    panel_y = WIN_H - status_h - panel_h
+    imgui.set_next_window_position(0, panel_y)
+    imgui.set_next_window_size(WIN_W, panel_h)
+    imgui.begin("##anim_panel", flags=FIXED_FLAGS)
+
+    anim = editor_state.current_animation
+    if anim is None:
+        imgui.text_disabled(tr(ui_state, "anim_no_anim_loaded"))
+        imgui.end()
+        return
+
+    # ── header（左半 + 右半两列） ──
+    imgui.columns(2, "##anim_header", border=False)
+    # 左：name / loop
+    imgui.set_next_item_width(-1)
+    chg_name, new_name = imgui.input_text(
+        tr(ui_state, "anim_name") + "##anim_name", anim.name, 128)
+    if chg_name and new_name != anim.name:
+        editor_state.anim_set_header(name=new_name)
+    chg_loop, new_loop = imgui.checkbox(
+        tr(ui_state, "anim_loop") + "##anim_loop", anim.loop)
+    if chg_loop:
+        editor_state.anim_set_header(loop=new_loop)
+    imgui.same_line()
+    chg_prev, new_prev = imgui.checkbox(
+        tr(ui_state, "anim_loop_preview") + "##loop_prev",
+        editor_state.playback_loop_preview)
+    if chg_prev:
+        editor_state.playback_loop_preview = new_prev
+
+    imgui.next_column()
+    # 右：end / speed
+    imgui.set_next_item_width(120)
+    chg_end, new_end = imgui.input_float(
+        tr(ui_state, "anim_end") + "##anim_end", float(anim.end),
+        0.0, 0.0, "%.3f")
+    if chg_end and abs(new_end - anim.end) > 1e-9:
+        editor_state.anim_set_header(end=new_end)
+    imgui.set_next_item_width(120)
+    chg_spd, new_spd = imgui.input_float(
+        tr(ui_state, "anim_speed") + "##anim_speed", float(anim.speed),
+        0.0, 0.0, "%.3f")
+    if chg_spd and abs(new_spd - anim.speed) > 1e-9:
+        editor_state.anim_set_header(speed=new_spd)
+    imgui.columns(1)
+
+    imgui.separator()
+
+    # ── 播放控件 ──
+    if editor_state.playback_playing:
+        if imgui.button(tr(ui_state, "anim_pause") + "##anim_pause"):
+            editor_state.playback_playing = False
+    else:
+        if imgui.button(tr(ui_state, "anim_play") + "##anim_play"):
+            editor_state.playback_playing = True
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "anim_stop") + "##anim_stop"):
+        editor_state.playback_playing = False
+        editor_state.playback_time = 0.0
+        if anim.frames:
+            editor_state.anim_select_frame(0)
+    imgui.same_line()
+
+    # 时间 slider（拖动 = scrub）
+    imgui.set_next_item_width(280)
+    end = max(anim.end, 1e-3)
+    chg_t, new_t = imgui.slider_float(
+        tr(ui_state, "anim_time") + "##anim_time",
+        float(editor_state.playback_time), 0.0, end, "%.3f")
+    if chg_t:
+        editor_state.playback_time = float(new_t)
+        editor_state._apply_interpolated_to_particles(new_t)
+        editor_state.playback_playing = False
+
+    # 当前帧 / 帧总数
+    imgui.same_line()
+    imgui.text(tr(ui_state, "anim_frame_n_of_m",
+                  n=editor_state.current_frame_idx + 1 if editor_state.current_frame_idx >= 0 else 0,
+                  m=len(anim.frames)))
+
+    imgui.separator()
+
+    # ── 时间线 ──
+    _draw_anim_timeline(ui_state, editor_state, WIN_W)
+
+    imgui.separator()
+
+    # ── 当前帧编辑 + control 事件（左右两栏）──
+    cur = editor_state.current_frame_idx
+    valid_frame = (0 <= cur < len(anim.frames))
+
+    imgui.columns(2, "##anim_frame_split", border=True)
+    imgui.set_column_width(0, 280)
+
+    # 左栏：当前帧 time / 上下帧 / 复制 / 删除
+    if valid_frame:
+        frame = anim.frames[cur]
+        imgui.set_next_item_width(120)
+        chg_ft, new_ft = imgui.input_float(
+            tr(ui_state, "anim_frame_time") + "##frame_time",
+            float(frame.time), 0.0, 0.0, "%.4f")
+        if chg_ft and abs(new_ft - frame.time) > 1e-9:
+            editor_state.anim_set_frame_time(cur, new_ft)
+
+        if imgui.button(tr(ui_state, "anim_prev_frame") + "##prev"):
+            if cur > 0:
+                editor_state.anim_select_frame(cur - 1)
+        imgui.same_line()
+        if imgui.button(tr(ui_state, "anim_next_frame") + "##next"):
+            if cur < len(anim.frames) - 1:
+                editor_state.anim_select_frame(cur + 1)
+        imgui.same_line()
+        if imgui.button(tr(ui_state, "anim_dup_frame") + "##dup"):
+            editor_state.anim_duplicate_current_frame()
+
+        _push_red()
+        if imgui.button(tr(ui_state, "anim_del_frame") + "##del", width=-1):
+            ok = editor_state.anim_delete_frame(cur)
+            if not ok:
+                ui_state.push_toast(
+                    tr(ui_state, "anim_cant_del_last_frame"), "error")
+        imgui.pop_style_color()
+    else:
+        imgui.text_disabled(tr(ui_state, "anim_no_frame_selected"))
+
+    imgui.next_column()
+
+    # 右栏：control 事件
+    imgui.text(tr(ui_state, "anim_controls_header"))
+    if valid_frame:
+        frame = anim.frames[cur]
+        if imgui.button(tr(ui_state, "anim_add_control") + "##add_ctrl"):
+            editor_state.anim_add_control(cur)
+
+        for ci, (key, value) in enumerate(list(frame.controls)):
+            imgui.push_id(f"ctrl-{ci}")
+            # key combo（包含 custom 选项）
+            try:
+                cur_key_idx = _ANIM_CONTROL_KEYS.index(key)
+            except ValueError:
+                cur_key_idx = len(_ANIM_CONTROL_KEYS)  # custom
+
+            options = _ANIM_CONTROL_KEYS + [tr(ui_state, "anim_control_custom")]
+            imgui.set_next_item_width(120)
+            chg_k, new_k = imgui.combo("##key", cur_key_idx, options)
+            if chg_k:
+                if new_k < len(_ANIM_CONTROL_KEYS):
+                    editor_state.anim_set_control(cur, ci, key=_ANIM_CONTROL_KEYS[new_k])
+                # custom 选项不做 set，让用户用下面的 input_text 改
+
+            if cur_key_idx >= len(_ANIM_CONTROL_KEYS):
+                imgui.same_line()
+                imgui.set_next_item_width(80)
+                chg_kt, new_kt = imgui.input_text("##key_text", key, 32)
+                if chg_kt and new_kt != key:
+                    editor_state.anim_set_control(cur, ci, key=new_kt)
+
+            imgui.same_line()
+            imgui.set_next_item_width(60)
+            chg_v, new_v = imgui.input_int("##val", int(value), 0, 0)
+            if chg_v and new_v != value:
+                editor_state.anim_set_control(cur, ci, value=new_v)
+
+            imgui.same_line()
+            _push_red()
+            if imgui.button("-##del_ctrl"):
+                editor_state.anim_remove_control(cur, ci)
+                imgui.pop_style_color()
+                imgui.pop_id()
+                break  # 列表变了，下一帧重画
+            imgui.pop_style_color()
+
+            imgui.pop_id()
+    else:
+        imgui.text_disabled(tr(ui_state, "anim_no_frame_selected"))
+
+    imgui.columns(1)
+    imgui.end()
+
+
+def _draw_anim_timeline(ui_state, editor_state, WIN_W):
+    """时间线：水平条 + 菱形关键帧 + playhead。"""
+    anim = editor_state.current_animation
+    if anim is None:
+        return
+
+    # 时间线 widget
+    avail_w = imgui.get_content_region_available_width()
+    timeline_w = max(avail_w - 20, 200)
+    timeline_h = 36
+    cursor = imgui.get_cursor_screen_pos()
+    tx, ty = cursor[0] + 10, cursor[1] + 4
+
+    # invisible_button 抓取该区域的鼠标输入
+    imgui.invisible_button("##anim_timeline", timeline_w, timeline_h)
+    is_hovered = imgui.is_item_hovered()
+    is_active = imgui.is_item_active()
+    mouse_x, _ = imgui.get_mouse_pos()
+    rel_x = mouse_x - tx
+
+    end = max(anim.end, 1e-3)
+    draw = imgui.get_window_draw_list()
+
+    # 背景条
+    bar_y = ty + timeline_h // 2
+    draw.add_rect_filled(tx, bar_y - 2, tx + timeline_w, bar_y + 2,
+                         imgui.get_color_u32_rgba(0.3, 0.3, 0.35, 1.0))
+
+    # playhead
+    play_x = tx + (editor_state.playback_time / end) * timeline_w
+    draw.add_line(play_x, ty, play_x, ty + timeline_h,
+                  imgui.get_color_u32_rgba(1.0, 1.0, 0.2, 1.0), 2.0)
+
+    # 关键帧菱形
+    diamond_size = 6
+    cur_idx = editor_state.current_frame_idx
+    hit_frame_idx = -1
+    for fi, f in enumerate(anim.frames):
+        fx = tx + (f.time / end) * timeline_w
+        is_cur = (fi == cur_idx)
+        col = (1.0, 0.85, 0.2, 1.0) if is_cur else (0.4, 0.7, 1.0, 1.0)
+        c = imgui.get_color_u32_rgba(*col)
+        # 菱形 = 4 顶点 add_quad_filled
+        draw.add_quad_filled(
+            fx, bar_y - diamond_size,
+            fx + diamond_size, bar_y,
+            fx, bar_y + diamond_size,
+            fx - diamond_size, bar_y,
+            c,
+        )
+        # 命中检测（鼠标在区域内 + 距离 <= diamond_size）
+        if is_hovered and abs(rel_x - (fx - tx)) < diamond_size + 2:
+            hit_frame_idx = fi
+
+    # 鼠标交互
+    if is_hovered and imgui.is_mouse_clicked(0):
+        if hit_frame_idx >= 0:
+            # 点中关键帧 → 选中 + 应用
+            editor_state.anim_select_frame(hit_frame_idx)
+            ui_state._anim_drag_frame_idx = hit_frame_idx
+            ui_state._anim_drag_frame_started_at = anim.frames[hit_frame_idx].time
+        else:
+            # 点空白 → 移 playhead
+            t = max(0.0, min(end, (rel_x / timeline_w) * end))
+            editor_state.playback_time = t
+            editor_state._apply_interpolated_to_particles(t)
+            editor_state.playback_playing = False
+
+    if is_active and imgui.is_mouse_dragging(0) and ui_state._anim_drag_frame_idx >= 0:
+        # 拖动关键帧
+        new_t = max(0.0, min(end, (rel_x / timeline_w) * end))
+        idx = ui_state._anim_drag_frame_idx
+        if 0 <= idx < len(anim.frames):
+            anim.frames[idx].time = new_t  # 临时更新（不 push undo）
+
+    if not imgui.is_mouse_down(0) and ui_state._anim_drag_frame_idx >= 0:
+        # 拖动结束
+        idx = ui_state._anim_drag_frame_idx
+        if 0 <= idx < len(anim.frames):
+            final_t = anim.frames[idx].time
+            # 还原 + 走正式 set_frame_time（push undo + sort）
+            anim.frames[idx].time = ui_state._anim_drag_frame_started_at
+            editor_state.anim_set_frame_time(idx, final_t)
+        ui_state._anim_drag_frame_idx = -1
+
+    # 双击空白加帧 / 双击关键帧删帧
+    if is_hovered and imgui.is_mouse_double_clicked(0):
+        if hit_frame_idx >= 0:
+            ok = editor_state.anim_delete_frame(hit_frame_idx)
+            if not ok:
+                ui_state.push_toast(
+                    tr(ui_state, "anim_cant_del_last_frame"), "error")
+        else:
+            t = max(0.0, min(end, (rel_x / timeline_w) * end))
+            editor_state.anim_add_frame_at(t)
