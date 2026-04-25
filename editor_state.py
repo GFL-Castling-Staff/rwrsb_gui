@@ -67,6 +67,16 @@ def _make_stick_name(particles_by_id, pa_id, pb_id):
     return f"{na}_{nb}"
 
 
+def _rotation_matrix(axis, angle_rad):
+    """构造绕世界坐标轴旋转的 3×3 矩阵。axis: 'x' | 'y' | 'z'。"""
+    c, s = float(np.cos(angle_rad)), float(np.sin(angle_rad))
+    if axis == "x":
+        return np.array([[1, 0, 0], [0, c, -s], [0, s, c]], dtype=np.float32)
+    if axis == "y":
+        return np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]], dtype=np.float32)
+    return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]], dtype=np.float32)
+
+
 class EditorState:
     def __init__(self):
         self.voxels = []
@@ -313,7 +323,63 @@ class EditorState:
         for idx in sorted(self.selected_particles):
             self.particles[idx][axis] = anchor
         self._mark_skeleton_changed()
-        
+
+    def rotate_selected_particles(self, angle_x_deg, angle_y_deg, angle_z_deg, pivot_mode="active"):
+        """绕指定 pivot 按 X→Y→Z 顺序旋转所有 selected_particles。
+
+        pivot_mode: "active" | "centroid" | "world_origin"
+        角度单位：度（deg）。全为 0 时 no-op。
+        """
+        if not self.selected_particles:
+            raise ValueError("至少选择 1 个粒子")
+
+        if pivot_mode == "active":
+            if self.active_particle_idx < 0 or self.active_particle_idx not in self.selected_particles:
+                raise ValueError("Active 粒子必须在选择集中")
+            pa = self.particles[self.active_particle_idx]
+            pivot = np.array([pa["x"], pa["y"], pa["z"]], dtype=np.float32)
+        elif pivot_mode == "centroid":
+            coords = np.array(
+                [[self.particles[i]["x"], self.particles[i]["y"], self.particles[i]["z"]]
+                 for i in self.selected_particles],
+                dtype=np.float32,
+            )
+            pivot = coords.mean(axis=0)
+        elif pivot_mode == "world_origin":
+            pivot = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+        else:
+            raise ValueError(f"未知 pivot_mode: {pivot_mode}")
+
+        if abs(angle_x_deg) < 1e-9 and abs(angle_y_deg) < 1e-9 and abs(angle_z_deg) < 1e-9:
+            return
+
+        if self.animation_mode:
+            self._anim_push_undo()
+        else:
+            self._push_undo()
+
+        # 按 X→Y→Z 顺序应用旋转（矩阵从右向左累乘：R = Rz @ Ry @ Rx）
+        R = np.eye(3, dtype=np.float32)
+        if abs(angle_x_deg) >= 1e-9:
+            R = _rotation_matrix("x", np.radians(angle_x_deg)) @ R
+        if abs(angle_y_deg) >= 1e-9:
+            R = _rotation_matrix("y", np.radians(angle_y_deg)) @ R
+        if abs(angle_z_deg) >= 1e-9:
+            R = _rotation_matrix("z", np.radians(angle_z_deg)) @ R
+
+        for idx in self.selected_particles:
+            p = self.particles[idx]
+            p_old = np.array([p["x"], p["y"], p["z"]], dtype=np.float32)
+            p_new = pivot + R @ (p_old - pivot)
+            p["x"] = float(p_new[0])
+            p["y"] = float(p_new[1])
+            p["z"] = float(p_new[2])
+
+        self._mark_skeleton_changed()
+
+        if self.animation_mode:
+            self.commit_particle_move_to_frame()
+
     def set_tool_mode(self, mode):
         """切换工具模式。离开 bone_edit 时清空 selected_particles。"""
         valid = ("brush", "voxel_select", "bone_edit")

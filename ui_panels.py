@@ -238,6 +238,21 @@ _TEXT = {
         "invalid_binding_stats": "Voxels: {voxels} | Sticks: {sticks} | Bindings: {bindings}",
         "invalid_binding_skeleton_only": "Load skeleton only",
         "invalid_binding_abort": "Cancel load",
+        # ── 旋转选中粒子 popup ──
+        "rotate_btn": "Rotate...",
+        "rotate_popup_title": "Rotate Selected Particles",
+        "rotate_pivot": "Pivot",
+        "rotate_pivot_active": "Active particle",
+        "rotate_pivot_centroid": "Centroid",
+        "rotate_pivot_world": "World origin",
+        "rotate_angle_x": "Angle X",
+        "rotate_angle_y": "Angle Y",
+        "rotate_angle_z": "Angle Z",
+        "rotate_apply": "Apply rotation",
+        "rotate_reset": "Reset to 0",
+        "rotate_hint_order": "Rotation applied in X → Y → Z order",
+        "rotate_disabled_no_sel": "Select at least 1 particle to rotate",
+        "rotate_disabled_active_not_in_sel": "Active particle must be in the selection",
     },
     "zh": {
         "open_vox": "打开 VOX",
@@ -442,6 +457,21 @@ _TEXT = {
         "invalid_binding_stats": "Voxels: {voxels} | Sticks: {sticks} | Bindings: {bindings}",
         "invalid_binding_skeleton_only": "只加载骨架",
         "invalid_binding_abort": "放弃加载",
+        # ── 旋转选中粒子 popup ──
+        "rotate_btn": "旋转...",
+        "rotate_popup_title": "旋转选中粒子",
+        "rotate_pivot": "旋转中心",
+        "rotate_pivot_active": "Active 粒子",
+        "rotate_pivot_centroid": "几何中心",
+        "rotate_pivot_world": "世界原点",
+        "rotate_angle_x": "角度 X",
+        "rotate_angle_y": "角度 Y",
+        "rotate_angle_z": "角度 Z",
+        "rotate_apply": "应用旋转",
+        "rotate_reset": "重置为 0",
+        "rotate_hint_order": "按 X → Y → Z 顺序应用",
+        "rotate_disabled_no_sel": "至少选择 1 个粒子",
+        "rotate_disabled_active_not_in_sel": "Active 粒子必须在选择集中",
     },
 }
 
@@ -522,6 +552,12 @@ class UIState:
         self._invalid_binding_reason = ""
         self._invalid_binding_info = {}
         self._invalid_binding_after_load = None
+
+        # 旋转 popup 暂存值
+        self.rotate_pivot_mode = "active"   # "active" | "centroid" | "world_origin"
+        self.rotate_angle_x = 0.0
+        self.rotate_angle_y = 0.0
+        self.rotate_angle_z = 0.0
 
     def push_toast(self, message: str, level: str = "info",
                    also_log: bool = True, exc_info=None) -> None:
@@ -1754,6 +1790,119 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
             ui_state.show_voxel_original_colors)
         if chg_oc:
             ui_state.show_voxel_original_colors = v_oc
+        imgui.separator()
+        imgui.text_disabled(tr(ui_state, "tip_axis"))
+        imgui.end_popup()
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "rotate_btn") + "##anim_rotate_btn"):
+        imgui.open_popup("##anim_rotate_popup")
+    if imgui.begin_popup("##anim_rotate_popup"):
+        imgui.text(tr(ui_state, "rotate_popup_title"))
+        imgui.separator()
+
+        # 启用条件
+        n_sel = len(editor_state.selected_particles)
+        can_rotate = n_sel >= 1
+        needs_active = (ui_state.rotate_pivot_mode == "active")
+        active_in_sel = (
+            editor_state.active_particle_idx >= 0
+            and editor_state.active_particle_idx in editor_state.selected_particles
+        )
+        if needs_active and not active_in_sel:
+            can_rotate = False
+
+        # 旋转中心下拉
+        pivot_options = ["active", "centroid", "world_origin"]
+        pivot_labels = [
+            tr(ui_state, "rotate_pivot_active"),
+            tr(ui_state, "rotate_pivot_centroid"),
+            tr(ui_state, "rotate_pivot_world"),
+        ]
+        cur_piv = pivot_options.index(ui_state.rotate_pivot_mode)
+        imgui.set_next_item_width(160)
+        chg_piv, new_piv = imgui.combo(
+            tr(ui_state, "rotate_pivot") + "##rot_pivot", cur_piv, pivot_labels
+        )
+        if chg_piv:
+            ui_state.rotate_pivot_mode = pivot_options[new_piv]
+
+        imgui.separator()
+
+        if not can_rotate:
+            if n_sel < 1:
+                imgui.text_colored(tr(ui_state, "rotate_disabled_no_sel"), 1.0, 0.6, 0.3, 1.0)
+            else:
+                imgui.text_colored(
+                    tr(ui_state, "rotate_disabled_active_not_in_sel"), 1.0, 0.6, 0.3, 1.0
+                )
+        else:
+            def _do_quick_rotate(axis, angle_deg):
+                kwargs = {"angle_x_deg": 0.0, "angle_y_deg": 0.0, "angle_z_deg": 0.0}
+                kwargs[f"angle_{axis}_deg"] = angle_deg
+                try:
+                    editor_state.rotate_selected_particles(
+                        pivot_mode=ui_state.rotate_pivot_mode, **kwargs
+                    )
+                except ValueError as exc:
+                    ui_state.push_toast(str(exc), "error")
+                except Exception as exc:
+                    ui_state.push_toast(f"旋转失败: {exc}", "error", exc_info=True)
+
+            def _angle_row(label_key, attr_name, axis):
+                imgui.set_next_item_width(80)
+                chg, val = imgui.input_float(
+                    tr(ui_state, label_key) + f"##{attr_name}",
+                    getattr(ui_state, attr_name), 0.0, 0.0, "%.1f"
+                )
+                if chg:
+                    setattr(ui_state, attr_name, float(val))
+                imgui.same_line()
+                if imgui.button(f"+90##{axis}"):
+                    _do_quick_rotate(axis, 90.0)
+                imgui.same_line()
+                if imgui.button(f"-90##{axis}"):
+                    _do_quick_rotate(axis, -90.0)
+                imgui.same_line()
+                if imgui.button(f"180##{axis}"):
+                    _do_quick_rotate(axis, 180.0)
+
+            _angle_row("rotate_angle_x", "rotate_angle_x", "x")
+            _angle_row("rotate_angle_y", "rotate_angle_y", "y")
+            _angle_row("rotate_angle_z", "rotate_angle_z", "z")
+
+        imgui.text_disabled(tr(ui_state, "rotate_hint_order"))
+        imgui.separator()
+
+        # Apply / Reset
+        apply_disabled = (not can_rotate) or (
+            abs(ui_state.rotate_angle_x) < 1e-9
+            and abs(ui_state.rotate_angle_y) < 1e-9
+            and abs(ui_state.rotate_angle_z) < 1e-9
+        )
+        if apply_disabled:
+            _disabled_button(tr(ui_state, "rotate_apply") + "##rot_apply")
+        else:
+            if imgui.button(tr(ui_state, "rotate_apply") + "##rot_apply"):
+                try:
+                    editor_state.rotate_selected_particles(
+                        angle_x_deg=ui_state.rotate_angle_x,
+                        angle_y_deg=ui_state.rotate_angle_y,
+                        angle_z_deg=ui_state.rotate_angle_z,
+                        pivot_mode=ui_state.rotate_pivot_mode,
+                    )
+                    ui_state.rotate_angle_x = 0.0
+                    ui_state.rotate_angle_y = 0.0
+                    ui_state.rotate_angle_z = 0.0
+                except ValueError as exc:
+                    ui_state.push_toast(str(exc), "error")
+                except Exception as exc:
+                    ui_state.push_toast(f"旋转失败: {exc}", "error", exc_info=True)
+        imgui.same_line()
+        if imgui.button(tr(ui_state, "rotate_reset") + "##rot_reset"):
+            ui_state.rotate_angle_x = 0.0
+            ui_state.rotate_angle_y = 0.0
+            ui_state.rotate_angle_z = 0.0
+
         imgui.end_popup()
     imgui.same_line()
     imgui.text("|")
