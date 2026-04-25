@@ -624,12 +624,15 @@ def main():
 
             # voxel GPU buffer 更新
             if g_editor.gpu_dirty and g_editor.voxels and g_renderer is not None:
-                if g_editor.animation_mode and g_editor._voxel_groups:
-                    # 动画蒙皮：仅位置变化，跳过颜色重建
+                _n = len(g_editor.voxels)
+                if (g_editor.animation_mode and g_editor._voxel_groups
+                        and g_renderer.n_voxels == _n):
+                    # 快速路径：renderer VBO 已建好且体素数一致，仅更新位置
                     arr = np.array(g_editor.voxels, dtype=np.float32)
                     g_renderer.update_voxel_positions(arr[:, :3])
                     g_editor.gpu_dirty = False
                 else:
+                    # 全量上传：首次加载或体素数量变化（建 VAO/VBO）
                     positions, colors, selected = g_editor.build_instance_arrays()
                     g_renderer.upload_voxels(positions, colors, selected)
 
