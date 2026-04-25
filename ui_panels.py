@@ -787,6 +787,7 @@ def _draw_particle_editor(ui_state, editor_state):
             if imgui.button(tr(ui_state, "delete_particle"), width=-1):
                 editor_state.delete_particle(idx)
                 ui_state._bone_error = ""
+                imgui.pop_style_color()
                 imgui.tree_pop()
                 imgui.pop_id()
                 return
