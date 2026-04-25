@@ -95,6 +95,24 @@ class EditorState:
         self.gpu_dirty = True
         self.skeleton_dirty = True
 
+        # ── 动画编辑状态 ──
+        self.animation_mode = False
+        self.current_animation = None              # animation_io.Animation | None
+        self.animation_source_doc = None           # AnimationDocIndex | None
+        self.animation_source_idx = -1
+        self.current_frame_idx = -1
+        self.playback_time = 0.0
+        self.playback_playing = False
+        self.playback_loop_preview = True          # 预览循环开关（独立于 anim.loop）
+
+        # 进入动画模式前的 particle 位置备份
+        self._particle_positions_before_anim = None
+        self._anim_dirty = False                   # 动画数据是否有未保存修改
+
+        # 动画模式独立 undo 栈
+        self._anim_undo_stack = []
+        self._anim_redo_stack = []
+
     def _preset_dir(self):
         return resource_path("presets")
 
@@ -297,6 +315,10 @@ class EditorState:
 
     def load_vox(self, path, trans_bias=None):
         from xml_io import parse_vox
+        
+        # 防御性退出动画模式（避免 _particle_positions_before_anim 错位）
+        if self.animation_mode:
+            self.exit_animation_mode(force=True)
 
         if trans_bias is not None:
             self.trans_bias = trans_bias
@@ -319,6 +341,10 @@ class EditorState:
 
     def load_xml(self, path, trans_bias=None):
         from xml_io import parse_xml
+        
+        # 防御性退出动画模式
+        if self.animation_mode:
+            self.exit_animation_mode(force=True)
 
         if trans_bias is not None:
             self.trans_bias = trans_bias
@@ -344,6 +370,10 @@ class EditorState:
         return skeleton
 
     def load_skeleton_preset(self, preset_path=None):
+        # 防御性退出动画模式
+        if self.animation_mode:
+            self.exit_animation_mode(force=True)
+            
         if preset_path is None:
             preset_path = resource_path("presets", "human_skeleton.json")
         data = json.loads(Path(preset_path).read_text(encoding="utf-8"))
@@ -745,3 +775,184 @@ class EditorState:
     @active_bone_idx.setter
     def active_bone_idx(self, value):
         self.active_stick_idx = value
+        
+    # ──────────────────────────────────────────────
+    # 动画模式：进入 / 退出 / 帧应用
+    # ──────────────────────────────────────────────
+
+    def enter_animation_mode(self, animation):
+        """进入动画模式，载入 animation 作为编辑目标。
+
+        要求 particle 数 = EXPECTED_PARTICLE_COUNT (15)，否则抛 ValueError。
+        如果 animation.frames 为空，自动加一帧 = 当前 particle 姿态。
+        """
+        from animation_io import EXPECTED_PARTICLE_COUNT, AnimationFrame
+        if len(self.particles) != EXPECTED_PARTICLE_COUNT:
+            raise ValueError(
+                f"Animation editing requires {EXPECTED_PARTICLE_COUNT} particles, "
+                f"current skeleton has {len(self.particles)}"
+            )
+
+        if not animation.frames:
+            # 无关键帧，自动加一帧 = 当前姿态
+            init_positions = [
+                (float(p['x']), float(p['y']), float(p['z']))
+                for p in self.particles
+            ]
+            animation.frames.append(AnimationFrame(time=0.0, positions=init_positions))
+            if animation.end <= 0:
+                animation.end = 1.0
+
+        # 备份原始 particle 位置（exit 时用于恢复）
+        self._particle_positions_before_anim = [
+            (float(p['x']), float(p['y']), float(p['z'])) for p in self.particles
+        ]
+
+        # 进入模式时清空 selected_particles 和镜像
+        self.selected_particles.clear()
+        self.exit_mirror_mode()
+
+        self.animation_mode = True
+        self.current_animation = animation
+        self.current_frame_idx = 0
+        self.playback_time = 0.0
+        self.playback_playing = False
+        self._anim_dirty = False
+        self._anim_undo_stack.clear()
+        self._anim_redo_stack.clear()
+
+        # 视觉上 particle 位置变成第 0 帧
+        self._apply_frame_to_particles(0)
+        logger.info("entered animation mode: %s (%d frames)",
+                    animation.name, len(animation.frames))
+
+    def exit_animation_mode(self, force=False):
+        """退出动画模式。
+
+        返回：
+            None — 已退出
+            "dirty_needs_confirmation" — 有脏状态且 force=False，UI 层应弹 confirm
+        """
+        if not self.animation_mode:
+            return None
+        if self._anim_dirty and not force:
+            return "dirty_needs_confirmation"
+
+        # 恢复 particle 位置
+        if self._particle_positions_before_anim:
+            for i, (x, y, z) in enumerate(self._particle_positions_before_anim):
+                if i < len(self.particles):
+                    self.particles[i]['x'] = x
+                    self.particles[i]['y'] = y
+                    self.particles[i]['z'] = z
+
+        self.animation_mode = False
+        self.current_animation = None
+        self.animation_source_doc = None
+        self.animation_source_idx = -1
+        self.current_frame_idx = -1
+        self.playback_time = 0.0
+        self.playback_playing = False
+        self._anim_dirty = False
+        self._anim_undo_stack.clear()
+        self._anim_redo_stack.clear()
+        self._particle_positions_before_anim = None
+        self.skeleton_dirty = True
+        logger.info("exited animation mode")
+        return None
+
+    def _apply_frame_to_particles(self, frame_idx):
+        """把指定 frame 的 position 写入 self.particles（视觉用，不入 undo）。"""
+        if not self.current_animation:
+            return
+        if frame_idx < 0 or frame_idx >= len(self.current_animation.frames):
+            return
+        frame = self.current_animation.frames[frame_idx]
+        for i, (x, y, z) in enumerate(frame.positions):
+            if i < len(self.particles):
+                self.particles[i]['x'] = float(x)
+                self.particles[i]['y'] = float(y)
+                self.particles[i]['z'] = float(z)
+        self.skeleton_dirty = True
+
+    def _apply_interpolated_to_particles(self, t):
+        """播放时：用插值 position 写入 self.particles。"""
+        from animation_io import interpolate_positions
+        if not self.current_animation:
+            return
+        positions = interpolate_positions(
+            self.current_animation, t, n_particles=len(self.particles)
+        )
+        for i, (x, y, z) in enumerate(positions):
+            if i < len(self.particles):
+                self.particles[i]['x'] = float(x)
+                self.particles[i]['y'] = float(y)
+                self.particles[i]['z'] = float(z)
+        self.skeleton_dirty = True
+
+    # ──────────────────────────────────────────────
+    # 动画模式：独立 undo 栈
+    # ──────────────────────────────────────────────
+
+    def _anim_snapshot(self):
+        if not self.current_animation:
+            return None
+        return {
+            "animation": copy.deepcopy(self.current_animation),
+            "current_frame_idx": self.current_frame_idx,
+        }
+
+    def _anim_push_undo(self):
+        snap = self._anim_snapshot()
+        if snap is None:
+            return
+        self._anim_undo_stack.append(snap)
+        self._anim_redo_stack.clear()
+        if len(self._anim_undo_stack) > 64:
+            self._anim_undo_stack.pop(0)
+        self._anim_dirty = True
+
+    def _anim_restore_snapshot(self, snap):
+        self.current_animation = copy.deepcopy(snap["animation"])
+        self.current_frame_idx = int(snap["current_frame_idx"])
+        if 0 <= self.current_frame_idx < len(self.current_animation.frames):
+            self._apply_frame_to_particles(self.current_frame_idx)
+        self.skeleton_dirty = True
+
+    def anim_undo(self):
+        if not self._anim_undo_stack:
+            return
+        cur = self._anim_snapshot()
+        if cur:
+            self._anim_redo_stack.append(cur)
+        self._anim_restore_snapshot(self._anim_undo_stack.pop())
+
+    def anim_redo(self):
+        if not self._anim_redo_stack:
+            return
+        cur = self._anim_snapshot()
+        if cur:
+            self._anim_undo_stack.append(cur)
+        self._anim_restore_snapshot(self._anim_redo_stack.pop())
+
+    def get_effective_undo_redo(self):
+        """根据当前模式返回 (undo_fn, redo_fn)。UI 按钮统一用此入口。"""
+        if self.animation_mode:
+            return (self.anim_undo, self.anim_redo)
+        return (self.undo, self.redo)
+
+    def commit_particle_move_to_frame(self):
+        """粒子拖动结束后，把当前 particle 位置写回当前帧。
+
+        Commit 4 在 main_animation.py 的 mouse_up 回调里调用。
+        """
+        if not self.animation_mode or not self.current_animation:
+            return
+        if (self.current_frame_idx < 0
+                or self.current_frame_idx >= len(self.current_animation.frames)):
+            return
+        self._anim_push_undo()  # 已经设了 _anim_dirty
+        frame = self.current_animation.frames[self.current_frame_idx]
+        frame.positions = [
+            (float(p['x']), float(p['y']), float(p['z'])) for p in self.particles
+        ]

@@ -997,6 +997,10 @@ def on_resize(window, width, height):
 
 def main():
     global g_renderer, g_imgui_impl, g_first_upload_logged, WIN_W, WIN_H
+    
+    # 显式声明这是绑骨入口（默认值就是 "skeleton"，但写出来让意图清晰，
+    # 与 main_animation.py 形成对照）
+    g_ui.app_mode = "skeleton"
 
     if not glfw.init():
         raise RuntimeError("GLFW init failed")

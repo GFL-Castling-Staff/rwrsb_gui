@@ -372,6 +372,10 @@ class UIState:
         # Toast 通知面板
         self.toasts: list = []          # list[Toast]
         self._toast_last_update: float = 0.0
+        
+        # 应用模式：rwrsb_gui.exe = "skeleton"，rwrsb_anim.exe = "animation"
+        # 由各自 entry 的 main 函数显式设置
+        self.app_mode = "skeleton"
 
     def push_toast(self, message: str, level: str = "info",
                    also_log: bool = True, exc_info=None) -> None:
