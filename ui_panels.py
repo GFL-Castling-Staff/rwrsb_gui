@@ -205,6 +205,7 @@ _TEXT = {
         "settings_popup_title": "Settings",
         "show_origin": "Show origin gizmo",
         "show_voxels": "Show voxels (if loaded)",
+        "show_original_colors": "Original voxel colors",
         "selected_particles_count": "Selected particles: {count}",
         "multi_edit": "Multi-select",
         "align_x": "Align X",
@@ -408,6 +409,7 @@ _TEXT = {
         "settings_popup_title": "设置",
         "show_origin": "显示原点坐标轴",
         "show_voxels": "显示体素（如已加载）",
+        "show_original_colors": "显示原始体素颜色",
         "selected_particles_count": "已选粒子: {count}",
         "multi_edit": "多选操作",
         "align_x": "对齐 X",
@@ -512,6 +514,7 @@ class UIState:
         # Settings popup 控制开关（任务5）
         self.show_origin_gizmo = True
         self.show_voxels = True
+        self.show_voxel_original_colors = False  # False=骨骼染色, True=原始体素颜色
 
         # 非法 voxel binding 对话框状态（动画工具）
         self._invalid_binding_show = False
@@ -1746,6 +1749,11 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
             tr(ui_state, "show_voxels") + "##anim_showvoxels", ui_state.show_voxels)
         if chg_vx:
             ui_state.show_voxels = v_vx
+        chg_oc, v_oc = imgui.checkbox(
+            tr(ui_state, "show_original_colors") + "##anim_origcol",
+            ui_state.show_voxel_original_colors)
+        if chg_oc:
+            ui_state.show_voxel_original_colors = v_oc
         imgui.end_popup()
     imgui.same_line()
     imgui.text("|")

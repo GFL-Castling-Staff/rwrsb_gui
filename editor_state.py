@@ -749,17 +749,23 @@ class EditorState:
             return (r * 0.5, g * 0.5, b * 0.5)
         return stick.color
 
-    def build_instance_arrays(self):
+    def build_instance_arrays(self, use_original_color=False):
         n = len(self.voxels)
         positions = np.zeros((n, 3), dtype=np.float32)
         colors = np.zeros((n, 4), dtype=np.float32)
         selected = np.zeros((n, 1), dtype=np.float32)
 
-        for i, (x, y, z, r, g, b, _) in enumerate(self.voxels):
-            positions[i] = (x, y, z)
-            cr, cg, cb = self.get_voxel_color(i)
-            colors[i] = (cr, cg, cb, 1.0)
-            selected[i] = 1.0 if i in self.selected_voxels else 0.0
+        if use_original_color:
+            for i, (x, y, z, r, g, b, _) in enumerate(self.voxels):
+                positions[i] = (x, y, z)
+                colors[i] = (r, g, b, 1.0)
+                selected[i] = 1.0 if i in self.selected_voxels else 0.0
+        else:
+            for i, (x, y, z, r, g, b, _) in enumerate(self.voxels):
+                positions[i] = (x, y, z)
+                cr, cg, cb = self.get_voxel_color(i)
+                colors[i] = (cr, cg, cb, 1.0)
+                selected[i] = 1.0 if i in self.selected_voxels else 0.0
 
         self.gpu_dirty = False
         return positions, colors, selected

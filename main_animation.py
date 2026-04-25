@@ -59,6 +59,7 @@ g_drag_grab_offset = None
 g_drag_particle_origin = None
 g_drag_origins = {}
 g_grid_sig_cache = None
+g_voxel_color_mode_cache = None  # 缓存上次体素颜色模式，切换时触发全量重传
 g_hover_particle_idx = -1
 g_positions_np = None
 g_renderer     = None
@@ -623,18 +624,28 @@ def main():
                 g_editor.skeleton_dirty = False
 
             # voxel GPU buffer 更新
-            if g_editor.gpu_dirty and g_editor.voxels and g_renderer is not None:
-                _n = len(g_editor.voxels)
-                if (g_editor.animation_mode and g_editor._voxel_groups
-                        and g_renderer.n_voxels == _n):
-                    # 快速路径：renderer VBO 已建好且体素数一致，仅更新位置
-                    arr = np.array(g_editor.voxels, dtype=np.float32)
-                    g_renderer.update_voxel_positions(arr[:, :3])
-                    g_editor.gpu_dirty = False
-                else:
-                    # 全量上传：首次加载或体素数量变化（建 VAO/VBO）
-                    positions, colors, selected = g_editor.build_instance_arrays()
-                    g_renderer.upload_voxels(positions, colors, selected)
+            if g_editor.voxels and g_renderer is not None:
+                global g_voxel_color_mode_cache
+                _color_mode = g_ui.show_voxel_original_colors
+                _color_mode_changed = (_color_mode != g_voxel_color_mode_cache)
+                if _color_mode_changed:
+                    g_voxel_color_mode_cache = _color_mode
+                    g_editor.gpu_dirty = True  # 颜色模式变化，强制全量重传
+
+                if g_editor.gpu_dirty:
+                    _n = len(g_editor.voxels)
+                    if (g_editor.animation_mode and g_editor._voxel_groups
+                            and g_renderer.n_voxels == _n
+                            and not _color_mode_changed):
+                        # 快速路径：VBO 已建好、体素数一致、颜色模式未变，仅更新位置
+                        arr = np.array(g_editor.voxels, dtype=np.float32)
+                        g_renderer.update_voxel_positions(arr[:, :3])
+                        g_editor.gpu_dirty = False
+                    else:
+                        # 全量上传：首次加载、体素数变化或颜色模式切换
+                        positions, colors, selected = g_editor.build_instance_arrays(
+                            use_original_color=_color_mode)
+                        g_renderer.upload_voxels(positions, colors, selected)
 
             # grid 上传（签名缓存，避免每帧重传）
             # 网格中心固定在世界原点 (0,0,0)，不跟随粒子
