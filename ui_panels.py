@@ -238,11 +238,16 @@ _TEXT = {
         "invalid_binding_stats": "Voxels: {voxels} | Sticks: {sticks} | Bindings: {bindings}",
         "invalid_binding_skeleton_only": "Load skeleton only",
         "invalid_binding_abort": "Cancel load",
+        # ── 拖动模式切换 ──
+        "drag_mode_move": "Move",
+        "drag_mode_rotate": "Rotate",
+        "drag_rotate_hint": "Drag = rotate around pivot  (axis from view direction)",
+        "rotate_pivot_hint": "First click the pivot joint, then Shift-click / box-select the rest",
         # ── 旋转选中粒子 popup ──
         "rotate_btn": "Rotate...",
         "rotate_popup_title": "Rotate Selected Particles",
         "rotate_pivot": "Pivot",
-        "rotate_pivot_active": "Active particle",
+        "rotate_pivot_active": "Fixed joint (active particle)",
         "rotate_pivot_centroid": "Centroid",
         "rotate_pivot_world": "World origin",
         "rotate_angle_x": "Angle X",
@@ -457,11 +462,16 @@ _TEXT = {
         "invalid_binding_stats": "Voxels: {voxels} | Sticks: {sticks} | Bindings: {bindings}",
         "invalid_binding_skeleton_only": "只加载骨架",
         "invalid_binding_abort": "放弃加载",
+        # ── 拖动模式切换 ──
+        "drag_mode_move": "移动",
+        "drag_mode_rotate": "旋转",
+        "drag_rotate_hint": "拖动 = 绕 pivot 旋转  （轴由视图方向决定）",
+        "rotate_pivot_hint": "先单击固定关节，再 Shift 点选 / 框选其余粒子",
         # ── 旋转选中粒子 popup ──
         "rotate_btn": "旋转...",
         "rotate_popup_title": "旋转选中粒子",
         "rotate_pivot": "旋转中心",
-        "rotate_pivot_active": "Active 粒子",
+        "rotate_pivot_active": "固定关节（Active 粒子）",
         "rotate_pivot_centroid": "几何中心",
         "rotate_pivot_world": "世界原点",
         "rotate_angle_x": "角度 X",
@@ -558,6 +568,9 @@ class UIState:
         self.rotate_angle_x = 0.0
         self.rotate_angle_y = 0.0
         self.rotate_angle_z = 0.0
+
+        # 拖动模式：平移 / 旋转
+        self.anim_drag_mode = "move"        # "move" | "rotate"
 
     def push_toast(self, message: str, level: str = "info",
                    also_log: bool = True, exc_info=None) -> None:
@@ -1700,6 +1713,27 @@ _ANIM_CONTROL_KEYS = [
 
 def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
     """动画模式工具栏。文件操作 / undo / 视图预设。"""
+    # ── 拖动模式切换：Move / Rotate ──
+    _BTN_ACTIVE = (0.25, 0.55, 0.25, 1.0)   # 激活态：绿色底
+    _BTN_HOVER  = (0.30, 0.65, 0.30, 1.0)
+    for _mode, _key, _id in (
+        ("move",   "drag_mode_move",   "##anim_mode_move"),
+        ("rotate", "drag_mode_rotate", "##anim_mode_rotate"),
+    ):
+        _active = (ui_state.anim_drag_mode == _mode)
+        if _active:
+            imgui.push_style_color(imgui.COLOR_BUTTON,          *_BTN_ACTIVE)
+            imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED,  *_BTN_HOVER)
+            imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE,   *_BTN_ACTIVE)
+        if imgui.button(tr(ui_state, _key) + _id):
+            ui_state.anim_drag_mode = _mode
+        if _active:
+            imgui.pop_style_color(3)
+        imgui.same_line()
+
+    imgui.text("|")
+    imgui.same_line()
+
     if imgui.button(tr(ui_state, "open_skeleton") + "##anim_open_skel"):
         _anim_action_open_skeleton(ui_state, editor_state)
     imgui.same_line()
@@ -1792,6 +1826,8 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
             ui_state.show_voxel_original_colors = v_oc
         imgui.separator()
         imgui.text_disabled(tr(ui_state, "tip_axis"))
+        if ui_state.anim_drag_mode == "rotate":
+            imgui.text_disabled(tr(ui_state, "drag_rotate_hint"))
         imgui.end_popup()
     imgui.same_line()
     if imgui.button(tr(ui_state, "rotate_btn") + "##anim_rotate_btn"):
@@ -1825,6 +1861,7 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
         )
         if chg_piv:
             ui_state.rotate_pivot_mode = pivot_options[new_piv]
+        imgui.text_disabled(tr(ui_state, "rotate_pivot_hint"))
 
         imgui.separator()
 
