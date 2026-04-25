@@ -59,6 +59,13 @@ g_drag_grab_offset = None
 g_drag_particle_origin = None
 g_drag_origins = {}
 g_grid_sig_cache = None
+
+# 旋转拖动专用状态（与平移拖动互斥）
+g_rotate_drag_active = False
+g_rotate_drag_start_mx = 0.0      # 拖动起始鼠标 X（屏幕像素）
+g_rotate_drag_snapshot = {}       # {idx: np.array([x, y, z])}，拖动前位置快照
+g_rotate_drag_pivot = None        # np.array，旋转中心（世界坐标）
+g_rotate_drag_axis = None         # "x" | "y" | "z"
 g_voxel_color_mode_cache = None  # 缓存上次体素颜色模式，切换时触发全量重传
 g_hover_particle_idx = -1
 g_positions_np = None
@@ -210,6 +217,105 @@ def _start_particle_drag(mx, my, particle_idx):
 
     g_drag_particle_idx = particle_idx
     g_particle_drag_active = True
+
+
+def _rotate_drag_axis_from_camera():
+    """从相机 forward 向量推断旋转轴：前视→Z，顶视→Y，侧视→X。"""
+    fwd = np.asarray(g_camera.get_view_direction(), dtype=np.float32)
+    norm = float(np.linalg.norm(fwd))
+    if norm < 1e-6:
+        return "y"
+    fwd = fwd / norm
+    idx = int(np.argmax(np.abs(fwd)))
+    return ("x", "y", "z")[idx]
+
+
+def _compute_rotate_pivot():
+    """根据 g_ui.rotate_pivot_mode 计算旋转中心（世界坐标）。
+    如果是 active 但 active 不在选择集中，fallback 到 centroid。
+    """
+    mode = g_ui.rotate_pivot_mode
+    sel = g_editor.selected_particles
+    if mode == "active":
+        act = g_editor.active_particle_idx
+        if act >= 0 and act in sel:
+            p = g_editor.particles[act]
+            return np.array([p["x"], p["y"], p["z"]], dtype=np.float32)
+        # fallback: centroid
+    if mode in ("active", "centroid") and sel:
+        coords = np.array(
+            [[g_editor.particles[i]["x"], g_editor.particles[i]["y"], g_editor.particles[i]["z"]]
+             for i in sel],
+            dtype=np.float32,
+        )
+        return coords.mean(axis=0)
+    return np.zeros(3, dtype=np.float32)
+
+
+def _start_rotate_drag(particle_idx):
+    """旋转模式下开始拖动：保存快照，计算 pivot + 轴，推 undo。"""
+    global g_rotate_drag_active, g_rotate_drag_start_mx
+    global g_rotate_drag_snapshot, g_rotate_drag_pivot, g_rotate_drag_axis
+
+    if not g_editor.selected_particles:
+        return
+
+    # 推 undo（在修改粒子之前推一次，拖动过程中不再推）
+    if g_editor.animation_mode:
+        g_editor._anim_push_undo()
+    else:
+        g_editor._push_undo()
+
+    # 保存选中粒子位置快照
+    g_rotate_drag_snapshot = {
+        idx: np.array([g_editor.particles[idx]["x"],
+                       g_editor.particles[idx]["y"],
+                       g_editor.particles[idx]["z"]], dtype=np.float32)
+        for idx in g_editor.selected_particles
+        if 0 <= idx < len(g_editor.particles)
+    }
+    g_rotate_drag_pivot = _compute_rotate_pivot()
+    g_rotate_drag_axis  = _rotate_drag_axis_from_camera()
+    g_rotate_drag_start_mx = g_mouse_x
+    g_rotate_drag_active = True
+
+
+def _update_rotate_drag(mx):
+    """旋转拖动每帧更新：从快照重算旋转，直接写入粒子坐标。"""
+    if not g_rotate_drag_active or g_rotate_drag_pivot is None:
+        return
+    from editor_state import _rotation_matrix
+    angle_deg = (mx - g_rotate_drag_start_mx) * 1.0   # 1px = 1°
+    R = _rotation_matrix(g_rotate_drag_axis, float(np.radians(angle_deg)))
+    pivot = g_rotate_drag_pivot
+    for idx, p_orig in g_rotate_drag_snapshot.items():
+        if 0 <= idx < len(g_editor.particles):
+            p_new = pivot + R @ (p_orig - pivot)
+            g_editor.particles[idx]["x"] = float(p_new[0])
+            g_editor.particles[idx]["y"] = float(p_new[1])
+            g_editor.particles[idx]["z"] = float(p_new[2])
+    g_editor.skeleton_dirty = True
+
+
+def _end_rotate_drag():
+    """结束旋转拖动：动画模式下手动写回当前帧（不再推 undo）。"""
+    global g_rotate_drag_active, g_rotate_drag_snapshot
+    global g_rotate_drag_pivot, g_rotate_drag_axis
+
+    if g_editor.animation_mode and g_editor.current_animation:
+        frame_idx = g_editor.current_frame_idx
+        frames = g_editor.current_animation.frames
+        if 0 <= frame_idx < len(frames):
+            frames[frame_idx].positions = [
+                (float(p["x"]), float(p["y"]), float(p["z"]))
+                for p in g_editor.particles
+            ]
+            g_editor._anim_dirty = True
+
+    g_rotate_drag_active = False
+    g_rotate_drag_snapshot = {}
+    g_rotate_drag_pivot = None
+    g_rotate_drag_axis = None
 
 
 def _drag_axis_mask(window):
@@ -391,7 +497,10 @@ def on_mouse_button(window, button, action, mods):
                     if hit not in g_editor.selected_particles:
                         g_editor.replace_selected_particles({hit})
                     g_editor.set_active_particle(hit)
-                    _start_particle_drag(g_mouse_x, g_mouse_y, hit)
+                    if g_ui.anim_drag_mode == "rotate":
+                        _start_rotate_drag(hit)
+                    else:
+                        _start_particle_drag(g_mouse_x, g_mouse_y, hit)
             else:
                 # 未命中粒子：普通点击清空选择，所有情况都起框选
                 if not (shift or ctrl):
@@ -403,6 +512,8 @@ def on_mouse_button(window, button, action, mods):
         else:
             if g_particle_drag_active:
                 _end_particle_drag()
+            if g_rotate_drag_active:
+                _end_rotate_drag()
             if g_ui.box_selecting:
                 g_ui.box_selecting = False
                 _finish_particle_box_select(bool(mods & glfw.MOD_SHIFT),
@@ -418,6 +529,8 @@ def on_cursor_pos(window, xpos, ypos):
     g_mouse_y = ypos
     if g_particle_drag_active:
         _update_particle_drag(window, xpos, ypos)
+    if g_rotate_drag_active:
+        _update_rotate_drag(xpos)
     if g_ui.box_selecting:
         g_ui.box_x1 = xpos
         g_ui.box_y1 = ypos
