@@ -43,7 +43,7 @@ WIN_W, WIN_H  = 1280, 800
 PANEL_W       = 280
 TOOLBAR_H     = 38
 STATUS_H      = 24
-ANIM_PANEL_H  = 200
+ANIM_PANEL_H  = 240
 
 g_editor          = EditorState()
 g_camera          = OrbitCamera(WIN_W, WIN_H)
@@ -263,6 +263,38 @@ def _end_particle_drag():
     g_drag_origins = {}
 
 
+def _finish_particle_box_select(shift, ctrl):
+    """框选结束：把框内粒子加入 / toggle / 替换选择集（anim 工具专用）。"""
+    if g_editor.mirror_mode:
+        return
+    if g_positions_np is None or len(g_positions_np) == 0:
+        return
+    panel_w, toolbar_h, status_h = _ui_layout_metrics()
+    vp_w = WIN_W - panel_w
+    vp_h = WIN_H - toolbar_h - status_h
+    if vp_w <= 0 or vp_h <= 0:
+        return
+    mvp = g_camera.get_mvp()
+    indices = box_select_particles(
+        mvp, g_positions_np,
+        g_ui.box_x0, g_ui.box_y0 - toolbar_h,
+        g_ui.box_x1, g_ui.box_y1 - toolbar_h,
+        vp_w, vp_h)
+    if ctrl:
+        for i in indices:
+            if i in g_editor.selected_particles:
+                g_editor.selected_particles.discard(i)
+            else:
+                g_editor.selected_particles.add(i)
+    elif shift:
+        g_editor.selected_particles.update(indices)
+    else:
+        g_editor.replace_selected_particles(indices)
+    if g_editor.selected_particles:
+        if g_editor.active_particle_idx not in g_editor.selected_particles:
+            g_editor.set_active_particle(next(iter(g_editor.selected_particles)))
+
+
 # ── GLFW callbacks ────────────────────────────
 
 def _safe_callback(fn):
@@ -307,9 +339,21 @@ def on_mouse_button(window, button, action, mods):
                         g_editor.replace_selected_particles({hit})
                     g_editor.set_active_particle(hit)
                     _start_particle_drag(g_mouse_x, g_mouse_y, hit)
+            else:
+                # 未命中粒子：普通点击清空选择，所有情况都起框选
+                if not (shift or ctrl):
+                    g_editor.clear_selected_particles()
+                    g_editor.active_particle_idx = -1
+                g_ui.box_selecting = True
+                g_ui.box_x0 = g_ui.box_x1 = g_mouse_x
+                g_ui.box_y0 = g_ui.box_y1 = g_mouse_y
         else:
             if g_particle_drag_active:
                 _end_particle_drag()
+            if g_ui.box_selecting:
+                g_ui.box_selecting = False
+                _finish_particle_box_select(bool(mods & glfw.MOD_SHIFT),
+                                            bool(mods & glfw.MOD_CONTROL))
 
     g_camera.on_mouse_button(button, action, mods, g_mouse_x, g_mouse_y)
 
@@ -321,6 +365,9 @@ def on_cursor_pos(window, xpos, ypos):
     g_mouse_y = ypos
     if g_particle_drag_active:
         _update_particle_drag(xpos, ypos)
+    if g_ui.box_selecting:
+        g_ui.box_x1 = xpos
+        g_ui.box_y1 = ypos
     if is_over_viewport(xpos, ypos):
         hover_particle = _pick_particle(xpos, ypos)
         g_hover_particle_idx = hover_particle
@@ -470,6 +517,12 @@ def main():
     ctx.enable(moderngl.DEPTH_TEST)
 
     g_renderer = VoxelRenderer(ctx)
+    # 动画工具默认只显示 XZ 面网格，三平面密度太大（任务3）
+    g_ui.show_grid_xy = False
+    g_ui.show_grid_yz = False
+    # 上传原点坐标轴 Gizmo 并默认开启（任务4）
+    g_renderer.upload_origin_axes(length=8.0)
+    g_renderer.show_origin_gizmo = True
 
     imgui.create_context()
     font_path = _configure_imgui_fonts()
@@ -523,6 +576,8 @@ def main():
             g_imgui_impl.process_inputs()
             _apply_ui_scale()
             g_camera.invert_y = g_ui.invert_y_axis
+            if g_renderer is not None:
+                g_renderer.show_origin_gizmo = g_ui.show_origin_gizmo
 
             glfw.set_window_title(window, _window_title())
 
