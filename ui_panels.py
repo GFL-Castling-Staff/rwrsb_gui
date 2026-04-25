@@ -286,8 +286,10 @@ _TEXT = {
         # ── 拖动 Settings popup（P3）──
         "drag_settings_btn": "Options...",
         "move_settings_title": "Move settings",
-        "move_length_clamp": "Length clamp",
-        "move_length_clamp_hint": "Stop sticks from being stretched while dragging",
+        "move_length_constraints_title": "Length constraints",
+        "move_length_constraints_hint": "Keep stick lengths constant while dragging",
+        "move_clamp_max": "Clamp max length",
+        "move_clamp_min": "Clamp min length",
         "move_skeleton_tree_section": "Skeleton tree",
         "move_skeleton_tree_root": "Root",
         "move_skeleton_tree_no_particles": "(no particles)",
@@ -547,8 +549,10 @@ _TEXT = {
         # ── 拖动 Settings popup（P3）──
         "drag_settings_btn": "选项...",
         "move_settings_title": "平移设置",
-        "move_length_clamp": "长度约束",
-        "move_length_clamp_hint": "拖动时阻止 stick 被拉长",
+        "move_length_constraints_title": "长度约束",
+        "move_length_constraints_hint": "拖动时保持 stick 长度恒定",
+        "move_clamp_max": "约束最大长度",
+        "move_clamp_min": "约束最小长度",
         "move_skeleton_tree_section": "骨架树",
         "move_skeleton_tree_root": "根节点",
         "move_skeleton_tree_no_particles": "（无粒子）",
@@ -647,7 +651,8 @@ class UIState:
         self.anim_drag_mode = "move"        # "move" | "rotate"
 
         # Move 模式拖动设置（P3）
-        self.move_length_clamp = False      # 是否启用 length clamp
+        self.move_clamp_max = True          # 约束 stick 不被拉长
+        self.move_clamp_min = True          # 约束 stick 不被压缩
 
         # P2：vanilla soldier_animations.xml 路径（不持久化，每次启动手动设）
         self.vanilla_animations_path = None  # str | None
@@ -1796,12 +1801,16 @@ def _draw_move_settings_section(ui_state, editor_state):
     imgui.text(tr(ui_state, "move_settings_title"))
     imgui.separator()
 
-    chg, v = imgui.checkbox(
-        tr(ui_state, "move_length_clamp"), ui_state.move_length_clamp
-    )
+    imgui.text_disabled(tr(ui_state, "move_length_constraints_hint"))
+    imgui.text(tr(ui_state, "move_length_constraints_title"))
+    imgui.indent()
+    chg, v = imgui.checkbox(tr(ui_state, "move_clamp_max"), ui_state.move_clamp_max)
     if chg:
-        ui_state.move_length_clamp = v
-    imgui.text_disabled(tr(ui_state, "move_length_clamp_hint"))
+        ui_state.move_clamp_max = v
+    chg, v = imgui.checkbox(tr(ui_state, "move_clamp_min"), ui_state.move_clamp_min)
+    if chg:
+        ui_state.move_clamp_min = v
+    imgui.unindent()
 
     imgui.separator()
 
