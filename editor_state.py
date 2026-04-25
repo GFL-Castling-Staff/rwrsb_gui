@@ -113,6 +113,9 @@ class EditorState:
         self._anim_undo_stack = []
         self._anim_redo_stack = []
 
+        # 5b：各 stick 的参考长度（进入动画模式时记录）
+        self._anim_reference_lengths = {}
+
     def _preset_dir(self):
         return resource_path("presets")
 
@@ -856,6 +859,7 @@ class EditorState:
 
         # 视觉上 particle 位置变成第 0 帧
         self._apply_frame_to_particles(0)
+        self._record_reference_lengths()
         logger.info("entered animation mode: %s (%d frames)",
                     animation.name, len(animation.frames))
 
@@ -890,6 +894,7 @@ class EditorState:
         self._anim_undo_stack.clear()
         self._anim_redo_stack.clear()
         self._particle_positions_before_anim = None
+        self._anim_reference_lengths = {}
         self.skeleton_dirty = True
         logger.info("exited animation mode")
         return None
@@ -1136,3 +1141,35 @@ class EditorState:
             return
         self._anim_push_undo()
         frames[frame_idx].controls[control_idx] = (new_key, new_value)
+
+    def _record_reference_lengths(self):
+        """记录当前 skeleton 各 stick 长度作为参考基准（enter_animation_mode 时调用）。"""
+        self._anim_reference_lengths = {}
+        id_to_p = {p["id"]: p for p in self.particles}
+        for i, s in enumerate(self.sticks):
+            pa = id_to_p.get(s.particle_a_id)
+            pb = id_to_p.get(s.particle_b_id)
+            if pa is None or pb is None:
+                continue
+            dx = pa["x"] - pb["x"]
+            dy = pa["y"] - pb["y"]
+            dz = pa["z"] - pb["z"]
+            self._anim_reference_lengths[i] = (dx*dx + dy*dy + dz*dz) ** 0.5
+
+    def compute_stick_length_deviations(self):
+        """返回 list[(stick_idx, current_length, ref_length, abs_pct_dev)]。无参考的 stick 不返回。"""
+        out = []
+        id_to_p = {p["id"]: p for p in self.particles}
+        for i, s in enumerate(self.sticks):
+            ref = self._anim_reference_lengths.get(i, 0.0)
+            pa = id_to_p.get(s.particle_a_id)
+            pb = id_to_p.get(s.particle_b_id)
+            if pa is None or pb is None or ref <= 0:
+                continue
+            dx = pa["x"] - pb["x"]
+            dy = pa["y"] - pb["y"]
+            dz = pa["z"] - pb["z"]
+            cur = (dx*dx + dy*dy + dz*dz) ** 0.5
+            pct = abs(cur - ref) / ref * 100.0
+            out.append((i, cur, ref, pct))
+        return out

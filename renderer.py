@@ -91,6 +91,8 @@ class VoxelRenderer:
         self.show_grid = True
         self.show_mirror_plane = False
         self.show_mirror_handles = False
+        # 5b：长度违规 stick 索引列表，驱动红色额外 draw call
+        self.violation_stick_indices = []
 
     def upload_voxels(self, positions, colors, selected):
         n = len(positions)
@@ -436,6 +438,18 @@ class VoxelRenderer:
                     self.ctx.line_width = _LINE_WIDTH_HIGHLIGHT
                     self.line_vao.render(moderngl.LINES, vertices=cnt, first=off)
                     self.ctx.line_width = _LINE_WIDTH
+
+            # 5b：长度违规 stick 红色覆盖
+            if self.violation_stick_indices and self.stick_segments:
+                self.line_prog["u_color_mult"].value = (1.0, 0.25, 0.25, 1.0)
+                self.ctx.disable(moderngl.DEPTH_TEST)
+                self.ctx.line_width = _LINE_WIDTH_HIGHLIGHT
+                for vi in self.violation_stick_indices:
+                    if 0 <= vi < len(self.stick_segments):
+                        off, cnt = self.stick_segments[vi]
+                        if cnt > 0:
+                            self.line_vao.render(moderngl.LINES, vertices=cnt, first=off)
+                self.ctx.line_width = _LINE_WIDTH
 
             self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 1.0)
             self.ctx.disable(moderngl.BLEND)
