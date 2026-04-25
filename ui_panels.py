@@ -283,6 +283,18 @@ _TEXT = {
         "rotate_hint_order": "Rotation applied in X → Y → Z order",
         "rotate_disabled_no_sel": "Select at least 1 particle to rotate",
         "rotate_disabled_active_not_in_sel": "Active particle must be in the selection",
+        # ── 拖动 Settings popup（P3）──
+        "drag_settings_btn": "Settings...",
+        "move_settings_title": "Move settings",
+        "move_length_clamp": "Length clamp",
+        "move_length_clamp_hint": "Stop sticks from being stretched while dragging",
+        "move_skeleton_tree_section": "Skeleton tree",
+        "move_skeleton_tree_root": "Root",
+        "move_skeleton_tree_no_particles": "(no particles)",
+        "move_select_subtree": "Select subtree from active",
+        "move_subtree_preview": "Subtree: {names}",
+        "move_subtree_no_active": "(no active particle)",
+        "move_subtree_active_not_in_tree": "(active not in skeleton tree)",
     },
     "zh": {
         "open_vox": "打开 VOX",
@@ -532,6 +544,18 @@ _TEXT = {
         "rotate_hint_order": "按 X → Y → Z 顺序应用",
         "rotate_disabled_no_sel": "至少选择 1 个粒子",
         "rotate_disabled_active_not_in_sel": "Active 粒子必须在选择集中",
+        # ── 拖动 Settings popup（P3）──
+        "drag_settings_btn": "设置...",
+        "move_settings_title": "平移设置",
+        "move_length_clamp": "长度约束",
+        "move_length_clamp_hint": "拖动时阻止 stick 被拉长",
+        "move_skeleton_tree_section": "骨架树",
+        "move_skeleton_tree_root": "根节点",
+        "move_skeleton_tree_no_particles": "（无粒子）",
+        "move_select_subtree": "从 active 选子树",
+        "move_subtree_preview": "子树：{names}",
+        "move_subtree_no_active": "（无 active 粒子）",
+        "move_subtree_active_not_in_tree": "（active 不在骨架树里）",
     },
 }
 
@@ -621,6 +645,9 @@ class UIState:
 
         # 拖动模式：平移 / 旋转
         self.anim_drag_mode = "move"        # "move" | "rotate"
+
+        # Move 模式拖动设置（P3）
+        self.move_length_clamp = False      # 是否启用 length clamp
 
         # P2：vanilla soldier_animations.xml 路径（不持久化，每次启动手动设）
         self.vanilla_animations_path = None  # str | None
@@ -1764,6 +1791,183 @@ _ANIM_CONTROL_KEYS = [
 ]
 
 
+def _draw_move_settings_section(ui_state, editor_state):
+    """Move 模式下的拖动设置 popup 内容。"""
+    imgui.text(tr(ui_state, "move_settings_title"))
+    imgui.separator()
+
+    chg, v = imgui.checkbox(
+        tr(ui_state, "move_length_clamp"), ui_state.move_length_clamp
+    )
+    if chg:
+        ui_state.move_length_clamp = v
+    imgui.text_disabled(tr(ui_state, "move_length_clamp_hint"))
+
+    imgui.separator()
+
+    imgui.text(tr(ui_state, "move_skeleton_tree_section"))
+
+    n = len(editor_state.particles)
+    if n == 0:
+        imgui.text_disabled(tr(ui_state, "move_skeleton_tree_no_particles"))
+        return
+
+    _, cur_root = editor_state.get_skeleton_tree()
+    options = [
+        f"[{i}] {p.get('name', '')}" for i, p in enumerate(editor_state.particles)
+    ]
+    cur_idx = cur_root if 0 <= cur_root < n else 0
+    imgui.set_next_item_width(220)
+    chg_root, new_root = imgui.combo(
+        tr(ui_state, "move_skeleton_tree_root") + "##move_root", cur_idx, options
+    )
+    if chg_root:
+        try:
+            editor_state.set_skeleton_tree_root(int(new_root))
+        except ValueError as exc:
+            ui_state.push_toast(str(exc), "error")
+
+    active = editor_state.active_particle_idx
+    parent, _ = editor_state.get_skeleton_tree()
+    can_select_subtree = (active >= 0 and active in parent)
+    if can_select_subtree:
+        try:
+            sub = sorted(editor_state.collect_subtree_indices(active))
+            if len(sub) <= 8:
+                names = ", ".join(
+                    f"[{i}] {editor_state.particles[i].get('name', '')}"
+                    for i in sub
+                )
+            else:
+                names = f"{len(sub)} particles ({sub[0]}..{sub[-1]})"
+            imgui.text_disabled(
+                tr(ui_state, "move_subtree_preview", names=names)
+            )
+        except ValueError:
+            imgui.text_disabled(tr(ui_state, "move_subtree_active_not_in_tree"))
+    elif active < 0:
+        imgui.text_disabled(tr(ui_state, "move_subtree_no_active"))
+    else:
+        imgui.text_disabled(tr(ui_state, "move_subtree_active_not_in_tree"))
+
+    if not can_select_subtree:
+        _disabled_button(tr(ui_state, "move_select_subtree") + "##move_sel_subtree")
+    else:
+        if imgui.button(tr(ui_state, "move_select_subtree") + "##move_sel_subtree"):
+            try:
+                sub = editor_state.collect_subtree_indices(active)
+                editor_state.selected_particles.update(sub)
+            except Exception as exc:
+                ui_state.push_toast(f"选择子树失败: {exc}", "error", exc_info=True)
+
+
+def _draw_rotate_settings_section(ui_state, editor_state):
+    """Rotate 模式下的设置 popup 内容（原 Rotate... popup 体搬运）。"""
+    imgui.text(tr(ui_state, "rotate_popup_title"))
+    imgui.separator()
+
+    n_sel = len(editor_state.selected_particles)
+    can_rotate = n_sel >= 1
+    needs_active = (ui_state.rotate_pivot_mode == "active")
+    active_in_sel = (
+        editor_state.active_particle_idx >= 0
+        and editor_state.active_particle_idx in editor_state.selected_particles
+    )
+    if needs_active and not active_in_sel:
+        can_rotate = False
+
+    pivot_options = ["active", "centroid", "world_origin"]
+    pivot_labels = [
+        tr(ui_state, "rotate_pivot_active"),
+        tr(ui_state, "rotate_pivot_centroid"),
+        tr(ui_state, "rotate_pivot_world"),
+    ]
+    cur_piv = pivot_options.index(ui_state.rotate_pivot_mode)
+    imgui.set_next_item_width(160)
+    chg_piv, new_piv = imgui.combo(
+        tr(ui_state, "rotate_pivot") + "##rot_pivot", cur_piv, pivot_labels
+    )
+    if chg_piv:
+        ui_state.rotate_pivot_mode = pivot_options[new_piv]
+    imgui.text_disabled(tr(ui_state, "rotate_pivot_hint"))
+
+    imgui.separator()
+
+    if not can_rotate:
+        if n_sel < 1:
+            imgui.text_colored(tr(ui_state, "rotate_disabled_no_sel"), 1.0, 0.6, 0.3, 1.0)
+        else:
+            imgui.text_colored(
+                tr(ui_state, "rotate_disabled_active_not_in_sel"), 1.0, 0.6, 0.3, 1.0
+            )
+    else:
+        def _do_quick_rotate(axis, angle_deg):
+            kwargs = {"angle_x_deg": 0.0, "angle_y_deg": 0.0, "angle_z_deg": 0.0}
+            kwargs[f"angle_{axis}_deg"] = angle_deg
+            try:
+                editor_state.rotate_selected_particles(
+                    pivot_mode=ui_state.rotate_pivot_mode, **kwargs
+                )
+            except ValueError as exc:
+                ui_state.push_toast(str(exc), "error")
+            except Exception as exc:
+                ui_state.push_toast(f"旋转失败: {exc}", "error", exc_info=True)
+
+        def _angle_row(label_key, attr_name, axis):
+            imgui.set_next_item_width(80)
+            chg, val = imgui.input_float(
+                tr(ui_state, label_key) + f"##{attr_name}",
+                getattr(ui_state, attr_name), 0.0, 0.0, "%.1f"
+            )
+            if chg:
+                setattr(ui_state, attr_name, float(val))
+            imgui.same_line()
+            if imgui.button(f"+90##{axis}"):
+                _do_quick_rotate(axis, 90.0)
+            imgui.same_line()
+            if imgui.button(f"-90##{axis}"):
+                _do_quick_rotate(axis, -90.0)
+            imgui.same_line()
+            if imgui.button(f"180##{axis}"):
+                _do_quick_rotate(axis, 180.0)
+
+        _angle_row("rotate_angle_x", "rotate_angle_x", "x")
+        _angle_row("rotate_angle_y", "rotate_angle_y", "y")
+        _angle_row("rotate_angle_z", "rotate_angle_z", "z")
+
+    imgui.text_disabled(tr(ui_state, "rotate_hint_order"))
+    imgui.separator()
+
+    apply_disabled = (not can_rotate) or (
+        abs(ui_state.rotate_angle_x) < 1e-9
+        and abs(ui_state.rotate_angle_y) < 1e-9
+        and abs(ui_state.rotate_angle_z) < 1e-9
+    )
+    if apply_disabled:
+        _disabled_button(tr(ui_state, "rotate_apply") + "##rot_apply")
+    else:
+        if imgui.button(tr(ui_state, "rotate_apply") + "##rot_apply"):
+            try:
+                editor_state.rotate_selected_particles(
+                    angle_x_deg=ui_state.rotate_angle_x,
+                    angle_y_deg=ui_state.rotate_angle_y,
+                    angle_z_deg=ui_state.rotate_angle_z,
+                    pivot_mode=ui_state.rotate_pivot_mode,
+                )
+                ui_state.rotate_angle_x = 0.0
+                ui_state.rotate_angle_y = 0.0
+                ui_state.rotate_angle_z = 0.0
+            except ValueError as exc:
+                ui_state.push_toast(str(exc), "error")
+            except Exception as exc:
+                ui_state.push_toast(f"旋转失败: {exc}", "error", exc_info=True)
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "rotate_reset") + "##rot_reset"):
+        ui_state.rotate_angle_x = 0.0
+        ui_state.rotate_angle_y = 0.0
+        ui_state.rotate_angle_z = 0.0
+
+
 def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
     """动画模式工具栏。文件操作 / undo / 视图预设。"""
     # ── 拖动模式切换：Move / Rotate ──
@@ -1883,116 +2087,13 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
             imgui.text_disabled(tr(ui_state, "drag_rotate_hint"))
         imgui.end_popup()
     imgui.same_line()
-    if imgui.button(tr(ui_state, "rotate_btn") + "##anim_rotate_btn"):
-        imgui.open_popup("##anim_rotate_popup")
-    if imgui.begin_popup("##anim_rotate_popup"):
-        imgui.text(tr(ui_state, "rotate_popup_title"))
-        imgui.separator()
-
-        # 启用条件
-        n_sel = len(editor_state.selected_particles)
-        can_rotate = n_sel >= 1
-        needs_active = (ui_state.rotate_pivot_mode == "active")
-        active_in_sel = (
-            editor_state.active_particle_idx >= 0
-            and editor_state.active_particle_idx in editor_state.selected_particles
-        )
-        if needs_active and not active_in_sel:
-            can_rotate = False
-
-        # 旋转中心下拉
-        pivot_options = ["active", "centroid", "world_origin"]
-        pivot_labels = [
-            tr(ui_state, "rotate_pivot_active"),
-            tr(ui_state, "rotate_pivot_centroid"),
-            tr(ui_state, "rotate_pivot_world"),
-        ]
-        cur_piv = pivot_options.index(ui_state.rotate_pivot_mode)
-        imgui.set_next_item_width(160)
-        chg_piv, new_piv = imgui.combo(
-            tr(ui_state, "rotate_pivot") + "##rot_pivot", cur_piv, pivot_labels
-        )
-        if chg_piv:
-            ui_state.rotate_pivot_mode = pivot_options[new_piv]
-        imgui.text_disabled(tr(ui_state, "rotate_pivot_hint"))
-
-        imgui.separator()
-
-        if not can_rotate:
-            if n_sel < 1:
-                imgui.text_colored(tr(ui_state, "rotate_disabled_no_sel"), 1.0, 0.6, 0.3, 1.0)
-            else:
-                imgui.text_colored(
-                    tr(ui_state, "rotate_disabled_active_not_in_sel"), 1.0, 0.6, 0.3, 1.0
-                )
+    if imgui.button(tr(ui_state, "drag_settings_btn") + "##anim_drag_settings_btn"):
+        imgui.open_popup("##anim_drag_settings_popup")
+    if imgui.begin_popup("##anim_drag_settings_popup"):
+        if ui_state.anim_drag_mode == "move":
+            _draw_move_settings_section(ui_state, editor_state)
         else:
-            def _do_quick_rotate(axis, angle_deg):
-                kwargs = {"angle_x_deg": 0.0, "angle_y_deg": 0.0, "angle_z_deg": 0.0}
-                kwargs[f"angle_{axis}_deg"] = angle_deg
-                try:
-                    editor_state.rotate_selected_particles(
-                        pivot_mode=ui_state.rotate_pivot_mode, **kwargs
-                    )
-                except ValueError as exc:
-                    ui_state.push_toast(str(exc), "error")
-                except Exception as exc:
-                    ui_state.push_toast(f"旋转失败: {exc}", "error", exc_info=True)
-
-            def _angle_row(label_key, attr_name, axis):
-                imgui.set_next_item_width(80)
-                chg, val = imgui.input_float(
-                    tr(ui_state, label_key) + f"##{attr_name}",
-                    getattr(ui_state, attr_name), 0.0, 0.0, "%.1f"
-                )
-                if chg:
-                    setattr(ui_state, attr_name, float(val))
-                imgui.same_line()
-                if imgui.button(f"+90##{axis}"):
-                    _do_quick_rotate(axis, 90.0)
-                imgui.same_line()
-                if imgui.button(f"-90##{axis}"):
-                    _do_quick_rotate(axis, -90.0)
-                imgui.same_line()
-                if imgui.button(f"180##{axis}"):
-                    _do_quick_rotate(axis, 180.0)
-
-            _angle_row("rotate_angle_x", "rotate_angle_x", "x")
-            _angle_row("rotate_angle_y", "rotate_angle_y", "y")
-            _angle_row("rotate_angle_z", "rotate_angle_z", "z")
-
-        imgui.text_disabled(tr(ui_state, "rotate_hint_order"))
-        imgui.separator()
-
-        # Apply / Reset
-        apply_disabled = (not can_rotate) or (
-            abs(ui_state.rotate_angle_x) < 1e-9
-            and abs(ui_state.rotate_angle_y) < 1e-9
-            and abs(ui_state.rotate_angle_z) < 1e-9
-        )
-        if apply_disabled:
-            _disabled_button(tr(ui_state, "rotate_apply") + "##rot_apply")
-        else:
-            if imgui.button(tr(ui_state, "rotate_apply") + "##rot_apply"):
-                try:
-                    editor_state.rotate_selected_particles(
-                        angle_x_deg=ui_state.rotate_angle_x,
-                        angle_y_deg=ui_state.rotate_angle_y,
-                        angle_z_deg=ui_state.rotate_angle_z,
-                        pivot_mode=ui_state.rotate_pivot_mode,
-                    )
-                    ui_state.rotate_angle_x = 0.0
-                    ui_state.rotate_angle_y = 0.0
-                    ui_state.rotate_angle_z = 0.0
-                except ValueError as exc:
-                    ui_state.push_toast(str(exc), "error")
-                except Exception as exc:
-                    ui_state.push_toast(f"旋转失败: {exc}", "error", exc_info=True)
-        imgui.same_line()
-        if imgui.button(tr(ui_state, "rotate_reset") + "##rot_reset"):
-            ui_state.rotate_angle_x = 0.0
-            ui_state.rotate_angle_y = 0.0
-            ui_state.rotate_angle_z = 0.0
-
+            _draw_rotate_settings_section(ui_state, editor_state)
         imgui.end_popup()
     imgui.same_line()
 
