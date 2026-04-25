@@ -1689,15 +1689,25 @@ class EditorState:
                     stack.append(c)
         return result
 
-    def apply_length_clamp_to_drag(self, delta, drag_idx_set):
-        """对正在被拖动的整组粒子应用 length clamp（PBD 迭代松弛）。
+    def apply_length_clamp_to_drag(self, delta, drag_idx_set,
+                                    clamp_max=True, clamp_min=True):
+        """对正在被拖动的整组粒子应用 length clamp（Jacobi 风格的约束投影迭代，带 under-relaxation）。
 
         输入：
             delta: np.ndarray (3,) — 鼠标拟应用的整组平移量
             drag_idx_set: set[int] — 被拖动的 particle idx 集合（已剔除 locked）
+            clamp_max: 为 True 时约束 stick 不被拉长（cur_len > ref）
+            clamp_min: 为 True 时约束 stick 不被压缩（cur_len < ref）
         返回：
             修正后的 delta（np.ndarray (3,)）
+
+        带符号 correction：拉长时 deviation > 0，correction 方向与 diff 同向（推回）；
+        压缩时 deviation < 0，correction 方向与 diff 反向（拉回）。
+        Under-relaxation 系数 RELAXATION 抑制 Jacobi 平均在多约束冲突时的振荡过冲。
         """
+        if not clamp_max and not clamp_min:
+            return delta
+
         if not self._anim_reference_lengths or not drag_idx_set:
             return delta
         if not self.sticks:
@@ -1725,7 +1735,8 @@ class EditorState:
             return delta
 
         delta = np.asarray(delta, dtype=np.float32).copy()
-        MAX_ITER = 5
+        MAX_ITER = 10
+        RELAXATION = 0.5
         for _ in range(MAX_ITER):
             violations = []
             for si, inner_idx, outer_idx, ref in boundary:
@@ -1743,16 +1754,20 @@ class EditorState:
                 )
                 diff = inner_new - outer_pos
                 cur_len = float(np.linalg.norm(diff))
-                if cur_len <= ref + 1e-5:
-                    continue
                 deviation = cur_len - ref
+                if abs(deviation) <= 1e-5:
+                    continue
+                if deviation > 0 and not clamp_max:
+                    continue
+                if deviation < 0 and not clamp_min:
+                    continue
                 if cur_len > 1e-6:
                     correction = (diff / cur_len) * deviation
                     violations.append(correction)
             if not violations:
                 break
             avg_corr = np.mean(np.stack(violations), axis=0)
-            delta = delta - avg_corr
+            delta = delta - RELAXATION * avg_corr
 
         return delta
 
