@@ -152,6 +152,12 @@ _TEXT = {
         "browse": "Browse...",
         "or_paste_path": "or paste a path below:",
         "file_dialog_unavailable": "System file dialog unavailable, enter path manually:",
+        # ── animation editor ──
+        "app_anim_title": "RWR Animation Editor",
+        "open_skeleton": "Open Skeleton...",
+        "load_anim": "Load Animation...",
+        "save_anim_as": "Save Animation As...",
+        "import_mixamo": "Import Mixamo... (TODO)",
         "selected_particles_count": "Selected particles: {count}",
         "multi_edit": "Multi-select",
         "align_x": "Align X",
@@ -292,6 +298,12 @@ _TEXT = {
         "browse": "浏览...",
         "or_paste_path": "或直接输入/粘贴路径:",
         "file_dialog_unavailable": "系统对话框不可用，请手动输入路径:",
+        # ── 动画编辑器 ──
+        "app_anim_title": "RWR 动画编辑器",
+        "open_skeleton": "加载骨架...",
+        "load_anim": "加载动画...",
+        "save_anim_as": "导出动画...",
+        "import_mixamo": "导入 Mixamo... (待实现)",
         "selected_particles_count": "已选粒子: {count}",
         "multi_edit": "多选操作",
         "align_x": "对齐 X",
@@ -480,11 +492,74 @@ def _disabled_button(label):
         imgui.button(label)
         imgui.pop_style_var()
 
+def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
+    """动画模式工具栏。文件操作 / undo / 视图预设。
+
+    本函数假设调用方已经 imgui.begin("##toolbar") 且会负责 imgui.end()。
+    """
+    # ── 文件操作（commit 4 接事件，本 commit 占位即可）──
+    if imgui.button(tr(ui_state, "open_skeleton") + "##anim_open_skel"):
+        # commit 4 实现
+        pass
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "load_anim") + "##anim_load"):
+        # commit 4 实现
+        pass
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "save_anim_as") + "##anim_save"):
+        # commit 4 实现
+        pass
+    imgui.same_line()
+    _disabled_button(tr(ui_state, "import_mixamo") + "##anim_mixamo")
+    imgui.same_line()
+
+    imgui.text("|")
+    imgui.same_line()
+
+    # ── undo / redo（commit 4 改成走 anim_undo/redo；commit 3 暂时直接调）──
+    if imgui.button(tr(ui_state, "undo") + "##anim_undo"):
+        undo_fn, _ = editor_state.get_effective_undo_redo()
+        undo_fn()
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "redo") + "##anim_redo"):
+        _, redo_fn = editor_state.get_effective_undo_redo()
+        redo_fn()
+    imgui.same_line()
+
+    imgui.text("|")
+    imgui.same_line()
+
+    # ── 视图预设（和绑骨工具栏一致）──
+    if imgui.button(tr(ui_state, "center") + "##anim_center"):
+        camera.reset_to_model(editor_state.voxels)  # voxels 为空时 no-op
+    imgui.same_line()
+    changed_ortho, ortho_v = imgui.checkbox(
+        tr(ui_state, "ortho") + "##anim_ortho", camera.is_ortho)
+    if changed_ortho:
+        camera.set_ortho_enabled(ortho_v)
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "front") + "##anim_front"):
+        camera.set_view_preset("front")
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "side") + "##anim_side"):
+        camera.set_view_preset("side")
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "top") + "##anim_top"):
+        camera.set_view_preset("top")
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "perspective") + "##anim_persp"):
+        camera.set_view_preset("perspective")
 
 def draw_toolbar(ui_state, editor_state, renderer, camera, WIN_W):
     imgui.set_next_window_position(0, 0)
     imgui.set_next_window_size(WIN_W, 38 * ui_state.ui_scale)
     imgui.begin("##toolbar", flags=FIXED_FLAGS | imgui.WINDOW_NO_SCROLLBAR)
+    
+    # 动画模式：分流到独立的工具栏（不显示 brush / voxel_select / bone_edit / VOX / XML / 预设等）
+    if ui_state.app_mode == "animation":
+        _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W)
+        imgui.end()
+        return
 
     if imgui.button(tr(ui_state, "open_vox") + "##open_vox"):
         ui_state.show_load_dialog = True
@@ -798,6 +873,11 @@ def _draw_add_stick(ui_state, editor_state):
 
 
 def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sticks_ref, camera):
+    # 动画模式下不画 bone panel（绑骨相关 UI 在动画模式下没有意义；
+    # commit 4 的动画面板会取代它的位置展示动画状态）
+    if ui_state.app_mode == "animation":
+        return
+    
     panel_w = int(280 * ui_state.ui_scale)
     toolbar_h = int(38 * ui_state.ui_scale)
     status_h = int(24 * ui_state.ui_scale)
@@ -1424,6 +1504,30 @@ _TOAST_COLORS = {
     "error":   (0.65, 0.20, 0.20),
 }
 
+def draw_animation_panel(ui_state, editor_state, WIN_W, WIN_H):
+    """动画面板（视口底部时间线 + 关键帧 + control 事件）。
+
+    Commit 4 实现主体。本 commit 仅占位。
+    """
+    if not editor_state.animation_mode:
+        return
+    # commit 4 实现
+
+
+def draw_anim_source_picker(ui_state, editor_state):
+    """加载多 animation 文件时的选择对话框。
+
+    Commit 4 实现。
+    """
+    pass
+
+
+def draw_anim_exit_confirm(ui_state, editor_state):
+    """动画模式下脏状态退出确认对话框。
+
+    Commit 4 实现。
+    """
+    pass
 
 def draw_toasts(ui_state, WIN_W, toolbar_h, ui_scale, draw_list):
     """

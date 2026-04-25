@@ -17,26 +17,34 @@ if not exist ".venv\Scripts\pyinstaller.exe" (
     )
 )
 
-echo [1/2] Cleaning old build output...
+echo [1/3] Cleaning old build output...
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 
-echo [2/2] Building rwrsb_gui...
+echo [2/3] Building rwrsb_gui...
 pyinstaller --noconfirm rwrsb_gui.spec
 if errorlevel 1 (
-    echo [ERROR] Build failed.
+    echo [ERROR] rwrsb_gui build failed.
+    exit /b 1
+)
+
+echo [3/3] Building rwrsb_anim...
+pyinstaller --noconfirm rwrsb_anim.spec
+if errorlevel 1 (
+    echo [ERROR] rwrsb_anim build failed.
     exit /b 1
 )
 
 echo.
 echo Build complete:
-echo   dist\rwrsb_gui\rwrsb_gui.exe
+echo   dist\rwrsb_gui\rwrsb_gui.exe   (skeleton/binding editor)
+echo   dist\rwrsb_anim\rwrsb_anim.exe (animation editor)
 echo.
 echo IMPORTANT:
-echo   Run the EXE from dist\rwrsb_gui\rwrsb_gui.exe
-echo   Do NOT run build\rwrsb_gui\rwrsb_gui.exe
+echo   Run the EXE from dist\<name>\<name>.exe
+echo   Do NOT run build\<name>\<name>.exe
 echo.
-echo Recommended release artifact:
-echo   zip the whole dist\rwrsb_gui folder
+echo Recommended release artifacts:
+echo   zip dist\rwrsb_gui  and  dist\rwrsb_anim  separately
 echo.
 endlocal
