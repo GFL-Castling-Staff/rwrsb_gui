@@ -145,6 +145,12 @@ class VoxelRenderer:
         self.inst_color_vbo.write(colors.astype(np.float32).tobytes())
         self.inst_sel_vbo.write(selected.astype(np.float32).tobytes())
 
+    def update_voxel_positions(self, positions):
+        """仅更新位置 VBO，不重建颜色/selection。动画蒙皮专用快速路径。"""
+        if self.inst_pos_vbo is None or len(positions) != self.n_voxels:
+            return
+        self.inst_pos_vbo.write(positions.astype(np.float32).tobytes())
+
     def upload_skeleton_lines(self, particles, sticks):
         self.stick_segments = []
 

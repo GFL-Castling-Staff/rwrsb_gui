@@ -119,6 +119,9 @@ class EditorState:
         # 蒙皮 bind pose：每个绑定 voxel 在其 stick 局部坐标系里的固定坐标
         # key = voxel_index, value = np.ndarray shape (3,)
         self._voxel_local_offsets = {}
+        # 预分组：ci -> (vis: list[int], locals_arr: np.ndarray (n,3))
+        # record_voxel_bind_pose 时填充，update_voxel_positions_from_skeleton 时使用
+        self._voxel_groups = {}
 
     def _preset_dir(self):
         return resource_path("presets")
@@ -1238,6 +1241,7 @@ class EditorState:
         self.bindings = {}
         self.selected_voxels = set()
         self._voxel_local_offsets = {}
+        self._voxel_groups = {}
         self.gpu_dirty = True
 
     def _compute_stick_frame(self, particle_a, particle_b):
@@ -1275,12 +1279,14 @@ class EditorState:
 
     def record_voxel_bind_pose(self, particle_positions=None):
         """记录所有绑定 voxel 在其 stick 局部坐标系里的固定坐标。
+        同时预分组（按 stick 分）供 update_voxel_positions_from_skeleton 向量化使用。
 
         particle_positions: 可选，list[dict]，结构同 self.particles。
             如果传入，使用这份位置作为 bind pose。
             如果不传，使用 self.particles 当前位置。
         """
         self._voxel_local_offsets = {}
+        self._voxel_groups = {}
         if not self.voxels or not self.bindings:
             return
 
@@ -1290,38 +1296,55 @@ class EditorState:
 
         id_to_p = {int(p["id"]): p for p in particles}
 
+        # 每根 stick 只算一次坐标系
+        stick_frames = {}
         for vi, ci in self.bindings.items():
             if ci < 0 or ci >= len(self.sticks):
                 continue
-            stick = self.sticks[ci]
-            pa = id_to_p.get(int(stick.particle_a_id))
-            pb = id_to_p.get(int(stick.particle_b_id))
-            if pa is None or pb is None:
+            if ci not in stick_frames:
+                stick = self.sticks[ci]
+                pa = id_to_p.get(int(stick.particle_a_id))
+                pb = id_to_p.get(int(stick.particle_b_id))
+                if pa is not None and pb is not None:
+                    stick_frames[ci] = self._compute_stick_frame(pa, pb)
+
+            frame = stick_frames.get(ci)
+            if frame is None:
                 continue
             if vi < 0 or vi >= len(self.voxels):
                 continue
 
-            origin, R = self._compute_stick_frame(pa, pb)
+            origin, R = frame
             v_world = np.array(self.voxels[vi][:3], dtype=np.float32)
             v_local = R.T @ (v_world - origin)
             self._voxel_local_offsets[vi] = v_local
 
+        # 预分组：ci -> (vis, locals_arr)，供 update 时向量化批量乘
+        groups_temp = {}
+        for vi, v_local in self._voxel_local_offsets.items():
+            ci = self.bindings.get(vi, -1)
+            if 0 <= ci < len(self.sticks):
+                if ci not in groups_temp:
+                    groups_temp[ci] = []
+                groups_temp[ci].append((vi, v_local))
+        for ci, items in groups_temp.items():
+            vis = [it[0] for it in items]
+            locals_arr = np.stack([it[1] for it in items])  # (n, 3)
+            self._voxel_groups[ci] = (vis, locals_arr)
+
     def update_voxel_positions_from_skeleton(self):
         """根据当前 skeleton 重新计算所有绑定 voxel 的世界位置。
 
-        依赖 _voxel_local_offsets 已经被 record_voxel_bind_pose() 填充过。
-        调用方负责标 self.gpu_dirty = True（_mark_skeleton_changed 里已设好）。
+        使用预分组 _voxel_groups：每根 stick 只计算一次坐标系，然后向量化批量应用。
+        调用方负责标 self.gpu_dirty = True。
         """
-        if not self._voxel_local_offsets or not self.voxels:
+        if not self._voxel_groups or not self.voxels:
             return
 
         id_to_p = {int(p["id"]): p for p in self.particles}
 
-        for vi, v_local in self._voxel_local_offsets.items():
-            if vi < 0 or vi >= len(self.voxels):
-                continue
-            ci = self.bindings.get(vi, -1)
-            if ci < 0 or ci >= len(self.sticks):
+        for ci, (vis, locals_arr) in self._voxel_groups.items():
+            if ci >= len(self.sticks):
                 continue
             stick = self.sticks[ci]
             pa = id_to_p.get(int(stick.particle_a_id))
@@ -1330,13 +1353,16 @@ class EditorState:
                 continue
 
             origin, R = self._compute_stick_frame(pa, pb)
-            v_world = R @ v_local + origin
+            # 批量计算：locals_arr (n,3) → worlds_arr (n,3)
+            worlds_arr = locals_arr @ R.T + origin
 
-            old = self.voxels[vi]
-            self.voxels[vi] = (
-                float(v_world[0]), float(v_world[1]), float(v_world[2]),
-                old[3], old[4], old[5], old[6],
-            )
+            for k, vi in enumerate(vis):
+                if vi < len(self.voxels):
+                    old = self.voxels[vi]
+                    self.voxels[vi] = (
+                        float(worlds_arr[k, 0]), float(worlds_arr[k, 1]), float(worlds_arr[k, 2]),
+                        old[3], old[4], old[5], old[6],
+                    )
 
 
 # ──────────────────────────────────────────────

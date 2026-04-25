@@ -624,8 +624,14 @@ def main():
 
             # voxel GPU buffer 更新
             if g_editor.gpu_dirty and g_editor.voxels and g_renderer is not None:
-                positions, colors, selected = g_editor.build_instance_arrays()
-                g_renderer.upload_voxels(positions, colors, selected)
+                if g_editor.animation_mode and g_editor._voxel_groups:
+                    # 动画蒙皮：仅位置变化，跳过颜色重建
+                    arr = np.array(g_editor.voxels, dtype=np.float32)
+                    g_renderer.update_voxel_positions(arr[:, :3])
+                    g_editor.gpu_dirty = False
+                else:
+                    positions, colors, selected = g_editor.build_instance_arrays()
+                    g_renderer.upload_voxels(positions, colors, selected)
 
             # grid 上传（签名缓存，避免每帧重传）
             # 网格中心固定在世界原点 (0,0,0)，不跟随粒子
@@ -653,7 +659,7 @@ def main():
                     )
                     extent = max(model_extent, camera_extent)
                     grid_sig = (
-                        round(extent, 1), step,
+                        int(extent / 2) * 2, step,  # 每 2 单位才重建，防止动画播放时每帧重绘
                         g_ui.show_grid_xz, g_ui.show_grid_xy, g_ui.show_grid_yz,
                     )
                     if grid_sig != g_grid_sig_cache:
