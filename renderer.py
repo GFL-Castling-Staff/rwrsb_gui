@@ -17,7 +17,9 @@ _PARTICLE_COLOR = (0.95, 0.35, 0.20)
 _PARTICLE_SIZE = 10.0
 _PARTICLE_SIZE_HIGHLIGHT = 16.0
 _PARTICLE_SIZE_SELECTED = 13.0
-_PARTICLE_SELECTED_COLOR = (1.0, 0.85, 0.35, 1.0)  # 次亮淡黄
+_PARTICLE_SELECTED_COLOR = (1.0, 0.85, 0.35, 1.0)  # 次亮淡黄（已选非 active）
+_PARTICLE_SIZE_ACTIVE = 15.0
+_PARTICLE_ACTIVE_COLOR = (0.25, 0.95, 1.0, 1.0)    # 青色，与淡黄明显区分
 _GRID_MINOR_COLOR = (0.28, 0.31, 0.38)
 _GRID_MAJOR_COLOR = (0.52, 0.56, 0.66)
 _MIRROR_PLANE_COLOR = (0.25, 0.90, 0.95)
@@ -87,8 +89,9 @@ class VoxelRenderer:
         self.show_voxels = True
         self.show_skeleton = True
         self.highlight_stick_idx = -1
-        self.highlight_particle_idx = -1
-        self.highlight_selected_particle_indices = []  # list[int]，F1 多选次亮
+        self.highlight_particle_idx = -1          # 悬停粒子
+        self.highlight_active_particle_idx = -1   # active 粒子（青色，独立于悬停）
+        self.highlight_selected_particle_indices = []  # list[int]，已选非 active
         self.show_grid = True
         self.show_mirror_plane = False
         self.show_mirror_handles = False
@@ -535,7 +538,7 @@ class VoxelRenderer:
             )
             self.point_vao.render(moderngl.POINTS, vertices=self.n_points)
 
-            # 2) selected 次亮（比 active 小一点、淡黄）
+            # 2) selected 次亮（淡黄，不含 active）
             if self.highlight_selected_particle_indices:
                 self.ctx.point_size = _PARTICLE_SIZE_SELECTED
                 self.line_prog["u_color_mult"].value = _PARTICLE_SELECTED_COLOR
@@ -543,7 +546,15 @@ class VoxelRenderer:
                     if 0 <= idx < self.n_points:
                         self.point_vao.render(moderngl.POINTS, vertices=1, first=idx)
 
-            # 3) active 最亮（原有逻辑不动）
+            # 3) active 粒子（青色，与已选淡黄明显区分）
+            if 0 <= self.highlight_active_particle_idx < self.n_points:
+                self.ctx.point_size = _PARTICLE_SIZE_ACTIVE
+                self.line_prog["u_color_mult"].value = _PARTICLE_ACTIVE_COLOR
+                self.point_vao.render(
+                    moderngl.POINTS, vertices=1, first=self.highlight_active_particle_idx
+                )
+
+            # 4) 悬停粒子（亮黄，覆盖 active 色提供额外反馈）
             if 0 <= self.highlight_particle_idx < self.n_points:
                 self.ctx.point_size = _PARTICLE_SIZE_HIGHLIGHT
                 self.line_prog["u_color_mult"].value = (1.0, 1.0, 0.25, 1.0)

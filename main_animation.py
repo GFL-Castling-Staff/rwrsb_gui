@@ -769,9 +769,12 @@ def main():
                 )
                 g_camera.resize(vp_w, vp_h)
                 mvp = g_camera.get_mvp()
-                g_renderer.highlight_selected_particle_indices = list(
-                    g_editor.selected_particles
-                )
+                # active 粒子单独用青色渲染，从 selected 列表中排除避免颜色叠加
+                act = g_editor.active_particle_idx
+                g_renderer.highlight_active_particle_idx = act
+                g_renderer.highlight_selected_particle_indices = [
+                    i for i in g_editor.selected_particles if i != act
+                ]
                 g_renderer.render(mvp)
 
             ctx.viewport = (0, 0, max(fb_w, 1), max(fb_h, 1))
