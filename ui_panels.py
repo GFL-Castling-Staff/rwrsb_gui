@@ -243,6 +243,31 @@ _TEXT = {
         "drag_mode_rotate": "Rotate",
         "drag_rotate_hint": "Drag = rotate around pivot  (axis from view direction)",
         "rotate_pivot_hint": "First click the pivot joint, then Shift-click / box-select the rest",
+        # ── 半身基准 pose popup（P2）──
+        "halfbody_btn": "Half-body...",
+        "halfbody_popup_title": "Half-body Animation",
+        "halfbody_baseline_section": "Baseline Pose",
+        "halfbody_load_vanilla": "Vanilla still",
+        "halfbody_load_current_frame": "Current frame",
+        "halfbody_load_from_file": "From file...",
+        "halfbody_baseline_loaded": "Loaded: {name}",
+        "halfbody_baseline_none": "(no baseline loaded)",
+        "halfbody_clear_baseline": "Clear baseline",
+        "halfbody_set_vanilla_path": "Set vanilla path...",
+        "halfbody_vanilla_path_unset": "(vanilla path not set)",
+        "halfbody_vanilla_disabled_hint": "Set vanilla path first",
+        "halfbody_lock_section": "Lock",
+        "halfbody_lock_upper": "Lock upper (0-7)",
+        "halfbody_lock_lower": "Lock lower (8-14)",
+        "halfbody_lock_none": "Lock none",
+        "halfbody_lock_midspine": "Lock midspine (idx 8)",
+        "halfbody_locked_indices": "Locked: {indices}",
+        "halfbody_lock_disabled_no_baseline": "Load a baseline first",
+        "halfbody_fill_section": "Fill",
+        "halfbody_fill_baseline": "Fill baseline to selected in all frames",
+        "halfbody_fill_disabled_no_baseline": "Load a baseline first",
+        "halfbody_fill_disabled_no_sel": "Select at least 1 particle",
+        "halfbody_fill_disabled_no_anim": "Enter animation mode first",
         # ── 旋转选中粒子 popup ──
         "rotate_btn": "Rotate...",
         "rotate_popup_title": "Rotate Selected Particles",
@@ -467,6 +492,31 @@ _TEXT = {
         "drag_mode_rotate": "旋转",
         "drag_rotate_hint": "拖动 = 绕 pivot 旋转  （轴由视图方向决定）",
         "rotate_pivot_hint": "先单击固定关节，再 Shift 点选 / 框选其余粒子",
+        # ── 半身基准 pose popup（P2）──
+        "halfbody_btn": "半身...",
+        "halfbody_popup_title": "半身动画",
+        "halfbody_baseline_section": "基准 Pose",
+        "halfbody_load_vanilla": "Vanilla still",
+        "halfbody_load_current_frame": "当前帧",
+        "halfbody_load_from_file": "从文件...",
+        "halfbody_baseline_loaded": "已加载: {name}",
+        "halfbody_baseline_none": "(未加载基准)",
+        "halfbody_clear_baseline": "清空基准",
+        "halfbody_set_vanilla_path": "设置 vanilla 路径...",
+        "halfbody_vanilla_path_unset": "(未设置 vanilla 路径)",
+        "halfbody_vanilla_disabled_hint": "请先设置 vanilla 路径",
+        "halfbody_lock_section": "锁定",
+        "halfbody_lock_upper": "锁定上半身 (0-7)",
+        "halfbody_lock_lower": "锁定下半身 (8-14)",
+        "halfbody_lock_none": "全部解锁",
+        "halfbody_lock_midspine": "锁定 midspine (idx 8)",
+        "halfbody_locked_indices": "已锁定: {indices}",
+        "halfbody_lock_disabled_no_baseline": "请先加载基准 pose",
+        "halfbody_fill_section": "填充",
+        "halfbody_fill_baseline": "把选中粒子填充到所有帧的基准位置",
+        "halfbody_fill_disabled_no_baseline": "请先加载 baseline",
+        "halfbody_fill_disabled_no_sel": "至少选择 1 个粒子",
+        "halfbody_fill_disabled_no_anim": "请先进入动画模式",
         # ── 旋转选中粒子 popup ──
         "rotate_btn": "旋转...",
         "rotate_popup_title": "旋转选中粒子",
@@ -571,6 +621,9 @@ class UIState:
 
         # 拖动模式：平移 / 旋转
         self.anim_drag_mode = "move"        # "move" | "rotate"
+
+        # P2：vanilla soldier_animations.xml 路径（不持久化，每次启动手动设）
+        self.vanilla_animations_path = None  # str | None
 
     def push_toast(self, message: str, level: str = "info",
                    also_log: bool = True, exc_info=None) -> None:
@@ -1939,6 +1992,171 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
             ui_state.rotate_angle_x = 0.0
             ui_state.rotate_angle_y = 0.0
             ui_state.rotate_angle_z = 0.0
+
+        imgui.end_popup()
+    imgui.same_line()
+
+    # ── Half-body popup（P2）──
+    if imgui.button(tr(ui_state, "halfbody_btn") + "##anim_halfbody_btn"):
+        imgui.open_popup("##anim_halfbody_popup")
+    if imgui.begin_popup("##anim_halfbody_popup"):
+        imgui.text(tr(ui_state, "halfbody_popup_title"))
+        imgui.separator()
+
+        # === Baseline 区 ===
+        imgui.text(tr(ui_state, "halfbody_baseline_section"))
+        if editor_state._baseline_positions is not None:
+            imgui.text_disabled(tr(ui_state, "halfbody_baseline_loaded",
+                                   name=editor_state._baseline_name))
+        else:
+            imgui.text_disabled(tr(ui_state, "halfbody_baseline_none"))
+
+        # 三个加载来源按钮
+        vanilla_disabled = (ui_state.vanilla_animations_path is None)
+        if vanilla_disabled:
+            _disabled_button(tr(ui_state, "halfbody_load_vanilla") + "##hb_vanilla")
+            if imgui.is_item_hovered():
+                imgui.set_tooltip(tr(ui_state, "halfbody_vanilla_disabled_hint"))
+        else:
+            if imgui.button(tr(ui_state, "halfbody_load_vanilla") + "##hb_vanilla"):
+                try:
+                    editor_state.load_baseline_pose(
+                        "vanilla_still",
+                        vanilla_path=ui_state.vanilla_animations_path
+                    )
+                    ui_state.push_toast(
+                        tr(ui_state, "halfbody_baseline_loaded",
+                           name=editor_state._baseline_name), "info"
+                    )
+                except ValueError as exc:
+                    ui_state.push_toast(str(exc), "error")
+                except Exception as exc:
+                    ui_state.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+        imgui.same_line()
+        if imgui.button(tr(ui_state, "halfbody_load_current_frame") + "##hb_cur"):
+            try:
+                editor_state.load_baseline_pose("current_frame")
+                ui_state.push_toast(
+                    tr(ui_state, "halfbody_baseline_loaded",
+                       name=editor_state._baseline_name), "info"
+                )
+            except ValueError as exc:
+                ui_state.push_toast(str(exc), "error")
+        imgui.same_line()
+        if imgui.button(tr(ui_state, "halfbody_load_from_file") + "##hb_file"):
+            try:
+                from file_dialogs import open_file_dialog
+                path = open_file_dialog(
+                    "选择 animation XML",
+                    [("XML files", "*.xml"), ("All files", "*.*")],
+                )
+                if path:
+                    editor_state.load_baseline_pose("file", file_path=path)
+                    ui_state.push_toast(
+                        tr(ui_state, "halfbody_baseline_loaded",
+                           name=editor_state._baseline_name), "info"
+                    )
+            except ValueError as exc:
+                ui_state.push_toast(str(exc), "error")
+            except Exception as exc:
+                ui_state.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+
+        # vanilla 路径设置
+        imgui.separator()
+        path_display = ui_state.vanilla_animations_path or tr(ui_state, "halfbody_vanilla_path_unset")
+        imgui.text_disabled(f"{tr(ui_state, 'halfbody_set_vanilla_path')}: {path_display}")
+        if imgui.button(tr(ui_state, "halfbody_set_vanilla_path") + "##hb_set_vanilla"):
+            try:
+                from file_dialogs import open_file_dialog
+                path = open_file_dialog(
+                    "选择 vanilla soldier_animations.xml",
+                    [("XML files", "*.xml"), ("All files", "*.*")],
+                )
+                if path:
+                    ui_state.vanilla_animations_path = path
+                    ui_state.push_toast("vanilla 路径已设置", "info")
+            except Exception as exc:
+                ui_state.push_toast(f"设置失败: {exc}", "error", exc_info=True)
+
+        # Clear baseline
+        if editor_state._baseline_positions is not None:
+            if imgui.button(tr(ui_state, "halfbody_clear_baseline") + "##hb_clear"):
+                editor_state.clear_baseline_pose()
+                ui_state.push_toast("基准已清空", "info")
+
+        # === Lock 区 ===
+        imgui.separator()
+        imgui.text(tr(ui_state, "halfbody_lock_section"))
+
+        if editor_state._baseline_positions is None:
+            imgui.text_disabled(tr(ui_state, "halfbody_lock_disabled_no_baseline"))
+        else:
+            if imgui.button(tr(ui_state, "halfbody_lock_upper") + "##hb_lock_upper"):
+                editor_state.set_baseline_locked_indices(set(range(0, 8)))
+                editor_state.apply_baseline_lock_to_particles()
+                editor_state._mark_skeleton_changed()
+            imgui.same_line()
+            if imgui.button(tr(ui_state, "halfbody_lock_lower") + "##hb_lock_lower"):
+                editor_state.set_baseline_locked_indices(set(range(8, 15)))
+                editor_state.apply_baseline_lock_to_particles()
+                editor_state._mark_skeleton_changed()
+            imgui.same_line()
+            if imgui.button(tr(ui_state, "halfbody_lock_none") + "##hb_lock_none"):
+                editor_state.set_baseline_locked_indices(set())
+                editor_state._mark_skeleton_changed()
+
+            # midspine 单独 toggle
+            midspine_locked = (8 in editor_state._baseline_locked_indices)
+            chg_ms, new_ms = imgui.checkbox(
+                tr(ui_state, "halfbody_lock_midspine") + "##hb_midspine",
+                midspine_locked
+            )
+            if chg_ms:
+                new_set = set(editor_state._baseline_locked_indices)
+                if new_ms:
+                    new_set.add(8)
+                else:
+                    new_set.discard(8)
+                editor_state.set_baseline_locked_indices(new_set)
+                editor_state.apply_baseline_lock_to_particles()
+                editor_state._mark_skeleton_changed()
+
+            if editor_state._baseline_locked_indices:
+                sorted_ids = sorted(editor_state._baseline_locked_indices)
+                imgui.text_disabled(
+                    tr(ui_state, "halfbody_locked_indices",
+                       indices=", ".join(str(i) for i in sorted_ids))
+                )
+
+        # === Fill 区 ===
+        imgui.separator()
+        imgui.text(tr(ui_state, "halfbody_fill_section"))
+
+        can_fill = (
+            editor_state._baseline_positions is not None
+            and len(editor_state.selected_particles) >= 1
+            and editor_state.animation_mode
+        )
+        if not can_fill:
+            if editor_state._baseline_positions is None:
+                imgui.text_disabled(tr(ui_state, "halfbody_fill_disabled_no_baseline"))
+            elif not editor_state.animation_mode:
+                imgui.text_disabled(tr(ui_state, "halfbody_fill_disabled_no_anim"))
+            else:
+                imgui.text_disabled(tr(ui_state, "halfbody_fill_disabled_no_sel"))
+        else:
+            if imgui.button(tr(ui_state, "halfbody_fill_baseline") + "##hb_fill",
+                            width=300):
+                try:
+                    n_sel = len(editor_state.selected_particles)
+                    editor_state.fill_baseline_to_selected_across_frames()
+                    ui_state.push_toast(
+                        f"已填充 {n_sel} 个粒子到所有帧", "info"
+                    )
+                except ValueError as exc:
+                    ui_state.push_toast(str(exc), "error")
+                except Exception as exc:
+                    ui_state.push_toast(f"填充失败: {exc}", "error", exc_info=True)
 
         imgui.end_popup()
     imgui.same_line()

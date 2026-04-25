@@ -177,6 +177,10 @@ def _start_particle_drag(mx, my, particle_idx):
     global g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin
     global g_drag_origins
 
+    # 单选：锁定粒子不可拖
+    if particle_idx in g_editor._baseline_locked_indices:
+        return
+
     if g_editor.animation_mode and g_editor.playback_playing:
         g_editor.playback_playing = False
 
@@ -193,10 +197,13 @@ def _start_particle_drag(mx, my, particle_idx):
         plane_normal = plane_normal / norm
     g_drag_plane_normal = plane_normal
 
-    # 多选拖动：备份所有选中点初始位置
+    # 多选拖动：备份所有选中点初始位置，剔除锁定粒子
     drag_set = (set(g_editor.selected_particles)
                 if particle_idx in g_editor.selected_particles
                 else {particle_idx})
+    drag_set = drag_set - g_editor._baseline_locked_indices
+    if not drag_set:
+        return
     g_drag_origins = {}
     for idx in drag_set:
         if 0 <= idx < len(g_editor.particles):
@@ -266,13 +273,14 @@ def _start_rotate_drag(particle_idx):
     else:
         g_editor._push_undo()
 
-    # 保存选中粒子位置快照
+    # 保存选中粒子位置快照（剔除锁定粒子，锁定粒子不参与旋转）
     g_rotate_drag_snapshot = {
         idx: np.array([g_editor.particles[idx]["x"],
                        g_editor.particles[idx]["y"],
                        g_editor.particles[idx]["z"]], dtype=np.float32)
         for idx in g_editor.selected_particles
         if 0 <= idx < len(g_editor.particles)
+        and idx not in g_editor._baseline_locked_indices
     }
     g_rotate_drag_pivot = _compute_rotate_pivot()
     g_rotate_drag_axis  = _rotate_drag_axis_from_camera()
@@ -314,6 +322,9 @@ def _end_rotate_drag():
         frame_idx = g_editor.current_frame_idx
         frames = g_editor.current_animation.frames
         if 0 <= frame_idx < len(frames):
+            # 写回前先 lock，确保锁定粒子不写入旋转后的错误位置
+            g_editor.apply_baseline_lock_to_particles()
+            g_editor.skeleton_dirty = True
             frames[frame_idx].positions = [
                 (float(p["x"]), float(p["y"]), float(p["z"]))
                 for p in g_editor.particles
@@ -795,6 +806,10 @@ def main():
                 g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks)
                 rebuild_positions_cache()
                 g_editor.skeleton_dirty = False
+
+            # 每帧同步锁定粒子列表给渲染器（锁定状态可能在 skeleton_dirty 未触发时改变）
+            if g_renderer is not None:
+                g_renderer.locked_particle_indices = list(g_editor._baseline_locked_indices)
 
             # voxel GPU buffer 更新
             if g_editor.voxels and g_renderer is not None:

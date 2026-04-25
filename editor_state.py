@@ -126,6 +126,11 @@ class EditorState:
         # 5b：各 stick 的参考长度（进入动画模式时记录）
         self._anim_reference_lengths = {}
 
+        # 半身基准 pose（P2）
+        self._baseline_positions = None  # list[tuple[float,float,float]] | None
+        self._baseline_name = ""
+        self._baseline_locked_indices: set = set()
+
         # 蒙皮 bind pose：每个绑定 voxel 在其 stick 局部坐标系里的固定坐标
         # key = voxel_index, value = np.ndarray shape (3,)
         self._voxel_local_offsets = {}
@@ -1006,6 +1011,8 @@ class EditorState:
                 self.particles[i]['x'] = float(x)
                 self.particles[i]['y'] = float(y)
                 self.particles[i]['z'] = float(z)
+        # 半身锁定：强制覆盖锁定粒子到基准位置（必须在 voxel 重算之前）
+        self.apply_baseline_lock_to_particles()
         self.skeleton_dirty = True
         # 蒙皮：粒子位置变了，重算 voxel 世界位置
         self.update_voxel_positions_from_skeleton()
@@ -1024,6 +1031,8 @@ class EditorState:
                 self.particles[i]['x'] = float(x)
                 self.particles[i]['y'] = float(y)
                 self.particles[i]['z'] = float(z)
+        # 半身锁定：强制覆盖锁定粒子到基准位置（必须在 voxel 重算之前）
+        self.apply_baseline_lock_to_particles()
         self.skeleton_dirty = True
         # 蒙皮：粒子位置变了，重算 voxel 世界位置
         self.update_voxel_positions_from_skeleton()
@@ -1090,6 +1099,8 @@ class EditorState:
         if (self.current_frame_idx < 0
                 or self.current_frame_idx >= len(self.current_animation.frames)):
             return
+        # 防御：commit 前确保锁定粒子在 baseline 位置，避免意外写入错误坐标
+        self.apply_baseline_lock_to_particles()
         self._anim_push_undo()  # 已经设了 _anim_dirty
         frame = self.current_animation.frames[self.current_frame_idx]
         frame.positions = [
@@ -1435,6 +1446,140 @@ class EditorState:
                         float(worlds_arr[k, 0]), float(worlds_arr[k, 1]), float(worlds_arr[k, 2]),
                         old[3], old[4], old[5], old[6],
                     )
+
+
+    # ──────────────────────────────────────────────
+    # 半身基准 pose（P2）
+    # ──────────────────────────────────────────────
+
+    def load_baseline_pose(self, source, **kwargs):
+        """加载基准 pose。
+
+        source: "vanilla_still" | "current_frame" | "file"
+
+        kwargs:
+            vanilla_path (str): source="vanilla_still" 时必传（vanilla soldier_animations.xml 路径）
+            file_path (str):    source="file" 时必传
+
+        成功设置 self._baseline_positions 和 self._baseline_name；失败抛 ValueError。
+        """
+        if source == "vanilla_still":
+            path = kwargs.get("vanilla_path")
+            if not path:
+                raise ValueError("未设置 vanilla 路径")
+            positions = self._parse_animation_first_frame(path, animation_name="still")
+            if positions is None:
+                raise ValueError("在 vanilla 文件中未找到 still 动画")
+            self._baseline_positions = positions
+            self._baseline_name = "Vanilla Still Pose"
+
+        elif source == "current_frame":
+            if not self.particles:
+                raise ValueError("当前没有粒子")
+            self._baseline_positions = [
+                (float(p["x"]), float(p["y"]), float(p["z"]))
+                for p in self.particles
+            ]
+            self._baseline_name = f"当前帧 ({len(self.particles)} 粒子)"
+
+        elif source == "file":
+            path = kwargs.get("file_path")
+            if not path:
+                raise ValueError("未指定文件路径")
+            positions = self._parse_animation_first_frame(path)
+            if positions is None:
+                raise ValueError("文件中未找到任何动画帧")
+            self._baseline_positions = positions
+            import os
+            self._baseline_name = f"文件: {os.path.basename(path)}"
+
+        else:
+            raise ValueError(f"未知 source: {source}")
+
+    def _parse_animation_first_frame(self, xml_path, animation_name=None):
+        """解析 animation XML，返回指定动画第 0 帧的 positions。
+
+        animation_name: 可选，None 时取文件第一个动画。
+        返回 list[tuple[float,float,float]] 或 None（找不到时）。
+        """
+        from animation_io import parse_animation_index, parse_single_animation
+        try:
+            doc = parse_animation_index(xml_path)
+        except Exception as exc:
+            raise ValueError(f"解析动画文件失败: {exc}") from exc
+
+        if animation_name is not None:
+            idx = doc.name_to_index.get(animation_name)
+            if idx is None:
+                return None
+            anim = parse_single_animation(xml_path, idx)
+        else:
+            if not doc.names:
+                return None
+            anim = parse_single_animation(xml_path, 0)
+
+        if not anim.frames:
+            return None
+        return list(anim.frames[0].positions)
+
+    def clear_baseline_pose(self):
+        """清空基准 pose，同时清空锁定集合。"""
+        self._baseline_positions = None
+        self._baseline_name = ""
+        self._baseline_locked_indices = set()
+
+    def set_baseline_locked_indices(self, indices):
+        """设置锁定的 particle idx 集合（覆盖式）。"""
+        self._baseline_locked_indices = set(int(i) for i in indices)
+
+    def apply_baseline_lock_to_particles(self):
+        """把所有锁定 idx 强制覆盖为 baseline pose 的对应位置。
+
+        baseline 未加载或锁定集合为空时 no-op。
+        调用方负责设 skeleton_dirty / gpu_dirty 并调用 update_voxel_positions_from_skeleton。
+        """
+        if self._baseline_positions is None:
+            return
+        if not self._baseline_locked_indices:
+            return
+        for idx in self._baseline_locked_indices:
+            if 0 <= idx < len(self.particles) and 0 <= idx < len(self._baseline_positions):
+                x, y, z = self._baseline_positions[idx]
+                self.particles[idx]["x"] = float(x)
+                self.particles[idx]["y"] = float(y)
+                self.particles[idx]["z"] = float(z)
+
+    def fill_baseline_to_selected_across_frames(self):
+        """把 selected_particles 里所有粒子在所有关键帧的位置统一覆写为 baseline 对应值。
+
+        P6 决策：selected 里有任何 idx 越界（>= len(_baseline_positions)）时整体拒绝。
+        """
+        if not self.animation_mode or self.current_animation is None:
+            raise ValueError("不在动画模式下")
+        if self._baseline_positions is None:
+            raise ValueError("未加载 baseline pose")
+        if not self.selected_particles:
+            raise ValueError("未选择任何粒子")
+
+        n_baseline = len(self._baseline_positions)
+        out_of_range = [i for i in self.selected_particles if i >= n_baseline or i < 0]
+        if out_of_range:
+            raise ValueError(
+                f"选中的粒子中有 {len(out_of_range)} 个越界"
+                f"（baseline 只有 {n_baseline} 个粒子）"
+            )
+
+        self._anim_push_undo()
+
+        for frame in self.current_animation.frames:
+            positions = list(frame.positions)
+            for idx in self.selected_particles:
+                if 0 <= idx < len(positions):
+                    positions[idx] = tuple(self._baseline_positions[idx])
+            frame.positions = positions
+
+        # 立即刷新当前帧视觉
+        self._apply_frame_to_particles(self.current_frame_idx)
 
 
 # ──────────────────────────────────────────────
