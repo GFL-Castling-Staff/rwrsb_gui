@@ -406,10 +406,14 @@ def _update_particle_drag(window, mx, my):
     new_anchor = _apply_particle_drag_rules_anim(new_anchor, axis_mask)
     delta = new_anchor - g_drag_particle_origin
 
-    # Length Clamp（P3）：仅 Move 模式 + 开启 toggle 时生效
-    if g_ui.anim_drag_mode == "move" and g_ui.move_length_clamp:
+    # Length Clamp（P3）：仅 Move 模式 + 至少一个 clamp 开关开启时生效
+    if g_ui.anim_drag_mode == "move" and (g_ui.move_clamp_max or g_ui.move_clamp_min):
         drag_idx_set = set(g_drag_origins.keys())
-        delta = g_editor.apply_length_clamp_to_drag(delta, drag_idx_set)
+        delta = g_editor.apply_length_clamp_to_drag(
+            delta, drag_idx_set,
+            clamp_max=g_ui.move_clamp_max,
+            clamp_min=g_ui.move_clamp_min,
+        )
 
     from ui_panels import _grid_step
     step = _grid_step(g_ui) if g_ui.snap_particles_to_grid else 0.0
