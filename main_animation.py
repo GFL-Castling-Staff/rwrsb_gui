@@ -212,7 +212,56 @@ def _start_particle_drag(mx, my, particle_idx):
     g_particle_drag_active = True
 
 
-def _update_particle_drag(mx, my):
+def _drag_axis_mask(window):
+    """读取 GLFW 修饰键返回轴锁定模式：Shift=X, Ctrl=Y, Alt=Z, 无=None。"""
+    shift = (
+        glfw.get_key(window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS
+        or glfw.get_key(window, glfw.KEY_RIGHT_SHIFT) == glfw.PRESS
+    )
+    ctrl = (
+        glfw.get_key(window, glfw.KEY_LEFT_CONTROL) == glfw.PRESS
+        or glfw.get_key(window, glfw.KEY_RIGHT_CONTROL) == glfw.PRESS
+    )
+    alt = (
+        glfw.get_key(window, glfw.KEY_LEFT_ALT) == glfw.PRESS
+        or glfw.get_key(window, glfw.KEY_RIGHT_ALT) == glfw.PRESS
+    )
+    if shift:
+        return "x"
+    if ctrl:
+        return "y"
+    if alt:
+        return "z"
+    return None
+
+
+def _apply_particle_drag_rules_anim(pos, axis_mask):
+    """轴锁定 + 可选网格吸附（anim 工具专用，使用 _grid_step 而非 grid_step_value）。"""
+    from ui_panels import _grid_step
+    out = np.array(pos, dtype=np.float32)
+    if axis_mask == "x":
+        out[1] = g_drag_particle_origin[1]
+        out[2] = g_drag_particle_origin[2]
+    elif axis_mask == "y":
+        out[0] = g_drag_particle_origin[0]
+        out[2] = g_drag_particle_origin[2]
+    elif axis_mask == "z":
+        out[0] = g_drag_particle_origin[0]
+        out[1] = g_drag_particle_origin[1]
+    if g_ui.snap_particles_to_grid:
+        step = _grid_step(g_ui)
+        if axis_mask == "x":
+            out[0] = round(float(out[0]) / step) * step
+        elif axis_mask == "y":
+            out[1] = round(float(out[1]) / step) * step
+        elif axis_mask == "z":
+            out[2] = round(float(out[2]) / step) * step
+        else:
+            out = np.round(out / step) * step
+    return out
+
+
+def _update_particle_drag(window, mx, my):
     if not g_particle_drag_active or g_drag_particle_origin is None:
         return
     _, toolbar_h, _ = _ui_layout_metrics()
@@ -227,6 +276,9 @@ def _update_particle_drag(mx, my):
         return
     # grab_offset = origin - initial_hit  →  new_anchor = hit + grab_offset
     new_anchor = hit + g_drag_grab_offset
+    # 轴锁定：clamp new_anchor 到约束轴，再算 delta（多选跟随用同一个 delta）
+    axis_mask = _drag_axis_mask(window)
+    new_anchor = _apply_particle_drag_rules_anim(new_anchor, axis_mask)
     delta = new_anchor - g_drag_particle_origin
     from ui_panels import _grid_step
     step = _grid_step(g_ui) if g_ui.snap_particles_to_grid else 0.0
@@ -365,7 +417,7 @@ def on_cursor_pos(window, xpos, ypos):
     g_mouse_x = xpos
     g_mouse_y = ypos
     if g_particle_drag_active:
-        _update_particle_drag(xpos, ypos)
+        _update_particle_drag(window, xpos, ypos)
     if g_ui.box_selecting:
         g_ui.box_x1 = xpos
         g_ui.box_y1 = ypos
