@@ -138,6 +138,11 @@ class EditorState:
         # record_voxel_bind_pose 时填充，update_voxel_positions_from_skeleton 时使用
         self._voxel_groups = {}
 
+        # 骨架树（P3）
+        self._tree_parent: dict = {}       # particle idx -> parent idx；root 的 parent 是 None
+        self._tree_root_idx: int = -1      # 当前 root 的 particle idx；-1 表示树未构建
+        self._tree_dirty: bool = True      # True 时下次访问前需要重建
+
     def _preset_dir(self):
         return resource_path("presets")
 
@@ -178,6 +183,7 @@ class EditorState:
         self._dirty = True
         self.gpu_dirty = True
         self.skeleton_dirty = True
+        self._tree_dirty = True
 
     def _push_undo(self):
         self._undo_stack.append(self._snapshot())
@@ -220,6 +226,7 @@ class EditorState:
             name = _make_stick_name(particles_by_id, pa_id, pb_id)
             self.sticks.append(StickEntry(ci, pa_id, pb_id, name))
         self.skeleton_dirty = True
+        self._tree_dirty = True
 
     def exit_mirror_mode(self):
         self.mirror_mode = False
@@ -447,6 +454,7 @@ class EditorState:
         self._rebuild_sticks_from_raw(skeleton.get("sticks", []))
         self.active_stick_idx = 0
         self.active_particle_idx = -1
+        self._tree_dirty = True
 
         # 如果加载了 voxels 且 bindings 存在，记录 bind pose
         if self.voxels and self.bindings:
@@ -471,6 +479,7 @@ class EditorState:
         self.exit_mirror_mode()
         self.gpu_dirty = True
         self.skeleton_dirty = True
+        self._tree_dirty = True
         return data
     
     def load_skeleton_xml(self, path):
@@ -496,6 +505,7 @@ class EditorState:
         self._rebuild_sticks_from_raw(skeleton.get("sticks", []))
         self.active_stick_idx = 0
         self.active_particle_idx = -1
+        self._tree_dirty = True
 
         # 如果加载了 voxels 且 bindings 存在，记录 bind pose
         if self.voxels and self.bindings:
@@ -626,6 +636,7 @@ class EditorState:
                 "z": float(z),
             }
         )
+        self._tree_dirty = True
         self._mark_skeleton_changed()
         return len(self.particles) - 1
 
@@ -690,6 +701,7 @@ class EditorState:
             self.active_particle_idx -= 1
         if self.mirror_pair and particle_index in self.mirror_pair:
             self.exit_mirror_mode()
+        self._tree_dirty = True
         self._mark_skeleton_changed()
 
     def add_stick(self, particle_a_id, particle_b_id, name=None):
@@ -709,6 +721,7 @@ class EditorState:
         stick_name = name or _make_stick_name(particles_by_id, pa_id, pb_id)
         self.sticks.append(StickEntry(ci, pa_id, pb_id, stick_name))
         self.active_stick_idx = ci
+        self._tree_dirty = True
         self._mark_skeleton_changed()
 
     def update_stick(self, stick_idx, particle_a_id=None, particle_b_id=None, name=None):
@@ -746,6 +759,7 @@ class EditorState:
                 remap[old_ci] = old_ci - 1
         self.bindings = {vi: remap[ci] for vi, ci in self.bindings.items() if ci in remap}
         self._normalize_stick_indices()
+        self._tree_dirty = True
         self._mark_skeleton_changed()
 
     def rename_sticks_from_particles(self, push_undo=True):
@@ -1580,6 +1594,167 @@ class EditorState:
 
         # 立即刷新当前帧视觉
         self._apply_frame_to_particles(self.current_frame_idx)
+
+    # ──────────────────────────────────────────────
+    # 骨架树（P3）
+    # ──────────────────────────────────────────────
+
+    def _build_skeleton_tree(self, root_idx):
+        """从 root_idx 出发用 BFS 构建有向树，结果写入 self._tree_parent。
+
+        BFS tie-breaking 规则：
+        1. 距 root 距离更近的 parent 优先（BFS 自然满足）
+        2. 同距离时，sticks 列表里更早出现的 stick 对应的 parent 优先
+        """
+        self._tree_parent = {}
+        self._tree_root_idx = -1
+        if not self.particles:
+            self._tree_dirty = False
+            return
+        if root_idx < 0 or root_idx >= len(self.particles):
+            self._tree_dirty = False
+            return
+
+        id_to_idx = {int(p["id"]): i for i, p in enumerate(self.particles)}
+        adj = {i: [] for i in range(len(self.particles))}
+        for so, s in enumerate(self.sticks):
+            ai = id_to_idx.get(int(s.particle_a_id))
+            bi = id_to_idx.get(int(s.particle_b_id))
+            if ai is None or bi is None:
+                continue
+            adj[ai].append((bi, so))
+            adj[bi].append((ai, so))
+
+        for i in adj:
+            adj[i].sort(key=lambda x: x[1])
+
+        from collections import deque
+        visited = {root_idx}
+        self._tree_parent[root_idx] = None
+        queue = deque([root_idx])
+        while queue:
+            cur = queue.popleft()
+            for nb, _so in adj[cur]:
+                if nb in visited:
+                    continue
+                visited.add(nb)
+                self._tree_parent[nb] = cur
+                queue.append(nb)
+
+        self._tree_root_idx = root_idx
+        self._tree_dirty = False
+
+    def get_skeleton_tree(self):
+        """返回当前骨架树（parent_dict, root_idx）。
+        parent_dict: dict[int, int|None] — particle idx -> parent idx；root 的 parent 为 None
+        root_idx: int — -1 表示树无效
+        """
+        if self._tree_dirty:
+            target = self._tree_root_idx if 0 <= self._tree_root_idx < len(self.particles) else 8
+            if target >= len(self.particles):
+                target = 0 if self.particles else -1
+            if target >= 0:
+                self._build_skeleton_tree(target)
+            else:
+                self._tree_parent = {}
+                self._tree_root_idx = -1
+                self._tree_dirty = False
+        return self._tree_parent, self._tree_root_idx
+
+    def set_skeleton_tree_root(self, root_idx):
+        """改变 root 并重建树。无效 idx raise ValueError。"""
+        if root_idx < 0 or root_idx >= len(self.particles):
+            raise ValueError(f"root_idx 越界: {root_idx}")
+        self._build_skeleton_tree(root_idx)
+
+    def collect_subtree_indices(self, start_idx):
+        """从 start_idx 出发，沿 parent→child 方向收集整棵子树的 particle idx 集合（含 start_idx 本身）。
+        start_idx 不在当前树里时 raise ValueError。
+        """
+        parent, _ = self.get_skeleton_tree()
+        if start_idx not in parent:
+            raise ValueError(f"start_idx={start_idx} 不在当前骨架树里")
+        children = {}
+        for child, par in parent.items():
+            if par is None:
+                continue
+            children.setdefault(par, []).append(child)
+        result = {start_idx}
+        stack = [start_idx]
+        while stack:
+            cur = stack.pop()
+            for c in children.get(cur, []):
+                if c not in result:
+                    result.add(c)
+                    stack.append(c)
+        return result
+
+    def apply_length_clamp_to_drag(self, delta, drag_idx_set):
+        """对正在被拖动的整组粒子应用 length clamp（PBD 迭代松弛）。
+
+        输入：
+            delta: np.ndarray (3,) — 鼠标拟应用的整组平移量
+            drag_idx_set: set[int] — 被拖动的 particle idx 集合（已剔除 locked）
+        返回：
+            修正后的 delta（np.ndarray (3,)）
+        """
+        if not self._anim_reference_lengths or not drag_idx_set:
+            return delta
+        if not self.sticks:
+            return delta
+
+        id_to_idx = {int(p["id"]): i for i, p in enumerate(self.particles)}
+        boundary = []
+        for si, s in enumerate(self.sticks):
+            ai = id_to_idx.get(int(s.particle_a_id))
+            bi = id_to_idx.get(int(s.particle_b_id))
+            if ai is None or bi is None:
+                continue
+            in_a = ai in drag_idx_set
+            in_b = bi in drag_idx_set
+            if in_a == in_b:
+                continue
+            ref = self._anim_reference_lengths.get(si, 0.0)
+            if ref <= 0:
+                continue
+            inner_idx = ai if in_a else bi
+            outer_idx = bi if in_a else ai
+            boundary.append((si, inner_idx, outer_idx, ref))
+
+        if not boundary:
+            return delta
+
+        delta = np.asarray(delta, dtype=np.float32).copy()
+        MAX_ITER = 5
+        for _ in range(MAX_ITER):
+            violations = []
+            for si, inner_idx, outer_idx, ref in boundary:
+                inner_p = self.particles[inner_idx]
+                outer_p = self.particles[outer_idx]
+                inner_new = np.array(
+                    [float(inner_p["x"]) + delta[0],
+                     float(inner_p["y"]) + delta[1],
+                     float(inner_p["z"]) + delta[2]],
+                    dtype=np.float32,
+                )
+                outer_pos = np.array(
+                    [float(outer_p["x"]), float(outer_p["y"]), float(outer_p["z"])],
+                    dtype=np.float32,
+                )
+                diff = inner_new - outer_pos
+                cur_len = float(np.linalg.norm(diff))
+                if cur_len <= ref + 1e-5:
+                    continue
+                overshoot = cur_len - ref
+                if cur_len > 1e-6:
+                    correction = (diff / cur_len) * overshoot
+                    violations.append(correction)
+            if not violations:
+                break
+            avg_corr = np.mean(np.stack(violations), axis=0)
+            delta = delta - avg_corr
+
+        return delta
 
 
 # ──────────────────────────────────────────────
