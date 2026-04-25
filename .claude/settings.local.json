@@ -5,7 +5,9 @@
       "Bash(python -c ':*)",
       "Bash(dir:*)",
       "Bash(ls:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
