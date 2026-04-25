@@ -1745,9 +1745,9 @@ class EditorState:
                 cur_len = float(np.linalg.norm(diff))
                 if cur_len <= ref + 1e-5:
                     continue
-                overshoot = cur_len - ref
+                deviation = cur_len - ref
                 if cur_len > 1e-6:
-                    correction = (diff / cur_len) * overshoot
+                    correction = (diff / cur_len) * deviation
                     violations.append(correction)
             if not violations:
                 break
