@@ -93,6 +93,11 @@ class VoxelRenderer:
         self.show_mirror_handles = False
         # 5b：长度违规 stick 索引列表，驱动红色额外 draw call
         self.violation_stick_indices = []
+        # 原点坐标轴 Gizmo（任务4）
+        self.origin_vbo = None
+        self.origin_vao = None
+        self.n_origin_vertices = 0
+        self.show_origin_gizmo = False
 
     def upload_voxels(self, positions, colors, selected):
         n = len(positions)
@@ -296,6 +301,33 @@ class VoxelRenderer:
         )
         self.n_grid_vertices = len(verts) // 7
 
+    def upload_origin_axes(self, length=8.0):
+        """生成 RGB 三轴线段上传 GPU（XYZ → 红绿蓝）。"""
+        if self.origin_vbo:
+            self.origin_vbo.release()
+            self.origin_vbo = None
+        if self.origin_vao:
+            self.origin_vao.release()
+            self.origin_vao = None
+        self.n_origin_vertices = 0
+
+        L = float(length)
+        verts = [
+            0.0, 0.0, 0.0,  0.95, 0.30, 0.30, 1.0,   # X 轴起点
+            L,   0.0, 0.0,  0.95, 0.30, 0.30, 1.0,   # X 轴终点（红）
+            0.0, 0.0, 0.0,  0.30, 0.85, 0.30, 1.0,   # Y 轴起点
+            0.0, L,   0.0,  0.30, 0.85, 0.30, 1.0,   # Y 轴终点（绿）
+            0.0, 0.0, 0.0,  0.35, 0.45, 0.95, 1.0,   # Z 轴起点
+            0.0, 0.0, L,    0.35, 0.45, 0.95, 1.0,   # Z 轴终点（蓝）
+        ]
+        arr = np.array(verts, dtype=np.float32)
+        self.origin_vbo = self.ctx.buffer(arr.tobytes())
+        self.origin_vao = self.ctx.vertex_array(
+            self.line_prog,
+            [(self.origin_vbo, "3f 4f", "in_vert", "in_color")],
+        )
+        self.n_origin_vertices = 6
+
     def upload_mirror_indicator(self, origin, normal, extent, show_handles=False, handle_len=None,
                                 show_grid=False, grid_step=1.0):
         if self.mirror_vbo:
@@ -409,6 +441,14 @@ class VoxelRenderer:
             self.ctx.disable(moderngl.BLEND)
             self.ctx.enable(moderngl.DEPTH_TEST)
 
+        if self.show_origin_gizmo and self.n_origin_vertices > 0 and self.origin_vao:
+            self.line_prog["u_mvp"].write(mvp_bytes)
+            self.ctx.enable(moderngl.DEPTH_TEST)
+            self.ctx.line_width = 3.0
+            self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 1.0)
+            self.origin_vao.render(moderngl.LINES, vertices=self.n_origin_vertices)
+            self.ctx.line_width = 1.0
+
         if self.vao is not None and self.n_voxels > 0:
             self.ctx.enable(moderngl.DEPTH_TEST)
             self.ctx.disable(moderngl.CULL_FACE)
@@ -518,6 +558,8 @@ class VoxelRenderer:
             self.point_vao,
             self.grid_vbo,
             self.grid_vao,
+            self.origin_vbo,
+            self.origin_vao,
             self.mirror_vbo,
             self.mirror_vao,
             self.mirror_point_vbo,
