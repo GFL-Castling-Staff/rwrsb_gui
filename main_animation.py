@@ -58,6 +58,7 @@ g_drag_plane_normal = None
 g_drag_grab_offset = None
 g_drag_particle_origin = None
 g_drag_origins = {}
+g_grid_sig_cache = None
 g_hover_particle_idx = -1
 g_positions_np = None
 g_renderer     = None
@@ -226,9 +227,17 @@ def _update_particle_drag(mx, my):
     # grab_offset = origin - initial_hit  →  new_anchor = hit + grab_offset
     new_anchor = hit + g_drag_grab_offset
     delta = new_anchor - g_drag_particle_origin
+    from ui_panels import _grid_step
+    step = _grid_step(g_ui) if g_ui.snap_particles_to_grid else 0.0
     for idx, origin in g_drag_origins.items():
         if 0 <= idx < len(g_editor.particles):
             target = origin + delta
+            if step > 0.0:
+                target = np.array([
+                    round(float(target[0]) / step) * step,
+                    round(float(target[1]) / step) * step,
+                    round(float(target[2]) / step) * step,
+                ], dtype=np.float32)
             g_editor.particles[idx]["x"] = float(target[0])
             g_editor.particles[idx]["y"] = float(target[1])
             g_editor.particles[idx]["z"] = float(target[2])
@@ -536,6 +545,54 @@ def main():
                 g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks)
                 rebuild_positions_cache()
                 g_editor.skeleton_dirty = False
+
+            # grid 上传（签名缓存，避免每帧重传）
+            if g_renderer is not None:
+                global g_grid_sig_cache
+                g_renderer.show_grid = bool(g_ui.show_grid)
+                if g_ui.show_grid and g_editor.particles:
+                    from ui_panels import _grid_step
+                    step = _grid_step(g_ui)
+                    xs = [p["x"] for p in g_editor.particles]
+                    ys = [p["y"] for p in g_editor.particles]
+                    zs = [p["z"] for p in g_editor.particles]
+                    center = (
+                        (min(xs) + max(xs)) / 2,
+                        (min(ys) + max(ys)) / 2,
+                        (min(zs) + max(zs)) / 2,
+                    )
+                    extent = max(
+                        max(xs) - min(xs),
+                        max(ys) - min(ys),
+                        max(zs) - min(zs),
+                        10.0,
+                    )
+                    grid_sig = (
+                        round(center[0], 1), round(center[1], 1), round(center[2], 1),
+                        round(extent, 1), step,
+                        g_ui.show_grid_xz, g_ui.show_grid_xy, g_ui.show_grid_yz,
+                    )
+                    if grid_sig != g_grid_sig_cache:
+                        g_renderer.upload_grid(
+                            np.array(center, dtype=np.float32),
+                            extent,
+                            step,
+                            show_xz=g_ui.show_grid_xz,
+                            show_xy=g_ui.show_grid_xy,
+                            show_yz=g_ui.show_grid_yz,
+                        )
+                        g_grid_sig_cache = grid_sig
+
+            # 5b：骨段长度违规检测，每帧更新 renderer
+            if g_renderer is not None:
+                if g_ui._anim_check_lengths and g_editor.animation_mode:
+                    deviations = g_editor.compute_stick_length_deviations()
+                    threshold = float(g_ui._anim_length_threshold_pct)
+                    g_renderer.violation_stick_indices = [
+                        i for (i, cur, ref, pct) in deviations if pct >= threshold
+                    ]
+                else:
+                    g_renderer.violation_stick_indices = []
 
             fb_w, fb_h = glfw.get_framebuffer_size(window)
             ctx.viewport = (0, 0, max(fb_w, 1), max(fb_h, 1))

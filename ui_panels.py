@@ -195,6 +195,12 @@ _TEXT = {
         "anim_skeleton_loaded": "Loaded skeleton ({n} particles)",
         "anim_skeleton_wrong_count": "Skeleton must have {expected} particles, got {actual}",
         "anim_no_anim_loaded": "No animation loaded",
+        "anim_check_lengths": "Check stick lengths",
+        "anim_length_threshold": "Threshold (%)",
+        "anim_length_dev_header": "Length deviations",
+        "anim_length_dev_none": "All sticks within threshold",
+        "grid_btn": "Grid...",
+        "grid_popup_title": "Grid options",
         "selected_particles_count": "Selected particles: {count}",
         "multi_edit": "Multi-select",
         "align_x": "Align X",
@@ -378,6 +384,12 @@ _TEXT = {
         "anim_skeleton_loaded": "已加载骨架 ({n} 粒子)",
         "anim_skeleton_wrong_count": "骨架需要 {expected} 个粒子，当前 {actual}",
         "anim_no_anim_loaded": "未加载动画",
+        "anim_check_lengths": "检查骨段长度",
+        "anim_length_threshold": "阈值 (%)",
+        "anim_length_dev_header": "长度偏差",
+        "anim_length_dev_none": "所有骨段均在阈值内",
+        "grid_btn": "网格...",
+        "grid_popup_title": "网格选项",
         "selected_particles_count": "已选粒子: {count}",
         "multi_edit": "多选操作",
         "align_x": "对齐 X",
@@ -471,6 +483,9 @@ class UIState:
         self._anim_save_target_path = ""    # 用于"保存并继续"流程
         self._anim_drag_frame_idx = -1      # 时间线上拖动中的帧 index（-1 = 没拖）
         self._anim_drag_frame_started_at = 0.0  # 拖动起始 time（用于 push_undo 阈值）
+        # 5b：骨段长度检查
+        self._anim_check_lengths = False
+        self._anim_length_threshold_pct = 1.0
 
     def push_toast(self, message: str, level: str = "info",
                    also_log: bool = True, exc_info=None) -> None:
@@ -1640,6 +1655,44 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
     imgui.text("|")
     imgui.same_line()
 
+    if imgui.button(tr(ui_state, "grid_btn") + "##anim_grid_btn"):
+        imgui.open_popup("##anim_grid_popup")
+    if imgui.begin_popup("##anim_grid_popup"):
+        imgui.text(tr(ui_state, "grid_popup_title"))
+        imgui.separator()
+        chg, v = imgui.checkbox(tr(ui_state, "show_grid"), ui_state.show_grid)
+        if chg:
+            ui_state.show_grid = v
+        chg, v = imgui.checkbox(tr(ui_state, "grid_xz"), ui_state.show_grid_xz)
+        if chg:
+            ui_state.show_grid_xz = v
+        chg, v = imgui.checkbox(tr(ui_state, "grid_xy"), ui_state.show_grid_xy)
+        if chg:
+            ui_state.show_grid_xy = v
+        chg, v = imgui.checkbox(tr(ui_state, "grid_yz"), ui_state.show_grid_yz)
+        if chg:
+            ui_state.show_grid_yz = v
+        imgui.separator()
+        chg, v = imgui.checkbox(tr(ui_state, "snap_grid"), ui_state.snap_particles_to_grid)
+        if chg:
+            ui_state.snap_particles_to_grid = v
+        if imgui.radio_button(tr(ui_state, "grid_half"), ui_state.grid_mode == 0):
+            ui_state.grid_mode = 0
+        if imgui.radio_button(tr(ui_state, "grid_one"), ui_state.grid_mode == 1):
+            ui_state.grid_mode = 1
+        if imgui.radio_button(tr(ui_state, "grid_n"), ui_state.grid_mode == 2):
+            ui_state.grid_mode = 2
+        if ui_state.grid_mode == 2:
+            imgui.set_next_item_width(80)
+            chg, v = imgui.input_int(tr(ui_state, "grid_n_label"), ui_state.grid_multiple)
+            if chg:
+                ui_state.grid_multiple = max(1, v)
+        imgui.text(tr(ui_state, "current_step", step=_grid_step(ui_state)))
+        imgui.end_popup()
+    imgui.same_line()
+    imgui.text("|")
+    imgui.same_line()
+
     if imgui.button(tr(ui_state, "front") + "##anim_front"):
         camera.set_view_preset("front")
     imgui.same_line()
@@ -2075,6 +2128,35 @@ def draw_animation_panel(ui_state, editor_state, WIN_W, WIN_H):
             imgui.pop_id()
     else:
         imgui.text_disabled(tr(ui_state, "anim_no_frame_selected"))
+
+    imgui.separator()
+    chg_chk, v = imgui.checkbox(
+        tr(ui_state, "anim_check_lengths") + "##check_len",
+        ui_state._anim_check_lengths)
+    if chg_chk:
+        ui_state._anim_check_lengths = v
+    if ui_state._anim_check_lengths:
+        imgui.same_line()
+        imgui.set_next_item_width(80)
+        chg_th, v = imgui.input_float(
+            tr(ui_state, "anim_length_threshold") + "##len_th",
+            float(ui_state._anim_length_threshold_pct), 0.0, 0.0, "%.2f")
+        if chg_th:
+            ui_state._anim_length_threshold_pct = max(0.0, v)
+        deviations = editor_state.compute_stick_length_deviations()
+        violators = [(i, cur, ref, pct) for (i, cur, ref, pct) in deviations
+                     if pct >= ui_state._anim_length_threshold_pct]
+        if not violators:
+            imgui.text_colored(tr(ui_state, "anim_length_dev_none"), 0.4, 0.9, 0.4, 1.0)
+        else:
+            imgui.begin_child("##len_dev", 0, 80, border=True)
+            for (i, cur, ref, pct) in violators:
+                if i < len(editor_state.sticks):
+                    name = editor_state.sticks[i].name
+                    imgui.text_colored(
+                        f"[{i}] {name}: {cur:.3f} / {ref:.3f}  (+{pct:.1f}%)",
+                        1.0, 0.4, 0.4, 1.0)
+            imgui.end_child()
 
     imgui.columns(1)
     imgui.end()
