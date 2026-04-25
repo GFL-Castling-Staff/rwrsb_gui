@@ -656,22 +656,22 @@ def main():
                     from ui_panels import _grid_step
                     step = _grid_step(g_ui)
                     center = (0.0, 0.0, 0.0)
-                    # 模型 extent：取所有粒子到原点的最大距离 * 1.5，至少 10
-                    if g_editor.particles:
-                        max_dist = max(
-                            math.sqrt(p["x"]**2 + p["y"]**2 + p["z"]**2)
-                            for p in g_editor.particles
-                        )
-                        model_extent = max(max_dist * 1.5, 10.0)
-                    else:
-                        model_extent = 16.0
                     # 相机 extent：覆盖当前可视范围
                     camera_extent = max(
                         g_camera.ortho_size * 1.2,
                         g_camera.distance * 0.35,
                         8.0,
                     )
-                    extent = max(model_extent, camera_extent)
+                    # 动画模式下粒子随帧移动，不用粒子距离决定 extent（否则每帧触发重建）
+                    if not g_editor.animation_mode and g_editor.particles:
+                        max_dist = max(
+                            math.sqrt(p["x"]**2 + p["y"]**2 + p["z"]**2)
+                            for p in g_editor.particles
+                        )
+                        model_extent = max(max_dist * 1.5, 10.0)
+                        extent = max(model_extent, camera_extent)
+                    else:
+                        extent = max(camera_extent, 10.0)
                     grid_sig = (
                         int(extent / 2) * 2, step,  # 每 2 单位才重建，防止动画播放时每帧重绘
                         g_ui.show_grid_xz, g_ui.show_grid_xy, g_ui.show_grid_yz,
