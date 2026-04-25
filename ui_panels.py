@@ -201,6 +201,10 @@ _TEXT = {
         "anim_length_dev_none": "All sticks within threshold",
         "grid_btn": "Grid...",
         "grid_popup_title": "Grid options",
+        "settings_btn": "Settings...",
+        "settings_popup_title": "Settings",
+        "show_origin": "Show origin gizmo",
+        "show_voxels": "Show voxels (if loaded)",
         "selected_particles_count": "Selected particles: {count}",
         "multi_edit": "Multi-select",
         "align_x": "Align X",
@@ -395,6 +399,10 @@ _TEXT = {
         "anim_length_dev_none": "所有骨段均在阈值内",
         "grid_btn": "网格...",
         "grid_popup_title": "网格选项",
+        "settings_btn": "设置...",
+        "settings_popup_title": "设置",
+        "show_origin": "显示原点坐标轴",
+        "show_voxels": "显示体素（如已加载）",
         "selected_particles_count": "已选粒子: {count}",
         "multi_edit": "多选操作",
         "align_x": "对齐 X",
@@ -491,6 +499,9 @@ class UIState:
         # 5b：骨段长度检查
         self._anim_check_lengths = False
         self._anim_length_threshold_pct = 1.0
+        # Settings popup 控制开关（任务5）
+        self.show_origin_gizmo = True
+        self.show_voxels = True
 
     def push_toast(self, message: str, level: str = "info",
                    also_log: bool = True, exc_info=None) -> None:
@@ -1695,6 +1706,31 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
         imgui.text(tr(ui_state, "current_step", step=_grid_step(ui_state)))
         imgui.end_popup()
     imgui.same_line()
+    if imgui.button(tr(ui_state, "settings_btn") + "##anim_settings_btn"):
+        imgui.open_popup("##anim_settings_popup")
+    if imgui.begin_popup("##anim_settings_popup"):
+        imgui.text(tr(ui_state, "settings_popup_title"))
+        imgui.separator()
+        imgui.set_next_item_width(160)
+        chg_sc, new_sc = imgui.slider_float(
+            tr(ui_state, "ui_scale") + "##anim_uiscale",
+            ui_state.ui_scale, 0.8, 1.75, "%.2f")
+        if chg_sc:
+            ui_state.ui_scale = new_sc
+        chg_iy, v_iy = imgui.checkbox(
+            tr(ui_state, "invert_y") + "##anim_inverty", ui_state.invert_y_axis)
+        if chg_iy:
+            ui_state.invert_y_axis = v_iy
+        chg_og, v_og = imgui.checkbox(
+            tr(ui_state, "show_origin") + "##anim_showorigin", ui_state.show_origin_gizmo)
+        if chg_og:
+            ui_state.show_origin_gizmo = v_og
+        chg_vx, v_vx = imgui.checkbox(
+            tr(ui_state, "show_voxels") + "##anim_showvoxels", ui_state.show_voxels)
+        if chg_vx:
+            ui_state.show_voxels = v_vx
+        imgui.end_popup()
+    imgui.same_line()
     imgui.text("|")
     imgui.same_line()
 
@@ -1956,18 +1992,31 @@ def draw_animation_panel(ui_state, editor_state, WIN_W, WIN_H):
     """动画面板：header / 播放控件 / 时间线 / 当前帧编辑 / control 事件。"""
     if not editor_state.animation_mode:
         return
-    panel_h = int(200 * ui_state.ui_scale)
+    panel_h = int(240 * ui_state.ui_scale)
     status_h = int(24 * ui_state.ui_scale)
     panel_y = WIN_H - status_h - panel_h
     imgui.set_next_window_position(0, panel_y)
     imgui.set_next_window_size(WIN_W, panel_h)
-    imgui.begin("##anim_panel", flags=FIXED_FLAGS)
+    imgui.begin("##anim_panel",
+                flags=FIXED_FLAGS | imgui.WINDOW_NO_SCROLLBAR | imgui.WINDOW_NO_SCROLL_WITH_MOUSE)
+    try:
+        _draw_anim_panel_inner(ui_state, editor_state, WIN_W, WIN_H)
+    except Exception:
+        logger.exception("draw_animation_panel 内部异常")
+    finally:
+        try:
+            imgui.columns(1)
+        except Exception:
+            pass
+        imgui.end()
 
+
+def _draw_anim_panel_inner(ui_state, editor_state, WIN_W, WIN_H):
+    """动画面板内容，由 draw_animation_panel 的 try/finally 包裹调用。"""
     anim = editor_state.current_animation
     if anim is None:
         imgui.text_disabled(tr(ui_state, "anim_no_anim_loaded"))
-        imgui.end()
-        return
+        return  # 外层 finally 负责 imgui.end()
 
     # ── header（左半 + 右半两列） ──
     imgui.columns(2, "##anim_header", border=False)
@@ -2079,6 +2128,11 @@ def draw_animation_panel(ui_state, editor_state, WIN_W, WIN_H):
             if not ok:
                 ui_state.push_toast(
                     tr(ui_state, "anim_cant_del_last_frame"), "error")
+            else:
+                # 删帧成功：关闭 columns 后退出，外层 finally 负责 imgui.end()
+                imgui.pop_style_color()
+                imgui.columns(1)
+                return
         imgui.pop_style_color()
     else:
         imgui.text_disabled(tr(ui_state, "anim_no_frame_selected"))
@@ -2164,7 +2218,7 @@ def draw_animation_panel(ui_state, editor_state, WIN_W, WIN_H):
             imgui.end_child()
 
     imgui.columns(1)
-    imgui.end()
+    # 注意：imgui.end() 由 draw_animation_panel 的 finally 统一调用
 
 
 def _draw_anim_timeline(ui_state, editor_state, WIN_W):
@@ -2259,6 +2313,10 @@ def _draw_anim_timeline(ui_state, editor_state, WIN_W):
             if not ok:
                 ui_state.push_toast(
                     tr(ui_state, "anim_cant_del_last_frame"), "error")
+            else:
+                # 删帧成功：重置拖动状态，防止用过期 idx 误改其他帧
+                ui_state._anim_drag_frame_idx = -1
+                return
         else:
             t = max(0.0, min(end, (rel_x / timeline_w) * end))
             editor_state.anim_add_frame_at(t)
