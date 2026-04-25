@@ -58,6 +58,53 @@ run.bat
 .venv\Scripts\python main.py path\to\model.vox
 ```
 
+## 动画编辑器（rwrsb_anim.exe）
+
+`rwrsb_anim` 是本仓库的第二个工具，用于制作和修改 RWR soldier XML 动画。
+
+启动命令：
+
+```bat
+.venv\Scripts\python main_animation.py
+```
+
+### 启动行为
+
+启动后自动加载内置的 vanilla 人形骨架（15 粒子），并自动进入空白动画编辑模式，可以直接开始 K 帧。
+
+### 三种工作流
+
+**A. 基础新建**
+
+直接拖动粒子摆姿势 → 添加帧 → 在时间线调整帧时间 → 保存为 XML。
+
+**B. 修改 vanilla 动画**
+
+工具栏点 "加载动画" → 选 `soldier_animations.xml` → 在动画列表选 `walking`（或其他） → 编辑帧 → 保存。
+
+**C. 异形骨骨架**
+
+工具栏点 "Open Skeleton" → 选自定义 skeleton XML（必须恰好 15 个 particle）→ 新建或加载动画 → 编辑 → 保存。
+
+也可以直接把 XML 文件拖到窗口，工具会自动判断是骨架文件还是动画文件。
+
+### 文件兼容性
+
+- 输出 XML 格式与 `soldier_animations.xml` 兼容，可直接被 RWR 引擎读取
+- `rwrac.exe` 导出的动画 XML 可以作为输入加载（注意 rwrac 的 particle name 字段通常带 `.dae` 后缀，加载后动画数据可用，但如有依赖粒子名的逻辑需手动修正 name）
+
+### 网格吸附
+
+工具栏 "Grid..." 按钮可开关视口网格和粒子拖动吸附。支持 0.5 / 1 / 自定义 步长，三个平面（XZ / XY / YZ）可独立开关。
+
+### 骨段长度检查
+
+动画面板右下角 "Check stick lengths" 复选框，开启后实时显示相对于第 0 帧参考长度偏差超过阈值的骨段，并在视口中用红色高亮。默认阈值 1%（与 vanilla 动画的自然漂移量匹配）。
+
+### 待实现
+
+- Mixamo 动画导入（工具栏 "Import Mixamo" 按钮当前为禁用状态）
+
 ## build.bat 怎么用
 
 `build.bat` 是项目的一键打包脚本，用来把当前工程打成 Windows 可分发目录包。
@@ -118,11 +165,19 @@ dist\rwrsb_gui\rwrsb_gui.exe
 ## 项目结构
 
 - `main.py`
-  - 主入口
+  - 绑骨工具主入口（`rwrsb_gui.exe`）
   - GLFW 窗口生命周期
   - 输入事件
   - 视口拖拽
   - UI 生效逻辑
+- `main_animation.py`
+  - 动画工具主入口（`rwrsb_anim.exe`）
+  - 粒子拾取/拖动、drop 加载
+  - 动画播放主循环
+- `animation_io.py`
+  - `Animation` / `AnimationFrame` 数据类
+  - soldier animation XML 解析与写出
+  - 帧间插值
 - `editor_state.py`
   - 可编辑项目状态
   - Undo/Redo
