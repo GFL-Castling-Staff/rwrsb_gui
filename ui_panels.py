@@ -2235,7 +2235,11 @@ def _draw_anim_timeline(ui_state, editor_state, WIN_W):
     tx, ty = cursor[0] + 10, cursor[1] + 4
 
     # invisible_button 抓取该区域的鼠标输入
-    imgui.invisible_button("##anim_timeline", timeline_w, timeline_h)
+    diamond_size = 6
+    hit_pad = diamond_size + 2
+
+    # invisible_button 比时间线宽一点，给最后一帧菱形留 hit 空间
+    imgui.invisible_button("##anim_timeline", timeline_w + hit_pad, timeline_h)
     is_hovered = imgui.is_item_hovered()
     is_active = imgui.is_item_active()
     mouse_x, _ = imgui.get_mouse_pos()
