@@ -84,6 +84,7 @@ class VoxelRenderer:
         self.mirror_point_vao = None
         self.n_mirror_points = 0
 
+        self.show_voxels = True
         self.show_skeleton = True
         self.highlight_stick_idx = -1
         self.highlight_particle_idx = -1
@@ -425,7 +426,7 @@ class VoxelRenderer:
 
     def render(self, mvp):
         mvp_bytes = mvp.astype(np.float32).T.tobytes()
-        if self.vao is not None and self.n_voxels > 0:
+        if self.show_voxels and self.vao is not None and self.n_voxels > 0:
             self.prog["u_mvp"].write(mvp_bytes)
             self.prog["u_light_dir"].value = (0.6, 1.0, 0.4)
 
@@ -449,7 +450,7 @@ class VoxelRenderer:
             self.origin_vao.render(moderngl.LINES, vertices=self.n_origin_vertices)
             self.ctx.line_width = 1.0
 
-        if self.vao is not None and self.n_voxels > 0:
+        if self.show_voxels and self.vao is not None and self.n_voxels > 0:
             self.ctx.enable(moderngl.DEPTH_TEST)
             self.ctx.disable(moderngl.CULL_FACE)
             self.ctx.disable(moderngl.BLEND)

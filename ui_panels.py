@@ -232,6 +232,11 @@ _TEXT = {
         "mirror_grid_unit": "Mirror Grid Unit",
         "mirror_grid_n_label": "Mirror Grid N",
         "mirror_current_step": "Mirror step: {step:.3f}",
+        "invalid_binding_title": "Invalid voxel bindings",
+        "invalid_binding_body": "This XML has invalid voxel bindings: {reason}",
+        "invalid_binding_stats": "Voxels: {voxels} | Sticks: {sticks} | Bindings: {bindings}",
+        "invalid_binding_skeleton_only": "Load skeleton only",
+        "invalid_binding_abort": "Cancel load",
     },
     "zh": {
         "open_vox": "打开 VOX",
@@ -430,6 +435,11 @@ _TEXT = {
         "mirror_grid_unit": "镜像网格单位",
         "mirror_grid_n_label": "镜像网格 N",
         "mirror_current_step": "镜像步长: {step:.3f}",
+        "invalid_binding_title": "无效的 voxel 绑定",
+        "invalid_binding_body": "此 XML 文件的 voxel 绑定不合法：{reason}",
+        "invalid_binding_stats": "Voxels: {voxels} | Sticks: {sticks} | Bindings: {bindings}",
+        "invalid_binding_skeleton_only": "只加载骨架",
+        "invalid_binding_abort": "放弃加载",
     },
 }
 
@@ -502,6 +512,13 @@ class UIState:
         # Settings popup 控制开关（任务5）
         self.show_origin_gizmo = True
         self.show_voxels = True
+
+        # 非法 voxel binding 对话框状态（动画工具）
+        self._invalid_binding_show = False
+        self._invalid_binding_path = None
+        self._invalid_binding_reason = ""
+        self._invalid_binding_info = {}
+        self._invalid_binding_after_load = None
 
     def push_toast(self, message: str, level: str = "info",
                    also_log: bool = True, exc_info=None) -> None:
@@ -1767,6 +1784,7 @@ def _anim_action_open_skeleton(ui_state, editor_state):
     """加载用户自定义 skeleton XML（异形骨场景）。"""
     def do():
         from file_dialogs import open_file_dialog, _is_supported as _fd_supported
+        from editor_state import check_xml_voxel_bindings
         if not _fd_supported():
             ui_state.push_toast("系统对话框不可用", "error")
             return
@@ -1780,24 +1798,40 @@ def _anim_action_open_skeleton(ui_state, editor_state):
             return
         if not path:
             return
-        try:
-            editor_state.load_skeleton_xml(path)
-        except Exception as exc:
-            ui_state.push_toast(f"加载骨架失败: {exc}", "error", exc_info=True)
-            return
-        # 加载完后尝试自动进入空动画
-        try:
-            from animation_io import Animation
-            new_anim = Animation(name="new_animation", loop=False, end=1.0, speed=1.0)
-            editor_state.enter_animation_mode(new_anim)
-            ui_state.push_toast(
-                tr(ui_state, "anim_skeleton_loaded", n=len(editor_state.particles)),
-                "info",
-            )
-        except ValueError as exc:
-            ui_state.push_toast(str(exc), "error")
-        except Exception as exc:
-            ui_state.push_toast(f"进入动画模式失败: {exc}", "error", exc_info=True)
+
+        # 加载完后进入空动画的回调
+        def after_load():
+            try:
+                from animation_io import Animation
+                new_anim = Animation(name="new_animation", loop=False, end=1.0, speed=1.0)
+                editor_state.enter_animation_mode(new_anim)
+                ui_state.push_toast(
+                    tr(ui_state, "anim_skeleton_loaded", n=len(editor_state.particles)),
+                    "info",
+                )
+            except ValueError as exc:
+                ui_state.push_toast(str(exc), "error")
+            except Exception as exc:
+                ui_state.push_toast(f"进入动画模式失败: {exc}", "error", exc_info=True)
+
+        is_valid, reason, info = check_xml_voxel_bindings(path)
+        if is_valid:
+            try:
+                if editor_state.animation_mode:
+                    editor_state.exit_animation_mode(force=True)
+                editor_state.load_skeleton_xml(path)
+            except Exception as exc:
+                ui_state.push_toast(f"加载骨架失败: {exc}", "error", exc_info=True)
+                return
+            after_load()
+        else:
+            # 非法 binding → 弹对话框让用户选择
+            ui_state._invalid_binding_show = True
+            ui_state._invalid_binding_path = path
+            ui_state._invalid_binding_reason = reason
+            ui_state._invalid_binding_info = info
+            ui_state._invalid_binding_after_load = after_load
+
     _anim_check_dirty_or_run(ui_state, editor_state, do)
 
 
@@ -2327,3 +2361,55 @@ def _draw_anim_timeline(ui_state, editor_state, WIN_W):
         else:
             t = max(0.0, min(end, (rel_x / timeline_w) * end))
             editor_state.anim_add_frame_at(t)
+
+
+# ── 非法 voxel binding 对话框 ─────────────────────
+
+def draw_invalid_binding_dialog(ui_state, editor_state):
+    """非法 voxel binding 时的对话框：放弃加载 / 只加载骨架。"""
+    if not ui_state._invalid_binding_show:
+        return
+
+    imgui.open_popup("##invalid_binding_dialog")
+
+    opened, _ = imgui.begin_popup_modal(
+        tr(ui_state, "invalid_binding_title"),
+        flags=imgui.WINDOW_ALWAYS_AUTO_RESIZE,
+    )
+    if opened:
+        info = ui_state._invalid_binding_info
+        imgui.text(tr(ui_state, "invalid_binding_body",
+                      reason=ui_state._invalid_binding_reason))
+        imgui.separator()
+        imgui.text(tr(ui_state, "invalid_binding_stats",
+                      voxels=info.get("n_voxels", 0),
+                      sticks=info.get("n_sticks", 0),
+                      bindings=info.get("n_bindings", 0)))
+        imgui.separator()
+
+        if imgui.button(tr(ui_state, "invalid_binding_skeleton_only"), width=180):
+            path = ui_state._invalid_binding_path
+            after = ui_state._invalid_binding_after_load
+            try:
+                if editor_state.animation_mode:
+                    editor_state.exit_animation_mode(force=True)
+                editor_state.load_skeleton_xml(path)
+                editor_state.discard_voxels_keep_skeleton()
+                if after is not None:
+                    after()
+                ui_state.push_toast("已加载骨架（已丢弃 voxels）", "info")
+            except Exception as exc:
+                ui_state.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+            ui_state._invalid_binding_show = False
+            ui_state._invalid_binding_path = None
+            ui_state._invalid_binding_after_load = None
+            imgui.close_current_popup()
+
+        imgui.same_line()
+        if imgui.button(tr(ui_state, "invalid_binding_abort"), width=120):
+            ui_state._invalid_binding_show = False
+            ui_state._invalid_binding_path = None
+            ui_state._invalid_binding_after_load = None
+            imgui.close_current_popup()
+
+        imgui.end_popup()

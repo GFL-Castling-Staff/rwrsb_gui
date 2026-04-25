@@ -116,6 +116,10 @@ class EditorState:
         # 5b：各 stick 的参考长度（进入动画模式时记录）
         self._anim_reference_lengths = {}
 
+        # 蒙皮 bind pose：每个绑定 voxel 在其 stick 局部坐标系里的固定坐标
+        # key = voxel_index, value = np.ndarray shape (3,)
+        self._voxel_local_offsets = {}
+
     def _preset_dir(self):
         return resource_path("presets")
 
@@ -171,6 +175,8 @@ class EditorState:
         self._dirty = True
         self.gpu_dirty = True
         self.skeleton_dirty = True
+        # 蒙皮：骨架变形时同步更新 voxel 世界位置（gpu_dirty 已经在上面设好）
+        self.update_voxel_positions_from_skeleton()
 
     def _normalize_stick_indices(self):
         for ci, stick in enumerate(self.sticks):
@@ -368,6 +374,10 @@ class EditorState:
         self.active_stick_idx = 0
         self.active_particle_idx = -1
 
+        # 如果加载了 voxels 且 bindings 存在，记录 bind pose
+        if self.voxels and self.bindings:
+            self.record_voxel_bind_pose()
+
         logger.info("loaded XML: %s (%d voxels, %d particles, %d sticks)",
                     path, len(self.voxels), len(self.particles), len(self.sticks))
         return skeleton
@@ -390,20 +400,15 @@ class EditorState:
         return data
     
     def load_skeleton_xml(self, path):
-        """从 RWR XML 文件加载 skeleton（particles + sticks），
-        丢弃 voxels 和 bindings。仅供动画工具用于异形骨场景。
-
-        如果当前在动画模式，会先 force-exit。
+        """从 RWR XML 文件加载 skeleton（particles + sticks）及 voxels/bindings。
+        仅供动画工具用。force-exit 动画模式的责任由调用方承担。
         """
         from xml_io import parse_xml
 
-        if self.animation_mode:
-            self.exit_animation_mode(force=True)
-
-        _voxels, skeleton, _bindings = parse_xml(path)
-        # 丢弃 voxels / bindings（动画工具不关心体素）
-        self.voxels = []
-        self.bindings = {}
+        voxels, skeleton, bindings = parse_xml(path)
+        # 保留 voxels 和 bindings（供蒙皮用）
+        self.voxels = voxels
+        self.bindings = bindings
         self.selected_voxels = set()
         self.selected_particles = set()
         self.exit_mirror_mode()
@@ -418,8 +423,12 @@ class EditorState:
         self.active_stick_idx = 0
         self.active_particle_idx = -1
 
-        logger.info("loaded skeleton-only XML: %s (%d particles, %d sticks)",
-                    path, len(self.particles), len(self.sticks))
+        # 如果加载了 voxels 且 bindings 存在，记录 bind pose
+        if self.voxels and self.bindings:
+            self.record_voxel_bind_pose()
+
+        logger.info("loaded skeleton XML: %s (%d voxels, %d particles, %d sticks)",
+                    path, len(self.voxels), len(self.particles), len(self.sticks))
         return skeleton
     
     def list_skeleton_presets(self):
@@ -857,6 +866,17 @@ class EditorState:
         self._anim_undo_stack.clear()
         self._anim_redo_stack.clear()
 
+        # 蒙皮：以 still pose（_particle_positions_before_anim）作为 bind pose
+        # 必须在 _apply_frame_to_particles 之前调用，否则 bind pose 会变成动画第 0 帧
+        if self.voxels and self.bindings:
+            still_particles = []
+            for i, (x, y, z) in enumerate(self._particle_positions_before_anim):
+                if i < len(self.particles):
+                    p = dict(self.particles[i])
+                    p["x"], p["y"], p["z"] = x, y, z
+                    still_particles.append(p)
+            self.record_voxel_bind_pose(particle_positions=still_particles)
+
         # 视觉上 particle 位置变成第 0 帧
         self._apply_frame_to_particles(0)
         self._record_reference_lengths()
@@ -912,6 +932,9 @@ class EditorState:
                 self.particles[i]['y'] = float(y)
                 self.particles[i]['z'] = float(z)
         self.skeleton_dirty = True
+        # 蒙皮：粒子位置变了，重算 voxel 世界位置
+        self.update_voxel_positions_from_skeleton()
+        self.gpu_dirty = True
 
     def _apply_interpolated_to_particles(self, t):
         """播放时：用插值 position 写入 self.particles。"""
@@ -927,6 +950,9 @@ class EditorState:
                 self.particles[i]['y'] = float(y)
                 self.particles[i]['z'] = float(z)
         self.skeleton_dirty = True
+        # 蒙皮：粒子位置变了，重算 voxel 世界位置
+        self.update_voxel_positions_from_skeleton()
+        self.gpu_dirty = True
 
     # ──────────────────────────────────────────────
     # 动画模式：独立 undo 栈
@@ -1173,3 +1199,177 @@ class EditorState:
             pct = abs(cur - ref) / ref * 100.0
             out.append((i, cur, ref, pct))
         return out
+
+    # ──────────────────────────────────────────────
+    # 蒙皮（单骨刚性 LBS）
+    # ──────────────────────────────────────────────
+
+    def validate_voxel_bindings(self):
+        """校验当前加载的 voxels 是否全部绑了有效的 stick。
+
+        返回 (is_valid, reason)：
+            is_valid=True  → reason=""
+            is_valid=False → reason 说明哪里不合法
+        """
+        n_voxels = len(self.voxels)
+        n_sticks = len(self.sticks)
+        n_bindings = len(self.bindings)
+
+        if n_voxels == 0:
+            return True, ""
+
+        if n_bindings != n_voxels:
+            return False, f"{n_voxels - n_bindings} 个 voxel 未绑骨"
+
+        invalid_bindings = [
+            vi for vi, ci in self.bindings.items()
+            if ci < 0 or ci >= n_sticks
+        ]
+        if invalid_bindings:
+            return False, f"{len(invalid_bindings)} 个 binding 引用了不存在的 stick"
+
+        return True, ""
+
+    def discard_voxels_keep_skeleton(self):
+        """丢弃 voxels 和 bindings，保留 particles + sticks。
+        用于"非法 voxel 绑定"对话框的"只加载骨架"分支。
+        """
+        self.voxels = []
+        self.bindings = {}
+        self.selected_voxels = set()
+        self._voxel_local_offsets = {}
+        self.gpu_dirty = True
+
+    def _compute_stick_frame(self, particle_a, particle_b):
+        """计算 stick 的局部坐标系。
+
+        返回 (origin, R)：
+            origin: np.ndarray shape (3,) —— stick 中点
+            R: np.ndarray shape (3, 3) —— 列向量是 [u, v, w] 三个正交单位轴
+        """
+        a = np.array([particle_a["x"], particle_a["y"], particle_a["z"]], dtype=np.float32)
+        b = np.array([particle_b["x"], particle_b["y"], particle_b["z"]], dtype=np.float32)
+        origin = (a + b) * 0.5
+
+        diff = b - a
+        length = float(np.linalg.norm(diff))
+        if length < 1e-6:
+            return origin, np.eye(3, dtype=np.float32)
+        u = diff / length
+
+        # 辅助参考：默认世界 Y，主轴接近 Y 时 fallback 到世界 X
+        if abs(float(u[1])) > 0.95:
+            ref = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        else:
+            ref = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+
+        v = np.cross(u, ref)
+        v_len = float(np.linalg.norm(v))
+        if v_len < 1e-6:
+            return origin, np.eye(3, dtype=np.float32)
+        v = v / v_len
+
+        w = np.cross(u, v)
+        R = np.column_stack([u, v, w]).astype(np.float32)
+        return origin, R
+
+    def record_voxel_bind_pose(self, particle_positions=None):
+        """记录所有绑定 voxel 在其 stick 局部坐标系里的固定坐标。
+
+        particle_positions: 可选，list[dict]，结构同 self.particles。
+            如果传入，使用这份位置作为 bind pose。
+            如果不传，使用 self.particles 当前位置。
+        """
+        self._voxel_local_offsets = {}
+        if not self.voxels or not self.bindings:
+            return
+
+        particles = particle_positions if particle_positions is not None else self.particles
+        if particle_positions is not None and len(particle_positions) != len(self.particles):
+            particles = self.particles
+
+        id_to_p = {int(p["id"]): p for p in particles}
+
+        for vi, ci in self.bindings.items():
+            if ci < 0 or ci >= len(self.sticks):
+                continue
+            stick = self.sticks[ci]
+            pa = id_to_p.get(int(stick.particle_a_id))
+            pb = id_to_p.get(int(stick.particle_b_id))
+            if pa is None or pb is None:
+                continue
+            if vi < 0 or vi >= len(self.voxels):
+                continue
+
+            origin, R = self._compute_stick_frame(pa, pb)
+            v_world = np.array(self.voxels[vi][:3], dtype=np.float32)
+            v_local = R.T @ (v_world - origin)
+            self._voxel_local_offsets[vi] = v_local
+
+    def update_voxel_positions_from_skeleton(self):
+        """根据当前 skeleton 重新计算所有绑定 voxel 的世界位置。
+
+        依赖 _voxel_local_offsets 已经被 record_voxel_bind_pose() 填充过。
+        调用方负责标 self.gpu_dirty = True（_mark_skeleton_changed 里已设好）。
+        """
+        if not self._voxel_local_offsets or not self.voxels:
+            return
+
+        id_to_p = {int(p["id"]): p for p in self.particles}
+
+        for vi, v_local in self._voxel_local_offsets.items():
+            if vi < 0 or vi >= len(self.voxels):
+                continue
+            ci = self.bindings.get(vi, -1)
+            if ci < 0 or ci >= len(self.sticks):
+                continue
+            stick = self.sticks[ci]
+            pa = id_to_p.get(int(stick.particle_a_id))
+            pb = id_to_p.get(int(stick.particle_b_id))
+            if pa is None or pb is None:
+                continue
+
+            origin, R = self._compute_stick_frame(pa, pb)
+            v_world = R @ v_local + origin
+
+            old = self.voxels[vi]
+            self.voxels[vi] = (
+                float(v_world[0]), float(v_world[1]), float(v_world[2]),
+                old[3], old[4], old[5], old[6],
+            )
+
+
+# ──────────────────────────────────────────────
+# 模块级辅助：XML voxel binding 合法性预校验
+# ──────────────────────────────────────────────
+
+def check_xml_voxel_bindings(path):
+    """校验 XML 文件的 voxel binding 合法性，不修改任何 EditorState。
+
+    返回 (is_valid, reason, info)：
+        is_valid: bool
+        reason: 不合法时的简短原因（中文，给用户看）
+        info: dict，包含 n_voxels / n_sticks / n_bindings 用于对话框展示
+    """
+    from xml_io import parse_xml
+    try:
+        voxels, skeleton, bindings = parse_xml(path)
+    except Exception as exc:
+        return False, f"解析失败: {exc}", {}
+
+    n_voxels = len(voxels)
+    n_sticks = len(skeleton.get("sticks", []))
+    n_bindings = len(bindings)
+    info = {"n_voxels": n_voxels, "n_sticks": n_sticks, "n_bindings": n_bindings}
+
+    if n_voxels == 0:
+        return True, "", info
+
+    if n_bindings != n_voxels:
+        return False, f"{n_voxels - n_bindings} 个 voxel 未绑骨", info
+
+    invalid = [vi for vi, ci in bindings.items() if ci < 0 or ci >= n_sticks]
+    if invalid:
+        return False, f"{len(invalid)} 个 binding 引用了不存在的 stick", info
+
+    return True, "", info

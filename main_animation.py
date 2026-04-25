@@ -29,7 +29,7 @@ from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_box_select_overlay, draw_exit_dialog,
                           draw_toasts,
                           draw_animation_panel, draw_anim_source_picker,
-                          draw_anim_exit_confirm)
+                          draw_anim_exit_confirm, draw_invalid_binding_dialog)
 from animation_io import (parse_animation_index, parse_single_animation,
                           parse_first_animation, Animation, AnimationFrame,
                           EXPECTED_PARTICLE_COUNT)
@@ -437,6 +437,7 @@ def on_drop(window, paths):
         return
 
     def do_load_anim_or_skel():
+        from editor_state import check_xml_voxel_bindings
         # 优先尝试当作 animation 文件
         try:
             doc = parse_animation_index(path)
@@ -452,14 +453,31 @@ def on_drop(window, paths):
                 return
         except Exception:
             logger.info("not an animation file, try as skeleton: %s", path)
-        # 不是 animation 文件 → 当作 skeleton XML
-        try:
-            g_editor.load_skeleton_xml(path)
-            g_editor.enter_animation_mode(
-                Animation(name="new_animation", end=1.0, speed=1.0))
-            g_ui.push_toast(f"已加载骨架", "success")
-        except Exception as exc:
-            g_ui.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+        # 不是 animation 文件 → 当作 skeleton XML（带 binding 校验）
+        def after_load():
+            try:
+                g_editor.enter_animation_mode(
+                    Animation(name="new_animation", end=1.0, speed=1.0))
+            except Exception as exc:
+                g_ui.push_toast(f"进入动画模式失败: {exc}", "error", exc_info=True)
+
+        is_valid, reason, info = check_xml_voxel_bindings(path)
+        if is_valid:
+            try:
+                if g_editor.animation_mode:
+                    g_editor.exit_animation_mode(force=True)
+                g_editor.load_skeleton_xml(path)
+                after_load()
+                g_ui.push_toast(f"已加载骨架", "success")
+            except Exception as exc:
+                g_ui.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+        else:
+            # 非法 binding → 弹对话框
+            g_ui._invalid_binding_show = True
+            g_ui._invalid_binding_path = path
+            g_ui._invalid_binding_reason = reason
+            g_ui._invalid_binding_info = info
+            g_ui._invalid_binding_after_load = after_load
 
     if g_editor.animation_mode and g_editor._anim_dirty:
         g_ui._anim_dirty_pending = do_load_anim_or_skel
@@ -580,6 +598,9 @@ def main():
                 g_renderer.show_origin_gizmo = g_ui.show_origin_gizmo
 
             glfw.set_window_title(window, _window_title())
+            # 同步 show_voxels 状态到 renderer
+            if g_renderer is not None:
+                g_renderer.show_voxels = g_ui.show_voxels
 
             imgui.new_frame()
 
@@ -601,29 +622,37 @@ def main():
                 rebuild_positions_cache()
                 g_editor.skeleton_dirty = False
 
+            # voxel GPU buffer 更新
+            if g_editor.gpu_dirty and g_editor.voxels and g_renderer is not None:
+                positions, colors, selected = g_editor.build_instance_arrays()
+                g_renderer.upload_voxels(positions, colors, selected)
+
             # grid 上传（签名缓存，避免每帧重传）
+            # 网格中心固定在世界原点 (0,0,0)，不跟随粒子
             if g_renderer is not None:
                 global g_grid_sig_cache
                 g_renderer.show_grid = bool(g_ui.show_grid)
-                if g_ui.show_grid and g_editor.particles:
+                if g_ui.show_grid:
                     from ui_panels import _grid_step
                     step = _grid_step(g_ui)
-                    xs = [p["x"] for p in g_editor.particles]
-                    ys = [p["y"] for p in g_editor.particles]
-                    zs = [p["z"] for p in g_editor.particles]
-                    center = (
-                        (min(xs) + max(xs)) / 2,
-                        (min(ys) + max(ys)) / 2,
-                        (min(zs) + max(zs)) / 2,
+                    center = (0.0, 0.0, 0.0)
+                    # 模型 extent：取所有粒子到原点的最大距离 * 1.5，至少 10
+                    if g_editor.particles:
+                        max_dist = max(
+                            math.sqrt(p["x"]**2 + p["y"]**2 + p["z"]**2)
+                            for p in g_editor.particles
+                        )
+                        model_extent = max(max_dist * 1.5, 10.0)
+                    else:
+                        model_extent = 16.0
+                    # 相机 extent：覆盖当前可视范围
+                    camera_extent = max(
+                        g_camera.ortho_size * 1.2,
+                        g_camera.distance * 0.35,
+                        8.0,
                     )
-                    extent = max(
-                        max(xs) - min(xs),
-                        max(ys) - min(ys),
-                        max(zs) - min(zs),
-                        10.0,
-                    )
+                    extent = max(model_extent, camera_extent)
                     grid_sig = (
-                        round(center[0], 1), round(center[1], 1), round(center[2], 1),
                         round(extent, 1), step,
                         g_ui.show_grid_xz, g_ui.show_grid_xy, g_ui.show_grid_yz,
                     )
@@ -696,6 +725,7 @@ def main():
             draw_animation_panel(g_ui, g_editor, WIN_W, WIN_H)
             draw_anim_source_picker(g_ui, g_editor)
             draw_anim_exit_confirm(g_ui, g_editor)
+            draw_invalid_binding_dialog(g_ui, g_editor)
 
             draw_status_bar(g_ui, g_editor, WIN_W, WIN_H)
 
