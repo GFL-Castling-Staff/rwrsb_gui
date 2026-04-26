@@ -636,7 +636,11 @@ def pick_voxel(ray_origin, ray_dir, positions, radius=0.5):
     return int(indices[best_local])
 
 
-def box_select_voxels(vp_matrix, positions, box_x0, box_y0, box_x1, box_y1, screen_w, screen_h):
+def box_select_voxels(
+    vp_matrix: np.ndarray, positions: np.ndarray,
+    box_x0: float, box_y0: float, box_x1: float, box_y1: float,
+    screen_w: int, screen_h: int,
+) -> list[int]:
     if len(positions) == 0:
         return []
 
@@ -665,7 +669,12 @@ def box_select_voxels(vp_matrix, positions, box_x0, box_y0, box_x1, box_y1, scre
     return list(np.where(in_box)[0])
 
 
-def pick_particle_screen(vp_matrix, positions, screen_x, screen_y, screen_w, screen_h, radius_px=14.0):
+def pick_particle_screen(
+    vp_matrix: np.ndarray, positions: np.ndarray,
+    screen_x: float, screen_y: float,
+    screen_w: int, screen_h: int,
+    radius_px: float = 14.0,
+) -> int:
     if len(positions) == 0:
         return -1
 
@@ -691,7 +700,11 @@ def pick_particle_screen(vp_matrix, positions, screen_x, screen_y, screen_w, scr
         return -1
     return best
 
-def box_select_particles(vp_matrix, positions, box_x0, box_y0, box_x1, box_y1, screen_w, screen_h):
+def box_select_particles(
+    vp_matrix: np.ndarray, positions: np.ndarray,
+    box_x0: float, box_y0: float, box_x1: float, box_y1: float,
+    screen_w: int, screen_h: int,
+) -> list[int]:
     """
     Particle 版框选。算法和 box_select_voxels 一致：NDC → 屏幕坐标 → 盒内筛选。
     返回 particle 的 index 列表。
