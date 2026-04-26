@@ -50,7 +50,7 @@ def world_to_xml(x, y, z):
 # VOX 二进制解析（格式版本150，兼容MV旧版）
 # ──────────────────────────────────────────────
 
-def parse_vox(path, trans_bias=127):
+def parse_vox(path: str | Path, trans_bias: int = 127) -> list[tuple[float, ...]]:
     """
     解析 .vox 文件，返回:
       voxels: list of (wx, wy, wz, r, g, b, a)  float rgb [0,1]
@@ -111,7 +111,7 @@ def parse_vox(path, trans_bias=127):
 # XML 解析
 # ──────────────────────────────────────────────
 
-def parse_xml(path):
+def parse_xml(path: str | Path) -> tuple[list[tuple[float, ...]], dict[str, list], dict[int, int]]:
     """
     解析 RWR 模型 XML，返回:
       voxels:   list of (x, y, z, r, g, b, a)  float
@@ -176,7 +176,7 @@ def parse_xml(path):
 # XML 输出（合并完整文件）
 # ──────────────────────────────────────────────
 
-def write_xml(path, voxels, skeleton, bindings):
+def write_xml(path: str | Path, voxels: list, skeleton: dict, bindings: dict) -> None:
     """
     输出合并后完整 XML。
     voxels:   list of (x,y,z,r,g,b,a)
