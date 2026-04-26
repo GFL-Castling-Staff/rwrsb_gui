@@ -658,7 +658,7 @@ class UIState:
         self.toasts: list = []          # list[Toast]
         self._toast_last_update: float = 0.0
         
-        # 应用模式：rwrsb_gui.exe = "skeleton"，rwrsb_anim.exe = "animation"
+        # 应用模式：rwrsb_bind.exe = "skeleton"，rwrsb_anim.exe = "animation"
         # 由各自 entry 的 main 函数显式设置
         self.app_mode = "skeleton"
         

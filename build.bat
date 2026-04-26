@@ -21,10 +21,10 @@ echo [1/3] Cleaning old build output...
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 
-echo [2/3] Building rwrsb_gui...
-pyinstaller --noconfirm rwrsb_gui.spec
+echo [2/3] Building rwrsb_bind...
+pyinstaller --noconfirm rwrsb_bind.spec
 if errorlevel 1 (
-    echo [ERROR] rwrsb_gui build failed.
+    echo [ERROR] rwrsb_bind build failed.
     exit /b 1
 )
 
@@ -37,7 +37,7 @@ if errorlevel 1 (
 
 echo.
 echo Build complete:
-echo   dist\rwrsb_gui\rwrsb_gui.exe   (skeleton/binding editor)
+echo   dist\rwrsb_bind\rwrsb_bind.exe  (skeleton/binding editor)
 echo   dist\rwrsb_anim\rwrsb_anim.exe (animation editor)
 echo.
 echo IMPORTANT:
@@ -45,6 +45,6 @@ echo   Run the EXE from dist\<name>\<name>.exe
 echo   Do NOT run build\<name>\<name>.exe
 echo.
 echo Recommended release artifacts:
-echo   zip dist\rwrsb_gui  and  dist\rwrsb_anim  separately
+echo   zip dist\rwrsb_bind  and  dist\rwrsb_anim  separately
 echo.
 endlocal

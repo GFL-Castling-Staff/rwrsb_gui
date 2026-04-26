@@ -7,8 +7,8 @@
 1. 确认工作区干净，没有未预期的修改
 2. 先用源码运行一次，确认基本功能正常
 3. 执行 `build.bat` 生成 Windows 发布包
-4. 在本机测试 `dist\rwrsb_gui\rwrsb_gui.exe`
-5. 把整个 `dist\rwrsb_gui` 文件夹压缩成 zip
+4. 在本机测试 `dist\rwrsb_bind\rwrsb_bind.exe`
+5. 把整个 `dist\rwrsb_bind` 文件夹压缩成 zip
 6. 确认版本号和 tag，例如 `v0.1.0`
 7. 在 GitHub 上创建 Release
 8. 上传 zip 包，并粘贴对应版本说明
@@ -23,7 +23,7 @@
 2. 激活 `.venv`
 3. 自动安装 `PyInstaller`（如果缺失）
 4. 清理旧的 `build/` 和 `dist/`
-5. 根据 [rwrsb_gui.spec](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/rwrsb_gui.spec) 重新构建发布包
+5. 根据 [rwrsb_bind.spec](rwrsb_bind.spec) 重新构建发布包
 
 执行方式：
 
@@ -34,23 +34,23 @@ build.bat
 输出结果：
 
 ```text
-dist\rwrsb_gui\rwrsb_gui.exe
+dist\rwrsb_bind\rwrsb_bind.exe
 ```
 
 注意：
 
-- 发布时建议压缩整个 `dist\rwrsb_gui`，不要只单独发 exe
+- 发布时建议压缩整个 `dist\rwrsb_bind`，不要只单独发 exe
 - 因为运行时还需要 `_internal/`、资源文件和依赖 DLL
 
 ## 推荐上传的发布物
 
 建议文件名：
 
-- `rwrsb_gui-v0.1.0-windows.zip`
+- `rwrsb_bind-v1.0.0-windows.zip`
 
 zip 内应包含：
 
-- `rwrsb_gui.exe`
+- `rwrsb_bind.exe`
 - PyInstaller 生成的 `_internal/`
 - `shaders/`
 - `presets/`
@@ -59,11 +59,11 @@ zip 内应包含：
 
 建议标题：
 
-- `rwrsb_gui v0.1.0`
+- `rwrsb_bind v1.0.0`
 
 建议正文：
 
-- 可以直接使用 [RELEASE_NOTES_v0.1.0.md](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/RELEASE_NOTES_v0.1.0.md)
+- 可以直接使用 [RELEASE_NOTES_v1.0.0.md](RELEASE_NOTES_v1.0.0.md)
 
 ## 发版前检查清单
 

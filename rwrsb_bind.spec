@@ -35,7 +35,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="rwrsb_gui",
+    name="rwrsb_bind",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -55,5 +55,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name="rwrsb_gui",
+    name="rwrsb_bind",
 )

@@ -1,5 +1,6 @@
 """
-main.py  --  rwrsb v2.0  (pyimgui + ModernGL + GLFW)
+main.py  --  rwrsb_bind v1.0.0  (pyimgui + ModernGL + GLFW)
+绑骨工具入口：骨架结构编辑、体素绑定、预设管理。
 Usage: python main.py [optional_file.vox]
        or drag a .vox / .xml onto the window
 """
@@ -163,8 +164,8 @@ def _apply_ui_scale():
 
 def _window_title():
     if g_ui.language == "zh":
-        return "rwrsb v2.0 -- RWR 骨架绑定编辑器"
-    return "rwrsb v2.0 -- RWR Skeleton Binder"
+        return "rwrsb_bind v1.0.0 -- RWR 骨架绑定编辑器"
+    return "rwrsb_bind v1.0.0 -- RWR Skeleton Binder"
 
 
 def _prepare_save_dialog():

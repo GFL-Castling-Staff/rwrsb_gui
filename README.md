@@ -1,4 +1,4 @@
-# rwrsb_gui
+# rwrsb_bind
 
 这是一个面向 RWR 风格资源的体素骨架绑定编辑器。
 
@@ -123,15 +123,15 @@ build.bat
 2. 激活虚拟环境
 3. 如果还没安装 `PyInstaller`，自动安装
 4. 删除旧的 `build/` 和 `dist/`
-5. 按 [rwrsb_gui.spec](rwrsb_gui.spec) 重新打包
+5. 按 [rwrsb_bind.spec](rwrsb_bind.spec) 重新打包
 
 打包成功后，输出位置是：
 
 ```text
-dist\rwrsb_gui\rwrsb_gui.exe
+dist\rwrsb_bind\rwrsb_bind.exe
 ```
 
-发布时建议不要只拿单个 exe，而是把整个 `dist\rwrsb_gui` 文件夹压缩成 zip 再发。
+发布时建议不要只拿单个 exe，而是把整个 `dist\rwrsb_bind` 文件夹压缩成 zip 再发。
 
 原因是这个目录里除了 exe 之外，还会包含：
 
@@ -167,7 +167,7 @@ dist\rwrsb_gui\rwrsb_gui.exe
 ## 项目结构
 
 - `main.py`
-  - 绑骨工具主入口（`rwrsb_gui.exe`）
+  - 绑骨工具主入口（`rwrsb_bind.exe`）
   - GLFW 窗口生命周期
   - 输入事件
   - 视口拖拽
