@@ -298,6 +298,46 @@ _TEXT = {
         "move_subtree_preview": "Subtree: {names}",
         "move_subtree_no_active": "(no active particle)",
         "move_subtree_active_not_in_tree": "(active not in skeleton tree)",
+        # ── operation feedback (toasts) ──
+        "loaded_file": "Loaded: {name}",
+        "load_failed": "Load failed: {error}",
+        "saved_file": "Saved: {name}",
+        "save_failed": "Save failed: {error}",
+        "only_xml_supported": "Only .xml files are supported",
+        "open_dialog_failed": "Failed to open dialog: {error}",
+        "system_dialog_unavailable": "System file dialog unavailable",
+        "add_particle_failed": "Failed to add particle: {error}",
+        "update_particle_failed": "Failed to update particle: {error}",
+        "update_stick_failed": "Failed to update stick: {error}",
+        "add_stick_failed": "Failed to add stick: {error}",
+        "align_failed": "Alignment failed: {error}",
+        "mirror_plane_set_failed": "Failed to set mirror plane: {error}",
+        "normalize_failed": "Normalization failed: {error}",
+        "mirror_normal_set_failed": "Failed to set mirror normal: {error}",
+        "mirror_exited": "Exited mirror mode",
+        "mirror_entered": "Entered mirror mode: {axis}-axis",
+        "mirror_enter_failed": "Failed to enter mirror mode: {error}",
+        "preset_loaded": "Loaded preset: {name}",
+        "preset_load_failed": "Failed to load preset: {error}",
+        "preset_deleted": "Deleted preset: {name}",
+        "preset_delete_failed": "Failed to delete preset: {error}",
+        "preset_saved": "Saved preset: {name}",
+        "preset_save_failed": "Failed to save preset: {error}",
+        "rotate_failed": "Rotation failed: {error}",
+        "subtree_select_failed": "Failed to select subtree: {error}",
+        "set_failed": "Operation failed: {error}",
+        "halfbody_select_anim_xml": "Select animation XML",
+        "halfbody_select_vanilla_xml": "Select vanilla soldier_animations.xml",
+        "halfbody_vanilla_path_set": "Vanilla path set",
+        "halfbody_baseline_cleared": "Baseline cleared",
+        "halfbody_filled": "Filled {n} particles to all frames",
+        "fill_failed": "Fill failed: {error}",
+        "load_skeleton_failed": "Failed to load skeleton: {error}",
+        "anim_parse_failed": "Failed to parse animation file: {error}",
+        "anim_file_no_animations": "File contains no animations",
+        "skeleton_loaded_voxels_discarded": "Loaded skeleton (voxels discarded)",
+        "anim_mode_enter_failed": "Failed to enter animation mode: {error}",
+        "anim_default_skeleton_failed": "Failed to load default skeleton: {error}",
     },
     "zh": {
         "open_vox": "打开 VOX",
@@ -562,6 +602,23 @@ _TEXT = {
         "move_subtree_preview": "子树：{names}",
         "move_subtree_no_active": "（无 active 粒子）",
         "move_subtree_active_not_in_tree": "（active 不在骨架树里）",
+        # ── 操作反馈（toasts）──
+        "loaded_file": "已加载: {name}",
+        "load_failed": "加载失败: {error}",
+        "only_xml_supported": "仅支持 .xml 文件",
+        "add_particle_failed": "添加粒子失败: {error}",
+        "update_particle_failed": "更新粒子失败: {error}",
+        "update_stick_failed": "更新骨段失败: {error}",
+        "add_stick_failed": "添加骨段失败: {error}",
+        "align_failed": "对齐失败: {error}",
+        "mirror_plane_set_failed": "设置镜像平面失败: {error}",
+        "normalize_failed": "归一化失败: {error}",
+        "mirror_normal_set_failed": "设置镜像法线失败: {error}",
+        "mirror_exited": "已退出镜像模式",
+        "mirror_entered": "进入镜像模式: {axis} 轴",
+        "mirror_enter_failed": "进入镜像模式失败: {error}",
+        "anim_mode_enter_failed": "进入动画模式失败: {error}",
+        "anim_default_skeleton_failed": "加载默认骨架失败: {error}",
     },
 }
 
@@ -1015,7 +1072,7 @@ def _draw_particle_editor(ui_state, editor_state):
             ui_state._bone_error = ""
         except Exception as exc:
             ui_state._bone_error = str(exc)
-            ui_state.push_toast(f"添加粒子失败: {exc}", "error", exc_info=True)
+            ui_state.push_toast(tr(ui_state, "add_particle_failed", error=exc), "error", exc_info=True)
 
     for idx, particle in enumerate(editor_state.particles):
         imgui.push_id(f"particle-{idx}")
@@ -1044,7 +1101,7 @@ def _draw_particle_editor(ui_state, editor_state):
                     ui_state._bone_error = ""
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
-                    ui_state.push_toast(f"更新粒子失败: {exc}", "error", exc_info=True)
+                    ui_state.push_toast(tr(ui_state, "update_particle_failed", error=exc), "error", exc_info=True)
 
             _push_red()
             if imgui.button(tr(ui_state, "delete_particle"), width=-1):
@@ -1095,7 +1152,7 @@ def _draw_active_stick_editor(ui_state, editor_state):
             ui_state._bone_error = ""
         except Exception as exc:
             ui_state._bone_error = str(exc)
-            ui_state.push_toast(f"更新骨段失败: {exc}", "error", exc_info=True)
+            ui_state.push_toast(tr(ui_state, "update_stick_failed", error=exc), "error", exc_info=True)
 
     if imgui.button(tr(ui_state, "auto_rename"), width=-1):
         editor_state.rename_sticks_from_particles()
@@ -1133,7 +1190,7 @@ def _draw_add_stick(ui_state, editor_state):
             ui_state._bone_error = ""
         except Exception as exc:
             ui_state._bone_error = str(exc)
-            ui_state.push_toast(f"添加骨段失败: {exc}", "error", exc_info=True)
+            ui_state.push_toast(tr(ui_state, "add_stick_failed", error=exc), "error", exc_info=True)
 
 
 def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sticks_ref, camera):
@@ -1181,7 +1238,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
                     ui_state._bone_error = ""
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
-                    ui_state.push_toast(f"对齐失败: {exc}", "error", exc_info=True)
+                    ui_state.push_toast(tr(ui_state, "align_failed", error=exc), "error", exc_info=True)
             imgui.same_line()
             if imgui.button(tr(ui_state, "align_y") + "##align_y"):
                 try:
@@ -1189,7 +1246,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
                     ui_state._bone_error = ""
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
-                    ui_state.push_toast(f"对齐失败: {exc}", "error", exc_info=True)
+                    ui_state.push_toast(tr(ui_state, "align_failed", error=exc), "error", exc_info=True)
             imgui.same_line()
             if imgui.button(tr(ui_state, "align_z") + "##align_z"):
                 try:
@@ -1197,7 +1254,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
                     ui_state._bone_error = ""
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
-                    ui_state.push_toast(f"对齐失败: {exc}", "error", exc_info=True)
+                    ui_state.push_toast(tr(ui_state, "align_failed", error=exc), "error", exc_info=True)
         else:
             imgui.text_disabled(tr(ui_state, "align_hint"))
 
@@ -1216,21 +1273,21 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
                 ui_state._bone_error = ""
             except Exception as exc:
                 ui_state._bone_error = str(exc)
-                ui_state.push_toast(f"设置镜像平面失败: {exc}", "error", exc_info=True)
+                ui_state.push_toast(tr(ui_state, "mirror_plane_set_failed", error=exc), "error", exc_info=True)
         if imgui.button(tr(ui_state, "mirror_use_midpoint") + "##mirror_midpoint", width=-1):
             try:
                 editor_state.set_mirror_origin_from_pair_midpoint()
                 ui_state._bone_error = ""
             except Exception as exc:
                 ui_state._bone_error = str(exc)
-                ui_state.push_toast(f"设置镜像平面失败: {exc}", "error", exc_info=True)
+                ui_state.push_toast(tr(ui_state, "mirror_plane_set_failed", error=exc), "error", exc_info=True)
         if imgui.button(tr(ui_state, "mirror_normalize") + "##mirror_normalize", width=-1):
             try:
                 editor_state.normalize_mirror_plane_normal()
                 ui_state._bone_error = ""
             except Exception as exc:
                 ui_state._bone_error = str(exc)
-                ui_state.push_toast(f"归一化失败: {exc}", "error", exc_info=True)
+                ui_state.push_toast(tr(ui_state, "normalize_failed", error=exc), "error", exc_info=True)
 
         _, ui_state.show_mirror_grid = imgui.checkbox(tr(ui_state, "mirror_show_grid"), ui_state.show_mirror_grid)
         _, ui_state.snap_to_mirror_grid = imgui.checkbox(tr(ui_state, "mirror_snap_grid"), ui_state.snap_to_mirror_grid)
@@ -1284,7 +1341,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
                     ui_state._bone_error = ""
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
-                    ui_state.push_toast(f"设置镜像法线失败: {exc}", "error", exc_info=True)
+                    ui_state.push_toast(tr(ui_state, "mirror_normal_set_failed", error=exc), "error", exc_info=True)
 
         if editor_state.mirror_mode:
             imgui.text_colored(
@@ -1294,7 +1351,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
             imgui.text_disabled(tr(ui_state, "mirror_locked"))
             if imgui.button(tr(ui_state, "mirror_mode_exit") + "##mirror_exit", width=-1):
                 editor_state.exit_mirror_mode()
-                ui_state.push_toast("已退出镜像模式", "info")
+                ui_state.push_toast(tr(ui_state, "mirror_exited"), "info")
         else:
             can_enter_mirror = len(editor_state.selected_particles) == 2
             if imgui.button(tr(ui_state, "mirror_mode_enter") + "##mirror_enter", width=-1):
@@ -1302,10 +1359,10 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
                     try:
                         editor_state.enter_mirror_mode()
                         ui_state._bone_error = ""
-                        ui_state.push_toast(f"进入镜像模式: {editor_state.mirror_axis} 轴", "info")
+                        ui_state.push_toast(tr(ui_state, "mirror_entered", axis=editor_state.mirror_axis.upper()), "info")
                     except Exception as exc:
                         ui_state._bone_error = str(exc)
-                        ui_state.push_toast(f"进入镜像模式失败: {exc}", "error", exc_info=True)
+                        ui_state.push_toast(tr(ui_state, "mirror_enter_failed", error=exc), "error", exc_info=True)
             if not can_enter_mirror:
                 imgui.text_disabled(tr(ui_state, "mirror_requires_two"))
     imgui.separator()
@@ -1438,7 +1495,7 @@ def _handle_browse_load(ui_state, editor_state, renderer, skeleton_sticks_ref):
                                 initial_path=ui_state.load_path_buf)
     except Exception as exc:
         ui_state._load_error = str(exc)
-        ui_state.push_toast(f"打开对话框失败: {exc}", "error", exc_info=True)
+        ui_state.push_toast(tr(ui_state, "open_dialog_failed", error=exc), "error", exc_info=True)
         return
     finally:
         # 补救：对话框阻塞期间不扣 toast 寿命
@@ -1461,10 +1518,10 @@ def _handle_browse_load(ui_state, editor_state, renderer, skeleton_sticks_ref):
         ui_state._load_error = ""
         ui_state.show_load_dialog = False
         imgui.close_current_popup()
-        ui_state.push_toast(f"已加载: {Path(path).name}", "success")
+        ui_state.push_toast(tr(ui_state, "loaded_file", name=Path(path).name), "success")
     except Exception as exc:
         ui_state._load_error = str(exc)
-        ui_state.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+        ui_state.push_toast(tr(ui_state, "load_failed", error=exc), "error", exc_info=True)
 
 
 def draw_load_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WIN_W, WIN_H):
@@ -1505,12 +1562,12 @@ def draw_load_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WIN_
                     ui_state._load_error = ""
                 except Exception as exc:
                     ui_state._load_error = str(exc)
-                    ui_state.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+                    ui_state.push_toast(tr(ui_state, "load_failed", error=exc), "error", exc_info=True)
             else:
                 ui_state._load_error = tr(ui_state, "file_not_found")
                 ui_state.push_toast(tr(ui_state, "file_not_found"), "error")
             if not ui_state._load_error:
-                ui_state.push_toast(f"已加载: {Path(path).name}", "success")
+                ui_state.push_toast(tr(ui_state, "loaded_file", name=Path(path).name), "success")
                 ui_state.show_load_dialog = False
                 imgui.close_current_popup()
 
@@ -1539,7 +1596,7 @@ def _handle_browse_save(ui_state, editor_state, skeleton_sticks_ref):
                                 initial_path=initial, default_ext="xml")
     except Exception as exc:
         ui_state._save_error = str(exc)
-        ui_state.push_toast(f"打开保存对话框失败: {exc}", "error", exc_info=True)
+        ui_state.push_toast(tr(ui_state, "open_dialog_failed", error=exc), "error", exc_info=True)
         return
     finally:
         dt = time.time() - t0
@@ -1555,10 +1612,10 @@ def _handle_browse_save(ui_state, editor_state, skeleton_sticks_ref):
         ui_state._save_error = ""
         ui_state.show_save_dialog = False
         imgui.close_current_popup()
-        ui_state.push_toast(f"已保存: {Path(path).name}", "success")
+        ui_state.push_toast(tr(ui_state, "saved_file", name=Path(path).name), "success")
     except Exception as exc:
         ui_state._save_error = str(exc)
-        ui_state.push_toast(f"保存失败: {exc}", "error", exc_info=True)
+        ui_state.push_toast(tr(ui_state, "save_failed", error=exc), "error", exc_info=True)
 
 
 def draw_save_dialog(ui_state, editor_state, skeleton_sticks_ref, WIN_W, WIN_H):
@@ -1591,10 +1648,10 @@ def draw_save_dialog(ui_state, editor_state, skeleton_sticks_ref, WIN_W, WIN_H):
                     ui_state._save_error = ""
                     ui_state.show_save_dialog = False
                     imgui.close_current_popup()
-                    ui_state.push_toast(f"已保存: {Path(path).name}", "success")
+                    ui_state.push_toast(tr(ui_state, "saved_file", name=Path(path).name), "success")
                 except Exception as exc:
                     ui_state._save_error = str(exc)
-                    ui_state.push_toast(f"保存失败: {exc}", "error", exc_info=True)
+                    ui_state.push_toast(tr(ui_state, "save_failed", error=exc), "error", exc_info=True)
         imgui.same_line()
         if imgui.button(tr(ui_state, "cancel"), width=80 * ui_state.ui_scale):
             ui_state.show_save_dialog = False
@@ -1678,10 +1735,10 @@ def draw_preset_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WI
                     renderer.upload_skeleton_lines(editor_state.particles, editor_state.sticks)
                     editor_state.gpu_dirty = True
                     ui_state._bone_error = ""
-                    ui_state.push_toast(f"已加载预设: {_preset['name']}", "success")
+                    ui_state.push_toast(tr(ui_state, "preset_loaded", name=_preset['name']), "success")
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
-                    ui_state.push_toast(f"加载预设失败: {exc}", "error", exc_info=True)
+                    ui_state.push_toast(tr(ui_state, "preset_load_failed", error=exc), "error", exc_info=True)
         imgui.same_line()
         if imgui.button(tr(ui_state, "delete_selected"), width=140 * ui_state.ui_scale):
             if presets:
@@ -1690,10 +1747,10 @@ def draw_preset_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WI
                     editor_state.delete_skeleton_preset(_preset["path"])
                     ui_state.preset_selected = max(0, ui_state.preset_selected - 1)
                     ui_state._bone_error = ""
-                    ui_state.push_toast(f"已删除预设: {_preset['name']}", "success")
+                    ui_state.push_toast(tr(ui_state, "preset_deleted", name=_preset['name']), "success")
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
-                    ui_state.push_toast(f"删除预设失败: {exc}", "error", exc_info=True)
+                    ui_state.push_toast(tr(ui_state, "preset_delete_failed", error=exc), "error", exc_info=True)
 
         imgui.separator()
         imgui.text(tr(ui_state, "save_preset_as"))
@@ -1705,10 +1762,10 @@ def draw_preset_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WI
             try:
                 editor_state.save_skeleton_preset(_pname, overwrite=False)
                 ui_state._bone_error = ""
-                ui_state.push_toast(f"已保存预设: {_pname}", "success")
+                ui_state.push_toast(tr(ui_state, "preset_saved", name=_pname), "success")
             except Exception as exc:
                 ui_state._bone_error = str(exc)
-                ui_state.push_toast(f"保存预设失败: {exc}", "error", exc_info=True)
+                ui_state.push_toast(tr(ui_state, "preset_save_failed", error=exc), "error", exc_info=True)
         imgui.same_line()
         if imgui.button(tr(ui_state, "overwrite_selected"), width=140 * ui_state.ui_scale):
             if presets:
@@ -1721,10 +1778,10 @@ def draw_preset_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WI
                         overwrite=True,
                     )
                     ui_state._bone_error = ""
-                    ui_state.push_toast(f"已保存预设: {_pname}", "success")
+                    ui_state.push_toast(tr(ui_state, "preset_saved", name=_pname), "success")
                 except Exception as exc:
                     ui_state._bone_error = str(exc)
-                    ui_state.push_toast(f"保存预设失败: {exc}", "error", exc_info=True)
+                    ui_state.push_toast(tr(ui_state, "preset_save_failed", error=exc), "error", exc_info=True)
 
         if ui_state._bone_error:
             imgui.separator()
@@ -1921,7 +1978,7 @@ def _draw_move_settings_section(ui_state, editor_state):
                 sub = editor_state.collect_subtree_indices(active)
                 editor_state.selected_particles.update(sub)
             except Exception as exc:
-                ui_state.push_toast(f"选择子树失败: {exc}", "error", exc_info=True)
+                ui_state.push_toast(tr(ui_state, "subtree_select_failed", error=exc), "error", exc_info=True)
 
 
 def _draw_rotate_settings_section(ui_state, editor_state):
@@ -1974,7 +2031,7 @@ def _draw_rotate_settings_section(ui_state, editor_state):
             except ValueError as exc:
                 ui_state.push_toast(str(exc), "error")
             except Exception as exc:
-                ui_state.push_toast(f"旋转失败: {exc}", "error", exc_info=True)
+                ui_state.push_toast(tr(ui_state, "rotate_failed", error=exc), "error", exc_info=True)
 
         def _angle_row(label_key, attr_name, axis):
             imgui.set_next_item_width(80)
@@ -2023,7 +2080,7 @@ def _draw_rotate_settings_section(ui_state, editor_state):
             except ValueError as exc:
                 ui_state.push_toast(str(exc), "error")
             except Exception as exc:
-                ui_state.push_toast(f"旋转失败: {exc}", "error", exc_info=True)
+                ui_state.push_toast(tr(ui_state, "rotate_failed", error=exc), "error", exc_info=True)
     imgui.same_line()
     if imgui.button(tr(ui_state, "rotate_reset") + "##rot_reset"):
         ui_state.rotate_angle_x = 0.0
@@ -2195,7 +2252,7 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
                 except ValueError as exc:
                     ui_state.push_toast(str(exc), "error")
                 except Exception as exc:
-                    ui_state.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+                    ui_state.push_toast(tr(ui_state, "load_failed", error=exc), "error", exc_info=True)
         imgui.same_line()
         if imgui.button(tr(ui_state, "halfbody_load_current_frame") + "##hb_cur"):
             try:
@@ -2211,7 +2268,7 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
             try:
                 from file_dialogs import open_file_dialog
                 path = open_file_dialog(
-                    "选择 animation XML",
+                    tr(ui_state, "halfbody_select_anim_xml"),
                     [("XML files", "*.xml"), ("All files", "*.*")],
                 )
                 if path:
@@ -2223,7 +2280,7 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
             except ValueError as exc:
                 ui_state.push_toast(str(exc), "error")
             except Exception as exc:
-                ui_state.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+                ui_state.push_toast(tr(ui_state, "load_failed", error=exc), "error", exc_info=True)
 
         # vanilla 路径设置
         imgui.separator()
@@ -2233,20 +2290,20 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
             try:
                 from file_dialogs import open_file_dialog
                 path = open_file_dialog(
-                    "选择 vanilla soldier_animations.xml",
+                    tr(ui_state, "halfbody_select_vanilla_xml"),
                     [("XML files", "*.xml"), ("All files", "*.*")],
                 )
                 if path:
                     ui_state.vanilla_animations_path = path
-                    ui_state.push_toast("vanilla 路径已设置", "info")
+                    ui_state.push_toast(tr(ui_state, "halfbody_vanilla_path_set"), "info")
             except Exception as exc:
-                ui_state.push_toast(f"设置失败: {exc}", "error", exc_info=True)
+                ui_state.push_toast(tr(ui_state, "set_failed", error=exc), "error", exc_info=True)
 
         # Clear baseline
         if editor_state._baseline_positions is not None:
             if imgui.button(tr(ui_state, "halfbody_clear_baseline") + "##hb_clear"):
                 editor_state.clear_baseline_pose()
-                ui_state.push_toast("基准已清空", "info")
+                ui_state.push_toast(tr(ui_state, "halfbody_baseline_cleared"), "info")
 
         # === Lock 区 ===
         imgui.separator()
@@ -2314,13 +2371,11 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
                 try:
                     n_sel = len(editor_state.selected_particles)
                     editor_state.fill_baseline_to_selected_across_frames()
-                    ui_state.push_toast(
-                        f"已填充 {n_sel} 个粒子到所有帧", "info"
-                    )
+                    ui_state.push_toast(tr(ui_state, "halfbody_filled", n=n_sel), "info")
                 except ValueError as exc:
                     ui_state.push_toast(str(exc), "error")
                 except Exception as exc:
-                    ui_state.push_toast(f"填充失败: {exc}", "error", exc_info=True)
+                    ui_state.push_toast(tr(ui_state, "fill_failed", error=exc), "error", exc_info=True)
 
         imgui.end_popup()
     imgui.same_line()
@@ -2362,7 +2417,7 @@ def _anim_action_open_skeleton(ui_state, editor_state):
         from file_dialogs import open_file_dialog, _is_supported as _fd_supported
         from editor_state import check_xml_voxel_bindings
         if not _fd_supported():
-            ui_state.push_toast("系统对话框不可用", "error")
+            ui_state.push_toast(tr(ui_state, "system_dialog_unavailable"), "error")
             return
         try:
             path = open_file_dialog(
@@ -2370,7 +2425,7 @@ def _anim_action_open_skeleton(ui_state, editor_state):
                 [("XML files", "*.xml"), ("All files", "*.*")],
             )
         except Exception as exc:
-            ui_state.push_toast(f"打开对话框失败: {exc}", "error", exc_info=True)
+            ui_state.push_toast(tr(ui_state, "open_dialog_failed", error=exc), "error", exc_info=True)
             return
         if not path:
             return
@@ -2388,7 +2443,7 @@ def _anim_action_open_skeleton(ui_state, editor_state):
             except ValueError as exc:
                 ui_state.push_toast(str(exc), "error")
             except Exception as exc:
-                ui_state.push_toast(f"进入动画模式失败: {exc}", "error", exc_info=True)
+                ui_state.push_toast(tr(ui_state, "anim_mode_enter_failed", error=exc), "error", exc_info=True)
 
         is_valid, reason, info = check_xml_voxel_bindings(path)
         if is_valid:
@@ -2397,7 +2452,7 @@ def _anim_action_open_skeleton(ui_state, editor_state):
                     editor_state.exit_animation_mode(force=True)
                 editor_state.load_skeleton_xml(path)
             except Exception as exc:
-                ui_state.push_toast(f"加载骨架失败: {exc}", "error", exc_info=True)
+                ui_state.push_toast(tr(ui_state, "load_skeleton_failed", error=exc), "error", exc_info=True)
                 return
             after_load()
         else:
@@ -2418,7 +2473,7 @@ def _anim_action_load_animation(ui_state, editor_state):
         from animation_io import (parse_animation_index, parse_single_animation,
                                   parse_first_animation)
         if not _fd_supported():
-            ui_state.push_toast("系统对话框不可用", "error")
+            ui_state.push_toast(tr(ui_state, "system_dialog_unavailable"), "error")
             return
         try:
             path = open_file_dialog(
@@ -2426,7 +2481,7 @@ def _anim_action_load_animation(ui_state, editor_state):
                 [("XML files", "*.xml"), ("All files", "*.*")],
             )
         except Exception as exc:
-            ui_state.push_toast(f"打开对话框失败: {exc}", "error", exc_info=True)
+            ui_state.push_toast(tr(ui_state, "open_dialog_failed", error=exc), "error", exc_info=True)
             return
         if not path:
             return
@@ -2434,10 +2489,10 @@ def _anim_action_load_animation(ui_state, editor_state):
         try:
             doc = parse_animation_index(path)
         except Exception as exc:
-            ui_state.push_toast(f"解析动画文件失败: {exc}", "error", exc_info=True)
+            ui_state.push_toast(tr(ui_state, "anim_parse_failed", error=exc), "error", exc_info=True)
             return
         if len(doc.names) == 0:
-            ui_state.push_toast("文件不包含 animation", "error")
+            ui_state.push_toast(tr(ui_state, "anim_file_no_animations"), "error")
             return
         if len(doc.names) == 1:
             try:
@@ -2446,7 +2501,7 @@ def _anim_action_load_animation(ui_state, editor_state):
                 ui_state.push_toast(
                     tr(ui_state, "anim_loaded", name=anim.name), "success")
             except Exception as exc:
-                ui_state.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+                ui_state.push_toast(tr(ui_state, "load_failed", error=exc), "error", exc_info=True)
             return
         # 多 animation：弹选择对话框
         ui_state._anim_picker_doc = doc
@@ -2463,7 +2518,7 @@ def _anim_action_save_animation(ui_state, editor_state):
     from file_dialogs import save_file_dialog, _is_supported as _fd_supported
     from animation_io import write_single_animation
     if not _fd_supported():
-        ui_state.push_toast("系统对话框不可用", "error")
+        ui_state.push_toast(tr(ui_state, "system_dialog_unavailable"), "error")
         return
     initial = f"{editor_state.current_animation.name}.xml"
     try:
@@ -2473,7 +2528,7 @@ def _anim_action_save_animation(ui_state, editor_state):
             initial_path=initial, default_ext="xml",
         )
     except Exception as exc:
-        ui_state.push_toast(f"打开保存对话框失败: {exc}", "error", exc_info=True)
+        ui_state.push_toast(tr(ui_state, "open_dialog_failed", error=exc), "error", exc_info=True)
         return
     if not path:
         return
@@ -2482,7 +2537,7 @@ def _anim_action_save_animation(ui_state, editor_state):
         editor_state._anim_dirty = False
         ui_state.push_toast(tr(ui_state, "anim_saved", path=path), "success")
     except Exception as exc:
-        ui_state.push_toast(f"保存失败: {exc}", "error", exc_info=True)
+        ui_state.push_toast(tr(ui_state, "save_failed", error=exc), "error", exc_info=True)
 
 
 # ── 选择对话框 (多 animation 文件) ────────────────
@@ -2551,7 +2606,7 @@ def _open_picker_choice(ui_state, editor_state):
         ui_state.push_toast(
             tr(ui_state, "anim_loaded", name=anim.name), "success")
     except Exception as exc:
-        ui_state.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+        ui_state.push_toast(tr(ui_state, "load_failed", error=exc), "error", exc_info=True)
     ui_state._anim_picker_doc = None
 
 
@@ -2973,9 +3028,9 @@ def draw_invalid_binding_dialog(ui_state, editor_state):
                 editor_state.discard_voxels_keep_skeleton()
                 if after is not None:
                     after()
-                ui_state.push_toast("已加载骨架（已丢弃 voxels）", "info")
+                ui_state.push_toast(tr(ui_state, "skeleton_loaded_voxels_discarded"), "info")
             except Exception as exc:
-                ui_state.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+                ui_state.push_toast(tr(ui_state, "load_failed", error=exc), "error", exc_info=True)
             ui_state._invalid_binding_show = False
             ui_state._invalid_binding_path = None
             ui_state._invalid_binding_after_load = None

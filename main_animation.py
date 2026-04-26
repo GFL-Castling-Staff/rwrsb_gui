@@ -29,7 +29,7 @@ from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_box_select_overlay, draw_exit_dialog,
                           draw_toasts,
                           draw_animation_panel, draw_anim_source_picker,
-                          draw_anim_exit_confirm, draw_invalid_binding_dialog)
+                          draw_anim_exit_confirm, draw_invalid_binding_dialog, tr)
 from animation_io import (parse_animation_index, parse_single_animation,
                           parse_first_animation, Animation, AnimationFrame,
                           EXPECTED_PARTICLE_COUNT)
@@ -645,7 +645,7 @@ def on_drop(window, paths):
         return
     path = paths[0]
     if not str(path).lower().endswith(".xml"):
-        g_ui.push_toast("仅支持 .xml 文件", "warning")
+        g_ui.push_toast(tr(g_ui, "only_xml_supported"), "warning")
         return
 
     def do_load_anim_or_skel():
@@ -657,7 +657,7 @@ def on_drop(window, paths):
                 if len(doc.names) == 1:
                     anim = parse_first_animation(path)
                     g_editor.enter_animation_mode(anim)
-                    g_ui.push_toast(f"已加载动画: {anim.name}", "success")
+                    g_ui.push_toast(tr(g_ui, "anim_loaded", name=anim.name), "success")
                 else:
                     g_ui._anim_picker_doc = doc
                     g_ui._anim_picker_filter = ""
@@ -671,7 +671,7 @@ def on_drop(window, paths):
                 g_editor.enter_animation_mode(
                     Animation(name="new_animation", end=1.0, speed=1.0))
             except Exception as exc:
-                g_ui.push_toast(f"进入动画模式失败: {exc}", "error", exc_info=True)
+                g_ui.push_toast(tr(g_ui, "anim_mode_enter_failed", error=exc), "error", exc_info=True)
 
         is_valid, reason, info = check_xml_voxel_bindings(path)
         if is_valid:
@@ -680,9 +680,9 @@ def on_drop(window, paths):
                     g_editor.exit_animation_mode(force=True)
                 g_editor.load_skeleton_xml(path)
                 after_load()
-                g_ui.push_toast(f"已加载骨架", "success")
+                g_ui.push_toast(tr(g_ui, "anim_skeleton_loaded", n=len(g_editor.particles)), "success")
             except Exception as exc:
-                g_ui.push_toast(f"加载失败: {exc}", "error", exc_info=True)
+                g_ui.push_toast(tr(g_ui, "load_failed", error=exc), "error", exc_info=True)
         else:
             # 非法 binding → 弹对话框
             g_ui._invalid_binding_show = True
@@ -771,7 +771,7 @@ def main():
                     len(g_editor.particles))
     except Exception as exc:
         logger.exception("failed to load default skeleton")
-        g_ui.push_toast(f"加载默认骨架失败: {exc}", "error", exc_info=True)
+        g_ui.push_toast(tr(g_ui, "anim_default_skeleton_failed", error=exc), "error", exc_info=True)
 
     # 自动进入动画模式
     try:
@@ -779,7 +779,7 @@ def main():
         g_editor.enter_animation_mode(new_anim)
     except Exception as exc:
         logger.exception("failed to enter animation mode")
-        g_ui.push_toast(f"进入动画模式失败: {exc}", "error", exc_info=True)
+        g_ui.push_toast(tr(g_ui, "anim_mode_enter_failed", error=exc), "error", exc_info=True)
 
     if g_editor.particles:
         xs = [p["x"] for p in g_editor.particles]

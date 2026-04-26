@@ -28,7 +28,7 @@ from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_status_bar, draw_load_dialog, draw_save_dialog,
                           draw_preset_dialog,
                           draw_box_select_overlay, draw_exit_dialog,
-                          draw_toasts)
+                          draw_toasts, tr)
 
 import time
 import math
@@ -763,13 +763,13 @@ def _load_file(path):
                 logger.debug('voxel[%d] = %s', i, v)
         else:
             logger.debug('voxel list is EMPTY after load')
-        g_ui.push_toast(f"已加载: {Path(path).name}", "success")
+        g_ui.push_toast(tr(g_ui, "loaded_file", name=Path(path).name), "success")
         # _load_file try 块的成功分支末尾（诊断日志之前或之后都行）
         global _grid_sig_cache, _mirror_sig_cache
         _grid_sig_cache = None
         _mirror_sig_cache = None
     except Exception as e:
-        g_ui.push_toast(f"加载失败: {e}", "error", exc_info=sys.exc_info())
+        g_ui.push_toast(tr(g_ui, "load_failed", error=e), "error", exc_info=sys.exc_info())
 
 
 # ── GLFW callbacks ────────────────────────────
