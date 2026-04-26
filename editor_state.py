@@ -1422,6 +1422,10 @@ class EditorState:
     def _compute_stick_frame(self, particle_a, particle_b):
         """计算 stick 的局部坐标系。
 
+        注意：此函数仅在 record_voxel_bind_pose 构造 bind pose 时调用一次，
+        每帧蒙皮走 _rotate_basis 路径，不再调此函数。
+        因此 ref 选轴的不连续性不会影响动画播放。
+
         返回 (origin, R)：
             origin: np.ndarray shape (3,) —— stick 中点
             R: np.ndarray shape (3, 3) —— 列向量是 [u, v, w] 三个正交单位轴
@@ -1436,11 +1440,15 @@ class EditorState:
             return origin, np.eye(3, dtype=np.float32)
         u = diff / length
 
-        # 辅助参考：默认世界 Y，主轴接近 Y 时 fallback 到世界 X
-        if abs(float(u[1])) > 0.95:
-            ref = np.array([1.0, 0.0, 0.0], dtype=np.float32)
-        else:
-            ref = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+        # 辅助参考：选 u 分量绝对值最小的世界轴。
+        # 这样 cross(u, ref) 永远稳定且不会接近 0，避免阈值切换造成的不连续。
+        # 历史上用 |u_y|>0.95 阈值切 X/Y 会在 |u_y|≈0.95 附近抽搐——
+        # 触发条件：stick 主轴接近 Y 且变化幅度跨过阈值，例如非常规人形（伯劳）
+        # 头部前倾使 head-neck 主轴的 |u_y| 在 0.94~0.96 之间来回横跳。
+        abs_u = np.abs(u)
+        min_axis = int(np.argmin(abs_u))
+        ref = np.zeros(3, dtype=np.float32)
+        ref[min_axis] = 1.0
 
         v = np.cross(u, ref)
         v_len = float(np.linalg.norm(v))
@@ -1451,6 +1459,42 @@ class EditorState:
         w = np.cross(u, v)
         R = np.column_stack([u, v, w]).astype(np.float32)
         return origin, R
+
+    def _rotate_basis(self, R_bind, u_bind, u_now):
+        """把 R_bind 用 u_bind→u_now 的最短旋转转到 u_now 朝向。
+
+        用罗德里格旋转公式构造 R_delta，使 R_delta @ u_bind = u_now，
+        然后返回 R_delta @ R_bind。这样：
+            - 主轴 u 永远等于 u_now
+            - v、w 跟着 u 一起最短路径旋转，对 u 的连续变化连续
+
+        奇点：u_now ≈ -u_bind（反向 180°），cross 退化。
+        这种情况蒙皮无解，返回 R_bind（体素短暂"卡住"），合理动画里不会出现。
+        """
+        cos_t = float(np.dot(u_bind, u_now))
+        if cos_t > 0.99999:
+            # 几乎没旋转，避免数值噪声
+            return R_bind
+
+        axis = np.cross(u_bind, u_now)
+        axis_len = float(np.linalg.norm(axis))
+        if axis_len < 1e-9:
+            # cos_t < -0.99999 的反向 180° 退化情况
+            return R_bind
+
+        axis = axis / axis_len
+        sin_t = axis_len  # |u_bind|=|u_now|=1，|cross|=sin(theta)
+
+        # Rodrigues: R_delta = I + sin*K + (1-cos)*K^2
+        kx, ky, kz = float(axis[0]), float(axis[1]), float(axis[2])
+        K = np.array([
+            [0.0, -kz,  ky],
+            [kz,  0.0, -kx],
+            [-ky, kx,  0.0],
+        ], dtype=np.float32)
+        K2 = K @ K
+        R_delta = np.eye(3, dtype=np.float32) + sin_t * K + (1.0 - cos_t) * K2
+        return R_delta @ R_bind
 
     def record_voxel_bind_pose(self, particle_positions=None):
         """记录所有绑定 voxel 在其 stick 局部坐标系里的固定坐标。
@@ -1471,7 +1515,7 @@ class EditorState:
 
         id_to_p = {int(p["id"]): p for p in particles}
 
-        # 每根 stick 只算一次坐标系
+        # 每根 stick 只算一次坐标系；同时记录 u_bind 供 _rotate_basis 使用
         stick_frames = {}
         for vi, ci in self.bindings.items():
             if ci < 0 or ci >= len(self.sticks):
@@ -1481,7 +1525,13 @@ class EditorState:
                 pa = id_to_p.get(int(stick.particle_a_id))
                 pb = id_to_p.get(int(stick.particle_b_id))
                 if pa is not None and pb is not None:
-                    stick_frames[ci] = self._compute_stick_frame(pa, pb)
+                    a = np.array([pa["x"], pa["y"], pa["z"]], dtype=np.float32)
+                    b = np.array([pb["x"], pb["y"], pb["z"]], dtype=np.float32)
+                    diff = b - a
+                    L = float(np.linalg.norm(diff))
+                    u_bind = diff / L if L >= 1e-6 else np.array([1.0, 0.0, 0.0], dtype=np.float32)
+                    origin, R = self._compute_stick_frame(pa, pb)
+                    stick_frames[ci] = (origin, R, u_bind)
 
             frame = stick_frames.get(ci)
             if frame is None:
@@ -1489,12 +1539,12 @@ class EditorState:
             if vi < 0 or vi >= len(self.voxels):
                 continue
 
-            origin, R = frame
+            origin, R, _u_bind = frame
             v_world = np.array(self.voxels[vi][:3], dtype=np.float32)
             v_local = R.T @ (v_world - origin)
             self._voxel_local_offsets[vi] = v_local
 
-        # 预分组：ci -> (vis, locals_arr)，供 update 时向量化批量乘
+        # 预分组：ci -> (vis, locals_arr, u_bind, R_bind)，供 update 时向量化批量乘
         groups_temp = {}
         for vi, v_local in self._voxel_local_offsets.items():
             ci = self.bindings.get(vi, -1)
@@ -1505,7 +1555,8 @@ class EditorState:
         for ci, items in groups_temp.items():
             vis = [it[0] for it in items]
             locals_arr = np.stack([it[1] for it in items])  # (n, 3)
-            self._voxel_groups[ci] = (vis, locals_arr)
+            _origin, R_bind, u_bind = stick_frames[ci]
+            self._voxel_groups[ci] = (vis, locals_arr, u_bind, R_bind)
 
     def update_voxel_positions_from_skeleton(self):
         """根据当前 skeleton 重新计算所有绑定 voxel 的世界位置。
@@ -1518,7 +1569,7 @@ class EditorState:
 
         id_to_p = {int(p["id"]): p for p in self.particles}
 
-        for ci, (vis, locals_arr) in self._voxel_groups.items():
+        for ci, (vis, locals_arr, u_bind, R_bind) in self._voxel_groups.items():
             if ci >= len(self.sticks):
                 continue
             stick = self.sticks[ci]
@@ -1527,7 +1578,16 @@ class EditorState:
             if pa is None or pb is None:
                 continue
 
-            origin, R = self._compute_stick_frame(pa, pb)
+            a = np.array([pa['x'], pa['y'], pa['z']], dtype=np.float32)
+            b = np.array([pb['x'], pb['y'], pb['z']], dtype=np.float32)
+            diff = b - a
+            L = float(np.linalg.norm(diff))
+            if L < 1e-6:
+                R = R_bind
+            else:
+                u_now = diff / L
+                R = self._rotate_basis(R_bind, u_bind, u_now)
+            origin = (a + b) * 0.5
             # 批量计算：locals_arr (n,3) → worlds_arr (n,3)
             worlds_arr = locals_arr @ R.T + origin
 
