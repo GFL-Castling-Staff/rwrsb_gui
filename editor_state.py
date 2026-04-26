@@ -48,6 +48,11 @@ class StickEntry:
         return f"[{self.constraint_index}] {self.name}"
 
     def clone(self):
+        """克隆 StickEntry。注意：不拷贝 visible 字段。
+        visible 是 UI 状态（用户的可视偏好），undo/redo 不应把它回滚到旧值。
+        undo/redo 时 visible 通过 _snapshot 的 visible_by_pair 独立通道保留，
+        并在 _restore_snapshot 里按 (particle_a_id, particle_b_id) 配对写回。
+        """
         cloned = StickEntry(
             self.constraint_index,
             self.particle_a_id,
@@ -55,7 +60,6 @@ class StickEntry:
             self.name,
             tuple(self.color),
         )
-        # visible 是 UI 状态，不进克隆（undo 里靠 _snapshot visible_by_pair 机制保留）
         return cloned
 
 
@@ -78,6 +82,48 @@ def _rotation_matrix(axis, angle_rad):
 
 
 class EditorState:
+    """事实上的单例状态中心，被 main.py 和 main_animation.py 各自实例化为 g_editor。
+    持有所有可编辑数据和运行时状态，分组如下：
+
+    文件数据
+        voxels, particles, sticks, bindings — 三组核心数据（见 ARCHITECTURE.md §3）
+        source_path                          — 当前打开文件路径
+        trans_bias                           — MagicaVoxel→世界坐标偏移（127 人形 / 49 武器）
+
+    选择状态
+        selected_voxels                      — 选中体素 index 集合
+        selected_particles                   — 选中 particle index 集合
+        active_stick_idx                     — 面板高亮的骨段 index
+        active_particle_idx                  — 多选时最后点击加入的 particle index
+
+    工具模式
+        tool_mode                            — "brush"/"voxel_select"/"bone_edit"（见 ARCHITECTURE.md §4）
+
+    镜像模式
+        mirror_mode, mirror_axis, mirror_pair
+        mirror_plane_origin, mirror_plane_normal, mirror_edit_mode
+
+    undo / redo
+        _undo_stack, _redo_stack             — 快照列表（上限 64）
+        _dirty                               — XML 数据有未保存修改
+
+    动画模式
+        animation_mode, current_animation, current_frame_idx
+        playback_*, _anim_dirty
+        _anim_undo_stack, _anim_redo_stack, _anim_reference_lengths
+        _particle_positions_before_anim      — enter_animation_mode 时备份，exit 时恢复
+
+    baseline pose
+        _baseline_positions, _baseline_name, _baseline_locked_indices
+
+    骨架树缓存
+        _tree_parent, _tree_root_idx, _tree_dirty
+
+    渲染同步
+        gpu_dirty                            — GPU 缓冲区需重建
+        skeleton_dirty                       — 骨架线段需重传给 renderer
+        _voxel_local_offsets, _voxel_groups  — 蒙皮 bind pose 数据
+    """
     def __init__(self):
         self.voxels = []
         self.particles = []
@@ -150,6 +196,10 @@ class EditorState:
         return [stick.clone() for stick in self.sticks]
 
     def _snapshot(self):
+        """快照当前 EditorState 用于 undo/redo。
+        visible_by_pair 以 (particle_a_id, particle_b_id) 为 key 独立保留各 stick 的可视状态，
+        因为 visible 是 UI 状态，不应被 undo 回滚到旧值（详见 StickEntry.clone 和 _restore_snapshot）。
+        """
         return {
             "particles": copy.deepcopy(self.particles),
             "sticks": self._clone_sticks(),
@@ -163,6 +213,11 @@ class EditorState:
         }
 
     def _restore_snapshot(self, snapshot):
+        """从快照恢复 EditorState。
+        注意：stick.visible 不参与回滚，而是从 visible_by_pair 按
+        (particle_a_id, particle_b_id) 配对查回，没匹配到的 stick（如新增的）默认保持 True。
+        这是有意为之——undo/redo 不应重置用户的可视偏好（详见 StickEntry.clone 和 _snapshot）。
+        """
         self.particles = copy.deepcopy(snapshot["particles"])
         self.sticks = [stick.clone() for stick in snapshot["sticks"]]
         self.bindings = copy.deepcopy(snapshot["bindings"])
