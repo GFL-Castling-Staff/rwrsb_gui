@@ -1,5 +1,7 @@
 # 发版说明
 
+> [English](RELEASE_EN.md)
+
 这份文档用于说明如何把当前项目整理成 GitHub Release。
 
 ## 推荐发版流程

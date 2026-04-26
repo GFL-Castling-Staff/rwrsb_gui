@@ -1,5 +1,7 @@
 # RWRSB - rwrsb_bind + rwrsb_anim
 
+> [English](README_EN.md)
+
 `rwrsb_bind` 是一个面向 RWR 风格资源的体素骨架绑定编辑器。
 
 它可以直接读取 `.vox` 或项目 XML，编辑骨架结构与体素绑定关系，并导出回目标 XML 格式。当前版本的重点是”可实用地编辑和复用骨架”，而不只是给默认人骨重新绑点。

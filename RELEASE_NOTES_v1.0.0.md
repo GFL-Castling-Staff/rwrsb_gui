@@ -1,5 +1,7 @@
 # rwrsb_bind v1.0.0 发版说明
 
+> [English](RELEASE_NOTES_v1.0.0_EN.md)
+
 ## 重要变更：工具重命名
 
 `rwrsb_gui.exe` 已重命名为 **`rwrsb_bind.exe`**。
