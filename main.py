@@ -255,7 +255,12 @@ def _finish_box_select():
             g_ui.box_x0, g_ui.box_y0 - toolbar_h,
             g_ui.box_x1, g_ui.box_y1 - toolbar_h,
             vp_w, vp_h)
-        if ctrl:
+        alt = io.key_alt
+        if shift and alt:
+            # Shift+Alt: 减选
+            for i in indices:
+                g_editor.selected_particles.discard(int(i))
+        elif ctrl:
             # Ctrl: toggle
             for i in indices:
                 if i in g_editor.selected_particles:
@@ -266,12 +271,13 @@ def _finish_box_select():
             g_editor.selected_particles.update(indices)
         else:
             g_editor.replace_selected_particles(indices)
-        # active 更新为框选结果中的任一
+        # active 兜底：active 被减掉或不在集合中时重新选一个，空集则 -1
         if g_editor.selected_particles:
             if g_editor.active_particle_idx not in g_editor.selected_particles:
                 g_editor.set_active_particle(next(iter(g_editor.selected_particles)))
+        else:
+            g_editor.active_particle_idx = -1
     elif g_editor.tool_mode == 'voxel_select':
-        # 原 select 行为
         if g_positions_np is None or len(g_positions_np) == 0:
             return
         indices = box_select_voxels(
@@ -279,10 +285,29 @@ def _finish_box_select():
             g_ui.box_x0, g_ui.box_y0 - toolbar_h,
             g_ui.box_x1, g_ui.box_y1 - toolbar_h,
             vp_w, vp_h)
-        if not shift:
-            g_editor.selected_voxels.clear()
-        g_editor.selected_voxels.update(indices)
-        g_editor.gpu_dirty = True
+        alt = io.key_alt
+        if shift and alt:
+            # Shift+Alt: 减选
+            for i in indices:
+                g_editor.selected_voxels.discard(int(i))
+            g_editor.gpu_dirty = True
+        elif ctrl:
+            # Ctrl: toggle
+            for i in indices:
+                i = int(i)
+                if i in g_editor.selected_voxels:
+                    g_editor.selected_voxels.discard(i)
+                else:
+                    g_editor.selected_voxels.add(i)
+            g_editor.gpu_dirty = True
+        elif shift:
+            # Shift: 加选
+            g_editor.selected_voxels.update(int(i) for i in indices)
+            g_editor.gpu_dirty = True
+        else:
+            # 替换
+            g_editor.selected_voxels = {int(i) for i in indices}
+            g_editor.gpu_dirty = True
 
 
 def _ray_plane_intersection(origin, direction, plane_point, plane_normal):
@@ -617,18 +642,12 @@ def _update_grid():
             _grid_sig_cache = "OFF"
         return
 
-    # 算签名：包括所有会影响 upload_grid 输出的输入
-    active_pos = None
-    if 0 <= g_editor.active_particle_idx < len(g_editor.particles):
-        p = g_editor.particles[g_editor.active_particle_idx]
-        active_pos = (round(p['x'], 3), round(p['y'], 3), round(p['z'], 3))
-
+    # 签名：去掉 active_particle_idx / active_pos（网格中心不再跟随粒子）
     sig = (
         bool(g_ui.show_grid_xz), bool(g_ui.show_grid_xy), bool(g_ui.show_grid_yz),
         int(g_ui.grid_mode), int(g_ui.grid_multiple),
         bool(g_ui.snap_particles_to_grid),
         len(g_editor.voxels), len(g_editor.particles),
-        int(g_editor.active_particle_idx), active_pos,
         round(float(g_camera.ortho_size), 3),
         round(float(g_camera.distance), 3),
     )
@@ -636,29 +655,23 @@ def _update_grid():
         return
     _grid_sig_cache = sig
 
-    # —— 以下是原有的实际计算逻辑，保持不变 ——
+    # 网格中心固定在世界原点，与动画模式保持一致
+    center = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+
+    # extent 取"覆盖原点到最远点的距离"和相机 extent 的较大者
+    # 用 max(|arr|) 而非 AABB 对角，因为 center 固定为原点而非模型中心
     points = []
     points.extend([(v[0], v[1], v[2]) for v in g_editor.voxels])
     points.extend([(p['x'], p['y'], p['z']) for p in g_editor.particles])
     if points:
         arr = np.array(points, dtype=np.float32)
-        mins = arr.min(axis=0)
-        maxs = arr.max(axis=0)
-        center = (mins + maxs) * 0.5
-        model_extent = max(float(np.max(maxs - mins)) * 0.75, 8.0)
+        model_extent = max(float(np.max(np.abs(arr))) * 1.2, 8.0)
     else:
-        center = np.array([0.0, 0.0, 0.0], dtype=np.float32)
         model_extent = 16.0
-
-    if 0 <= g_editor.active_particle_idx < len(g_editor.particles):
-        active = g_editor.particles[g_editor.active_particle_idx]
-        center = np.array([active['x'], active['y'], active['z']], dtype=np.float32)
 
     camera_extent = max(float(g_camera.ortho_size) * 1.2, float(g_camera.distance) * 0.35, 8.0)
     extent = max(model_extent, camera_extent)
     step = grid_step_value()
-    if g_ui.snap_particles_to_grid:
-        center = np.round(center / step) * step
     major_every = 2 if step == 0.5 else 4
     g_renderer.upload_grid(
         center, extent, step, major_every,
@@ -826,7 +839,16 @@ def on_mouse_button(window, button, action, mods):
                             )
                     return
                 if hit_particle >= 0:
-                    if shift:
+                    alt = bool(mods & glfw.MOD_ALT)
+                    if shift and alt:
+                        # Shift+Alt+点击: 从选集中减去
+                        g_editor.selected_particles.discard(hit_particle)
+                        if g_editor.active_particle_idx == hit_particle:
+                            if g_editor.selected_particles:
+                                g_editor.set_active_particle(next(iter(g_editor.selected_particles)))
+                            else:
+                                g_editor.active_particle_idx = -1
+                    elif shift:
                         # Shift+点击：追加到选中，设为 active
                         g_editor.add_selected_particle(hit_particle)
                         g_editor.set_active_particle(hit_particle)
