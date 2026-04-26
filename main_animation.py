@@ -451,8 +451,8 @@ def _end_particle_drag():
     g_drag_origins = {}
 
 
-def _finish_particle_box_select(shift, ctrl):
-    """框选结束：把框内粒子加入 / toggle / 替换选择集（anim 工具专用）。"""
+def _finish_particle_box_select(shift, ctrl, alt=False):
+    """框选结束：把框内粒子加入 / toggle / 减选 / 替换选择集（anim 工具专用）。"""
     if g_editor.mirror_mode:
         return
     if g_positions_np is None or len(g_positions_np) == 0:
@@ -468,7 +468,11 @@ def _finish_particle_box_select(shift, ctrl):
         g_ui.box_x0, g_ui.box_y0 - toolbar_h,
         g_ui.box_x1, g_ui.box_y1 - toolbar_h,
         vp_w, vp_h)
-    if ctrl:
+    if shift and alt:
+        # Shift+Alt: 减选
+        for i in indices:
+            g_editor.selected_particles.discard(int(i))
+    elif ctrl:
         for i in indices:
             if i in g_editor.selected_particles:
                 g_editor.selected_particles.discard(i)
@@ -478,9 +482,12 @@ def _finish_particle_box_select(shift, ctrl):
         g_editor.selected_particles.update(indices)
     else:
         g_editor.replace_selected_particles(indices)
+    # active 兜底：被减掉或不在集合时重新选一个，空集则 -1
     if g_editor.selected_particles:
         if g_editor.active_particle_idx not in g_editor.selected_particles:
             g_editor.set_active_particle(next(iter(g_editor.selected_particles)))
+    else:
+        g_editor.active_particle_idx = -1
 
 
 # ── GLFW callbacks ────────────────────────────
@@ -513,9 +520,18 @@ def on_mouse_button(window, button, action, mods):
         if pressed:
             shift = bool(mods & glfw.MOD_SHIFT)
             ctrl = bool(mods & glfw.MOD_CONTROL)
+            alt = bool(mods & glfw.MOD_ALT)
             hit = _pick_particle(g_mouse_x, g_mouse_y)
             if hit >= 0:
-                if shift:
+                if shift and alt:
+                    # Shift+Alt+点击: 从选集中减去
+                    g_editor.selected_particles.discard(hit)
+                    if g_editor.active_particle_idx == hit:
+                        if g_editor.selected_particles:
+                            g_editor.set_active_particle(next(iter(g_editor.selected_particles)))
+                        else:
+                            g_editor.active_particle_idx = -1
+                elif shift:
                     g_editor.add_selected_particle(hit)
                     g_editor.set_active_particle(hit)
                 elif ctrl:
@@ -546,7 +562,8 @@ def on_mouse_button(window, button, action, mods):
             if g_ui.box_selecting:
                 g_ui.box_selecting = False
                 _finish_particle_box_select(bool(mods & glfw.MOD_SHIFT),
-                                            bool(mods & glfw.MOD_CONTROL))
+                                            bool(mods & glfw.MOD_CONTROL),
+                                            bool(mods & glfw.MOD_ALT))
 
     g_camera.on_mouse_button(button, action, mods, g_mouse_x, g_mouse_y)
 

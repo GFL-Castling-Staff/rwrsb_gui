@@ -113,6 +113,7 @@ _TEXT = {
         "invert_y": "Invert Y axis",
         "tip_drag": "Tip: drag orange particle points in the viewport.",
         "tip_axis": "Shift=X  Ctrl=Y  Alt=Z",
+        "tip_select_modifiers": "Select: Shift=add, Ctrl=toggle, Shift+Alt=subtract",
         "status": "  {src}  |  {total} voxels  |  {sticks} sticks  |  bound {bound}  |  {mode}{dirty}",
         "mode_brush": "Brush",
         "mode_voxel_select": "Voxels",
@@ -376,6 +377,7 @@ _TEXT = {
         "invert_y": "反转 Y 轴",
         "tip_drag": "提示: 可在视口中拖动橙色粒子点。",
         "tip_axis": "Shift=X  Ctrl=Y  Alt=Z",
+        "tip_select_modifiers": "选取: Shift=加选, Ctrl=toggle, Shift+Alt=减选",
         "status": "  {src}  |  {total} 个体素  |  {sticks} 条骨段  |  已绑定 {bound}  |  {mode}{dirty}",
         "mode_brush": "涂刷",
         "mode_voxel_select": "选体素",
@@ -919,7 +921,16 @@ def _draw_stick_list(ui_state, editor_state):
             label = label[:17] + "~"
         if imgui.button(label + "##b", width=118 * ui_state.ui_scale):
             editor_state.active_stick_idx = idx
-            editor_state.select_stick_voxels(idx)
+            _io = imgui.get_io()
+            if _io.key_shift and _io.key_alt:
+                _sel_mode = "subtract"
+            elif _io.key_ctrl:
+                _sel_mode = "toggle"
+            elif _io.key_shift:
+                _sel_mode = "add"
+            else:
+                _sel_mode = "replace"
+            editor_state.select_stick_voxels(idx, mode=_sel_mode)
         if is_active:
             imgui.pop_style_color()
 
@@ -1346,6 +1357,7 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
     imgui.separator()
     imgui.text_disabled(tr(ui_state, "tip_drag"))
     imgui.text_disabled(tr(ui_state, "tip_axis"))
+    imgui.text_disabled(tr(ui_state, "tip_select_modifiers"))
 
     imgui.end()
 
