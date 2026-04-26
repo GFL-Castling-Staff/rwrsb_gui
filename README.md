@@ -305,3 +305,7 @@ dist/
 - 最终运行效果仍然建议在本机 OpenGL 环境里实际验证
 - 当前 XML 兼容性是面向本项目格式，不是任意通用 schema
 - 当前发布包是目录版，不是单文件版 exe
+
+## License
+
+本项目采用 MIT License，详见 [LICENSE](LICENSE) 文件。
