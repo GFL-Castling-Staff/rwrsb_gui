@@ -567,6 +567,48 @@ _TEXT = {
 
 
 class UIState:
+    """UI 层运行时状态，和 EditorState 平行存在，持有与业务数据无关的界面状态。
+    由各入口的 main 函数创建为 g_ui，生命周期与进程相同。
+
+    对话框可见性
+        show_load_dialog, show_save_dialog, show_preset_dialog, show_exit_dialog
+
+    文件路径缓冲
+        load_path_buf, save_path_buf  — 对话框输入框内容
+        load_mode                      — "vox" 或 "xml"
+
+    框选状态
+        box_selecting, box_x0/y0/x1/y1 — 拖动框选的屏幕坐标
+
+    编辑权限开关（是否允许修改数据，与 tool_mode 正交）
+        allow_skeleton_edit, allow_stick_edit, allow_particle_edit
+
+    网格 / 视图 / 用户偏好
+        show_grid, show_grid_xz/xy/yz, snap_particles_to_grid
+        grid_mode, grid_multiple, show_mirror_grid, snap_to_mirror_grid
+        show_skeleton_lines, show_origin_gizmo, show_voxels, show_voxel_original_colors
+        language, ui_scale, invert_y_axis, trans_bias
+
+    错误消息（面板红字，同时也走 push_toast）
+        _load_error, _save_error, _bone_error
+
+    Toast 通知系统
+        toasts, _toast_last_update — 见 push_toast 方法
+
+    应用模式
+        app_mode  — "skeleton"（rwrsb_bind.exe）或 "animation"（rwrsb_anim.exe），
+                    由各入口 main 函数显式设置
+
+    动画工具临时 UI 状态
+        _anim_picker_*      — 动画选择器（文件/过滤/高亮）
+        _anim_dirty_pending — dirty confirm 流程的回调暂存
+        _anim_drag_frame_*  — 时间线帧拖动状态
+        _anim_check_lengths, _anim_length_threshold_pct — 骨段长度检查开关
+        _invalid_binding_*  — 非法 binding 对话框状态
+        rotate_pivot_mode, rotate_angle_* — 旋转 popup 暂存值
+        anim_drag_mode, move_clamp_max/min — 拖动模式与长度约束设置
+        vanilla_animations_path — vanilla 动画文件路径（不持久化）
+    """
     def __init__(self):
         self.show_load_dialog = False
         self.show_save_dialog = False

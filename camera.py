@@ -14,6 +14,13 @@ import numpy as np
 
 
 class OrbitCamera:
+    """轨道相机，支持透视/正交投影切换和四视图快速切换。
+
+    输入约定：右键拖动旋转，中键拖动平移，滚轮缩放。
+    is_ortho=True 时切换为正交投影，get_ray 返回平行射线（方向恒为相机 forward）。
+    set_view_preset 二次点击同一按钮会翻到反面视角（前↔后、侧↔反侧、顶↔底）；
+    任何右键/中键/滚轮操作后重置翻面计数器，下次点击从正面开始。
+    """
     def __init__(self, width, height):
         self.width = width
         self.height = height
