@@ -1,0 +1,6 @@
+截图占位文件
+
+请在本机运行 rwrsb_bind.exe 或 python main.py，截取编辑器主界面截图，
+保存为 docs/screenshot.png，然后删除本文件。
+
+README.md 顶部的图片引用路径为 docs/screenshot.png。

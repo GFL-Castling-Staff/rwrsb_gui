@@ -2,7 +2,9 @@
 
 这是一个面向 RWR 风格资源的体素骨架绑定编辑器。
 
-它可以直接读取 `.vox` 或项目 XML，编辑骨架结构与体素绑定关系，并导出回目标 XML 格式。当前版本的重点是“可实用地编辑和复用骨架”，而不只是给默认人骨重新绑点。
+它可以直接读取 `.vox` 或项目 XML，编辑骨架结构与体素绑定关系，并导出回目标 XML 格式。当前版本的重点是”可实用地编辑和复用骨架”，而不只是给默认人骨重新绑点。
+
+![rwrsb_bind screenshot](docs/screenshot.png)
 
 ## 功能概览
 
@@ -121,7 +123,7 @@ build.bat
 2. 激活虚拟环境
 3. 如果还没安装 `PyInstaller`，自动安装
 4. 删除旧的 `build/` 和 `dist/`
-5. 按 [rwrsb_gui.spec](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/rwrsb_gui.spec) 重新打包
+5. 按 [rwrsb_gui.spec](rwrsb_gui.spec) 重新打包
 
 打包成功后，输出位置是：
 
@@ -259,10 +261,10 @@ XML 工作流主要围绕三块数据：
 
 如果后续要继续扩展这个项目，建议先读：
 
-- [main.py](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/main.py)
-- [editor_state.py](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/editor_state.py)
-- [xml_io.py](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/xml_io.py)
-- [ui_panels.py](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/ui_panels.py)
+- [main.py](main.py)
+- [editor_state.py](editor_state.py)
+- [xml_io.py](xml_io.py)
+- [ui_panels.py](ui_panels.py)
 
 建议遵守的边界：
 
@@ -296,9 +298,9 @@ dist/
 
 ## 发布
 
-发版流程见 [RELEASE.md](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/RELEASE.md)。
+发版流程见 [RELEASE.md](RELEASE.md)。
 
-本次版本说明稿见 [RELEASE_NOTES_v0.1.0.md](D:/IMP/RWR/模型相关/【rwrsb_gui_v2】/rwrsb_gui_v2.2/rwrsb_gui/RELEASE_NOTES_v0.1.0.md)。
+本次版本说明稿见 [RELEASE_NOTES_v0.1.0.md](RELEASE_NOTES_v0.1.0.md)。
 
 ## 已知限制
 
