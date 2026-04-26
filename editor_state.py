@@ -199,8 +199,10 @@ class EditorState:
         self._dirty = True
         self.gpu_dirty = True
         self.skeleton_dirty = True
-        # 蒙皮：骨架变形时同步更新 voxel 世界位置（gpu_dirty 已经在上面设好）
-        self.update_voxel_positions_from_skeleton()
+        # 蒙皮：仅动画模式下骨架变形时同步更新 voxel 世界位置
+        # 绑骨模式下 voxel 是体模型本身，拖粒子只是在挪标注，不应触发蒙皮
+        if self.animation_mode:
+            self.update_voxel_positions_from_skeleton()
 
     def _normalize_stick_indices(self):
         for ci, stick in enumerate(self.sticks):
@@ -855,10 +857,28 @@ class EditorState:
         self.gpu_dirty = False
         return positions, colors, selected
 
-    def select_stick_voxels(self, stick_idx):
+    def select_stick_voxels(self, stick_idx, mode="replace"):
+        """选中绑到指定骨段的所有体素。
+
+        mode:
+          - "replace": 替换当前 selected_voxels（默认，向后兼容）
+          - "add": 并入 selected_voxels
+          - "toggle": 在集合里则移除，不在则加入
+          - "subtract": 从 selected_voxels 里减去
+        """
         if stick_idx < 0 or stick_idx >= len(self.sticks):
             return
-        self.selected_voxels = {vi for vi, ci in self.bindings.items() if ci == stick_idx}
+        target = {vi for vi, ci in self.bindings.items() if ci == stick_idx}
+        if mode == "replace":
+            self.selected_voxels = target
+        elif mode == "add":
+            self.selected_voxels |= target
+        elif mode == "toggle":
+            self.selected_voxels ^= target
+        elif mode == "subtract":
+            self.selected_voxels -= target
+        else:
+            return  # 未知 mode 不动
         self.gpu_dirty = True
 
     def clear_selection(self):
@@ -996,6 +1016,9 @@ class EditorState:
                     self.particles[i]['x'] = x
                     self.particles[i]['y'] = y
                     self.particles[i]['z'] = z
+        # 把 voxel 归位到 bind pose（此时 particles 已恢复到 bind pose 位置）
+        self.update_voxel_positions_from_skeleton()
+        self.gpu_dirty = True
 
         self.animation_mode = False
         self.current_animation = None
