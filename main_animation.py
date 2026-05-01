@@ -860,9 +860,11 @@ def main():
                     if (g_editor.animation_mode and g_editor._voxel_groups
                             and g_renderer.n_voxels == _n
                             and not _color_mode_changed):
-                        # 快速路径：VBO 已建好、体素数一致、颜色模式未变，仅更新位置
+                        # 快速路径：VBO 已建好、体素数一致、颜色模式未变，仅更新位置 + 朝向
                         arr = np.array(g_editor.voxels, dtype=np.float32)
                         g_renderer.update_voxel_positions(arr[:, :3])
+                        if g_editor._voxel_orientations is not None:
+                            g_renderer.update_voxel_orientations(g_editor._voxel_orientations)
                         g_editor.gpu_dirty = False
                     else:
                         # 全量上传：首次加载、体素数变化或颜色模式切换

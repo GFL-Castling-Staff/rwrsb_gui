@@ -1673,6 +1673,7 @@ class EditorState:
         if not self._voxel_groups or not self.voxels:
             return
 
+        self._ensure_voxel_orientations()
         id_to_p = {int(p["id"]): p for p in self.particles}
 
         for ci, (vis, locals_arr, u_bind, R_bind) in self._voxel_groups.items():
@@ -1700,6 +1701,14 @@ class EditorState:
                 origin = (a + b) * 0.5
             # 批量计算：locals_arr (n,3) → worlds_arr (n,3)
             worlds_arr = locals_arr @ R.T + origin
+
+            # 体素自身朝向：R_cube = R_now @ R_bind.T，bind 时 cube axis-aligned，
+            # 当前帧把每个 cube 旋转到与骨段当前姿态一致。
+            # 列优先展平 (Fortran order) → [col0, col1, col2] 依次。
+            R_cube_flat = (R @ R_bind.T).flatten('F').astype(np.float32)
+            valid_vis = [vi for vi in vis if 0 <= vi < len(self.voxels)]
+            if valid_vis:
+                self._voxel_orientations[valid_vis] = R_cube_flat
 
             for k, vi in enumerate(vis):
                 if vi < len(self.voxels):
