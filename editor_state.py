@@ -185,6 +185,10 @@ class EditorState:
         self._voxel_groups = {}
         # 胯部横骨（righthip <-> lefthip）没有足够信息决定 roll。
         # 普通骨骼继续使用 bind rotation tracking；胯部横骨用 midspine 提供 roll 参考。
+        # Oriented voxel rendering（D）：每个 voxel 自身朝向矩阵
+        # shape (N_voxels, 9) float32，每行是 mat3 列优先展平 [col0, col1, col2]
+        # 绑骨模式 + 静止 pose：identity；动画蒙皮时 = R_now @ R_bind.T
+        self._voxel_orientations: np.ndarray | None = None
 
         # 骨架树（P3）
         self._tree_parent: dict = {}       # particle idx -> parent idx；root 的 parent 是 None
@@ -893,6 +897,18 @@ class EditorState:
             return (r * 0.5, g * 0.5, b * 0.5)
         return stick.color
 
+    def _ensure_voxel_orientations(self):
+        """确保 _voxel_orientations 大小匹配 voxels 总数；不存在或 size 不对则重置为 identity。"""
+        n = len(self.voxels)
+        if (self._voxel_orientations is None
+                or self._voxel_orientations.shape != (n, 9)):
+            arr = np.zeros((n, 9), dtype=np.float32)
+            # identity 列优先展平：[1,0,0, 0,1,0, 0,0,1]
+            arr[:, 0] = 1.0
+            arr[:, 4] = 1.0
+            arr[:, 8] = 1.0
+            self._voxel_orientations = arr
+
     def build_instance_arrays(self, use_original_color=False):
         n = len(self.voxels)
         positions = np.zeros((n, 3), dtype=np.float32)
@@ -911,8 +927,10 @@ class EditorState:
                 colors[i] = (cr, cg, cb, 1.0)
                 selected[i] = 1.0 if i in self.selected_voxels else 0.0
 
+        self._ensure_voxel_orientations()
+        orientations = self._voxel_orientations
         self.gpu_dirty = False
-        return positions, colors, selected
+        return positions, colors, selected, orientations
 
     def select_stick_voxels(self, stick_idx, mode="replace"):
         """选中绑到指定骨段的所有体素。

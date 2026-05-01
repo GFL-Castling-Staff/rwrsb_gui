@@ -1101,8 +1101,8 @@ def main():
 
             # update GPU buffers when dirty
             if g_editor.gpu_dirty and g_editor.voxels:
-                positions, colors, selected = g_editor.build_instance_arrays()
-                g_renderer.upload_voxels(positions, colors, selected)
+                positions, colors, selected, orientations = g_editor.build_instance_arrays()
+                g_renderer.upload_voxels(positions, colors, selected, orientations)
                 rebuild_positions_cache()
                 if not g_first_upload_logged:
                     logger.debug('uploaded %d instances to GPU (renderer.n_voxels=%d)',

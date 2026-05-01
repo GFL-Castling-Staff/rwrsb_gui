@@ -65,6 +65,7 @@ class VoxelRenderer:
         self.inst_pos_vbo = None
         self.inst_color_vbo = None
         self.inst_sel_vbo = None
+        self.inst_orient_vbo = None
         self.vao = None
         self.n_voxels = 0
 
@@ -106,7 +107,7 @@ class VoxelRenderer:
         self.n_origin_vertices = 0
         self.show_origin_gizmo = False
 
-    def upload_voxels(self, positions, colors, selected):
+    def upload_voxels(self, positions, colors, selected, orientations):
         n = len(positions)
         self.n_voxels = n
         if n == 0:
@@ -115,6 +116,7 @@ class VoxelRenderer:
         pos_bytes = positions.astype(np.float32).tobytes()
         col_bytes = colors.astype(np.float32).tobytes()
         sel_bytes = selected.astype(np.float32).tobytes()
+        ori_bytes = orientations.astype(np.float32).tobytes()
 
         if self.inst_pos_vbo is None or self.inst_pos_vbo.size != len(pos_bytes):
             if self.inst_pos_vbo:
@@ -123,14 +125,18 @@ class VoxelRenderer:
                 self.inst_color_vbo.release()
             if self.inst_sel_vbo:
                 self.inst_sel_vbo.release()
+            if self.inst_orient_vbo:
+                self.inst_orient_vbo.release()
             self.inst_pos_vbo = self.ctx.buffer(pos_bytes, dynamic=True)
             self.inst_color_vbo = self.ctx.buffer(col_bytes, dynamic=True)
             self.inst_sel_vbo = self.ctx.buffer(sel_bytes, dynamic=True)
+            self.inst_orient_vbo = self.ctx.buffer(ori_bytes, dynamic=True)
             self._rebuild_vao()
         else:
             self.inst_pos_vbo.write(pos_bytes)
             self.inst_color_vbo.write(col_bytes)
             self.inst_sel_vbo.write(sel_bytes)
+            self.inst_orient_vbo.write(ori_bytes)
 
     def _rebuild_vao(self):
         if self.vao:
@@ -142,6 +148,9 @@ class VoxelRenderer:
                 (self.inst_pos_vbo, "3f/i", "i_pos"),
                 (self.inst_color_vbo, "4f/i", "i_color"),
                 (self.inst_sel_vbo, "1f/i", "i_selected"),
+                # 9 floats = mat3 列优先，拆成 3 个 vec3 attribute 绑定
+                (self.inst_orient_vbo, "3f 3f 3f/i",
+                 "i_orient_x", "i_orient_y", "i_orient_z"),
             ],
         )
 
@@ -156,6 +165,12 @@ class VoxelRenderer:
         if self.inst_pos_vbo is None or len(positions) != self.n_voxels:
             return
         self.inst_pos_vbo.write(positions.astype(np.float32).tobytes())
+
+    def update_voxel_orientations(self, orientations):
+        """仅更新朝向 VBO。动画蒙皮专用快速路径。"""
+        if self.inst_orient_vbo is None or len(orientations) != self.n_voxels:
+            return
+        self.inst_orient_vbo.write(orientations.astype(np.float32).tobytes())
 
     def upload_skeleton_lines(self, particles, sticks):
         self.stick_segments = []

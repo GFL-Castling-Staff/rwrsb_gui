@@ -866,9 +866,9 @@ def main():
                         g_editor.gpu_dirty = False
                     else:
                         # 全量上传：首次加载、体素数变化或颜色模式切换
-                        positions, colors, selected = g_editor.build_instance_arrays(
+                        positions, colors, selected, orientations = g_editor.build_instance_arrays(
                             use_original_color=_color_mode)
-                        g_renderer.upload_voxels(positions, colors, selected)
+                        g_renderer.upload_voxels(positions, colors, selected, orientations)
 
             # grid 上传（签名缓存，避免每帧重传）
             # 网格中心固定在世界原点 (0,0,0)，不跟随粒子
