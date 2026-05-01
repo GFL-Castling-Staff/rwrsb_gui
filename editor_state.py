@@ -183,8 +183,9 @@ class EditorState:
         # 预分组：ci -> (vis: list[int], locals_arr: np.ndarray (n,3))
         # record_voxel_bind_pose 时填充，update_voxel_positions_from_skeleton 时使用
         self._voxel_groups = {}
-        # 胯部横骨（righthip <-> lefthip）没有足够信息决定 roll。
-        # 普通骨骼继续使用 bind rotation tracking；胯部横骨用 midspine 提供 roll 参考。
+        # 身体横骨（胯部 righthip<->lefthip、肩部 rightshoulder<->leftshoulder）
+        # 没有足够信息决定 roll。普通骨骼继续使用 bind rotation tracking；
+        # 身体横骨用 midspine 作为 roll 参考构造局部坐标系。
         # Oriented voxel rendering（D）：per-bone 朝向矩阵
         # _bone_orientations: shape (MAX_BONE_SLOTS, 16) float32, mat4 列优先展平
         #   - 槽 0：identity 哨位（未绑定体素指向这里）
@@ -1534,10 +1535,17 @@ class EditorState:
         w = w / w_len
         return np.column_stack([u, v, w]).astype(np.float32)
 
-    def _is_hip_bridge_stick(self, stick, id_to_p):
-        """判断是否为默认人骨的 righthip <-> lefthip 胯部横骨。"""
+    # 默认人骨身体横骨的 id 对：(髋部, 肩部)。name 兜底覆盖非 vanilla id 的预设。
+    _BODY_BRIDGE_ID_PAIRS = ({10, 20}, {15, 25})
+    _BODY_BRIDGE_NAME_PAIRS = (
+        {"righthip", "lefthip"},
+        {"rightshoulder", "leftshoulder"},
+    )
+
+    def _is_body_bridge_stick(self, stick, id_to_p):
+        """判断是否为默认人骨的身体横骨（胯部或肩部）。"""
         ids = {int(stick.particle_a_id), int(stick.particle_b_id)}
-        if ids == {10, 20}:
+        if ids in self._BODY_BRIDGE_ID_PAIRS:
             return True
         pa = id_to_p.get(int(stick.particle_a_id), {})
         pb = id_to_p.get(int(stick.particle_b_id), {})
@@ -1545,7 +1553,7 @@ class EditorState:
             str(pa.get("name", "")).lower(),
             str(pb.get("name", "")).lower(),
         }
-        return names == {"righthip", "lefthip"}
+        return names in self._BODY_BRIDGE_NAME_PAIRS
 
     def _find_midspine_particle(self, id_to_p):
         """查找 midspine particle；默认人骨 id=1，找不到再按 name 兜底。"""
@@ -1557,13 +1565,14 @@ class EditorState:
                 return particle
         return None
 
-    def _compute_hip_bridge_frame(self, stick, id_to_p):
-        """用 righthip/lefthip/midspine 三点构造胯部横骨局部坐标系。
+    def _compute_body_bridge_frame(self, stick, id_to_p):
+        """用身体横骨两端 + midspine 三点构造局部坐标系（胯部 / 肩部通用）。
 
-        stick 主轴仍按 XML 中 a->b 的方向作为 u；midspine 相对髋部中心的方向
+        stick 主轴仍按 XML 中 a->b 的方向作为 u；midspine 相对横骨中心的方向
         投影到垂直于 u 的平面作为 v，从而给这根横骨一个身体姿态相关的 roll。
+        bind 时和 now 时用同一种构基方案，自洽。
         """
-        if not self._is_hip_bridge_stick(stick, id_to_p):
+        if not self._is_body_bridge_stick(stick, id_to_p):
             return None
         pa = id_to_p.get(int(stick.particle_a_id))
         pb = id_to_p.get(int(stick.particle_b_id))
@@ -1648,9 +1657,9 @@ class EditorState:
                 pa = id_to_p.get(int(stick.particle_a_id))
                 pb = id_to_p.get(int(stick.particle_b_id))
                 if pa is not None and pb is not None:
-                    hip_frame = self._compute_hip_bridge_frame(stick, id_to_p)
-                    if hip_frame is not None:
-                        origin, R, u_bind = hip_frame
+                    body_frame = self._compute_body_bridge_frame(stick, id_to_p)
+                    if body_frame is not None:
+                        origin, R, u_bind = body_frame
                     else:
                         a = np.array([pa["x"], pa["y"], pa["z"]], dtype=np.float32)
                         b = np.array([pb["x"], pb["y"], pb["z"]], dtype=np.float32)
@@ -1710,15 +1719,15 @@ class EditorState:
             b = np.array([pb['x'], pb['y'], pb['z']], dtype=np.float32)
             diff = b - a
             L = float(np.linalg.norm(diff))
-            hip_frame = self._compute_hip_bridge_frame(stick, id_to_p)
-            if hip_frame is not None:
-                origin, R, _u_now = hip_frame
+            body_frame = self._compute_body_bridge_frame(stick, id_to_p)
+            if body_frame is not None:
+                origin, R, _u_now = body_frame
             elif L < 1e-6:
                 R = R_bind
             else:
                 u_now = diff / L
                 R = self._rotate_basis(R_bind, u_bind, u_now)
-            if hip_frame is None:
+            if body_frame is None:
                 origin = (a + b) * 0.5
             # 批量计算：locals_arr (n,3) → worlds_arr (n,3)
             worlds_arr = locals_arr @ R.T + origin
