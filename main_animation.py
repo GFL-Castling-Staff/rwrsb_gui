@@ -311,6 +311,10 @@ def _update_rotate_drag(window, mx):
             g_editor.particles[idx]["y"] = float(p_new[1])
             g_editor.particles[idx]["z"] = float(p_new[2])
     g_editor.skeleton_dirty = True
+    # 实时蒙皮：让体素跟着骨架一起旋转，避免"等到播放才看到效果"
+    if g_editor.animation_mode:
+        g_editor.update_voxel_positions_from_skeleton()
+        g_editor.gpu_dirty = True
 
 
 def _end_rotate_drag():
@@ -430,6 +434,10 @@ def _update_particle_drag(window, mx, my):
             g_editor.particles[idx]["y"] = float(target[1])
             g_editor.particles[idx]["z"] = float(target[2])
     g_editor.skeleton_dirty = True
+    # 实时蒙皮：让体素跟着骨架一起变形，避免"等到播放才看到效果"
+    if g_editor.animation_mode:
+        g_editor.update_voxel_positions_from_skeleton()
+        g_editor.gpu_dirty = True
 
 
 def _end_particle_drag():
