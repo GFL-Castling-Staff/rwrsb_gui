@@ -30,6 +30,41 @@ _MIRROR_ARROW_COLOR = (0.35, 1.0, 0.70)
 _MIRROR_HANDLE_SIZE = 14.0
 _MIRROR_ARROW_SIZE = 18.0
 
+# 选区 gizmo（Blender 风格 3 轴箭头 + 3 圆环 + 中心球）
+_GIZMO_AXIS_COLORS = {
+    "x": (1.00, 0.30, 0.35, 1.0),   # 红
+    "y": (0.30, 0.95, 0.35, 1.0),   # 绿
+    "z": (0.30, 0.55, 1.00, 1.0),   # 蓝
+}
+_GIZMO_HOVER_COLOR = (1.0, 0.95, 0.25, 1.0)   # 黄
+_GIZMO_CENTER_COLOR = (0.85, 0.85, 0.85, 1.0)
+_GIZMO_HIT_THRESHOLD_PX = 10.0
+_GIZMO_CENTER_HIT_PX = 8.0
+
+
+def _point_to_segment_dist_2d(px, py, ax, ay, bx, by):
+    abx, aby = bx - ax, by - ay
+    apx, apy = px - ax, py - ay
+    ab_len2 = abx * abx + aby * aby
+    if ab_len2 < 1e-9:
+        return float(np.hypot(px - ax, py - ay))
+    t = max(0.0, min(1.0, (apx * abx + apy * aby) / ab_len2))
+    cx = ax + t * abx
+    cy = ay + t * aby
+    return float(np.hypot(px - cx, py - cy))
+
+
+def _project_world_to_screen(world_pt, mvp, screen_w, screen_h):
+    """世界点 → 屏幕坐标（top-left origin），返回 (sx, sy) 或 None。"""
+    p = np.array([world_pt[0], world_pt[1], world_pt[2], 1.0], dtype=np.float32)
+    clip = mvp @ p
+    if abs(clip[3]) < 1e-6:
+        return None
+    ndc = clip[:3] / clip[3]
+    sx = (ndc[0] + 1.0) * 0.5 * screen_w
+    sy = (1.0 - ndc[1]) * 0.5 * screen_h
+    return (float(sx), float(sy))
+
 
 def _make_cube_vbo():
     faces = [
@@ -106,6 +141,16 @@ class VoxelRenderer:
         self.origin_vao = None
         self.n_origin_vertices = 0
         self.show_origin_gizmo = False
+
+        # 选区 gizmo（动画工具，bone_edit + 选中粒子时显示）
+        self.gizmo_vbo = None
+        self.gizmo_vao = None
+        self.gizmo_n_vertices = 0
+        # hit test 缓存：prepare 时填，pick 时读
+        self.gizmo_pivot = None                # np.ndarray(3,) 或 None
+        self.gizmo_handle_endpoints = {}       # {handle_name: (start_w, end_w)}
+        self.gizmo_ring_data = {}              # {handle_name: (center_w, axis_letter, radius_w)}
+        self.gizmo_arrow_world_length = 0.0
 
     def upload_voxels(self, positions, colors, selected, bone_indices):
         n = len(positions)
@@ -457,6 +502,188 @@ class VoxelRenderer:
                 [(self.mirror_point_vbo, "3f 4f", "in_vert", "in_color")],
             )
             self.n_mirror_points = len(point_verts) // 7
+
+    # ──────────────────────────────────────────────
+    # 选区 gizmo（Blender 风格 3 轴箭头 + 圆环 + 中心球）
+    # ──────────────────────────────────────────────
+
+    def prepare_gizmo(self, pivot, mvp, screen_w, screen_h,
+                      arrow_pixels=80, hover_handle=None):
+        """根据 pivot + 当前 MVP 重建 gizmo 几何，做屏幕空间恒定缩放。
+
+        每帧调用：cheap，~200 个顶点。同时缓存把手数据供 pick_gizmo_handle 使用。
+        """
+        if pivot is None:
+            self.gizmo_pivot = None
+            self.gizmo_n_vertices = 0
+            return
+
+        pivot_arr = np.asarray(pivot, dtype=np.float32)
+        # 用 pivot 和 pivot+(1,0,0) 的屏幕投影距离推 pixels-per-world
+        p2d_pivot = _project_world_to_screen(pivot_arr, mvp, screen_w, screen_h)
+        p2d_test = _project_world_to_screen(
+            pivot_arr + np.array([1.0, 0.0, 0.0], dtype=np.float32),
+            mvp, screen_w, screen_h,
+        )
+        if p2d_pivot is None or p2d_test is None:
+            self.gizmo_pivot = None
+            self.gizmo_n_vertices = 0
+            return
+        pixels_per_world = float(np.hypot(
+            p2d_test[0] - p2d_pivot[0], p2d_test[1] - p2d_pivot[1]
+        ))
+        if pixels_per_world < 1e-3:
+            pixels_per_world = 1e-3
+        arrow_world_length = float(arrow_pixels) / pixels_per_world
+
+        axes = {
+            "x": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+            "y": np.array([0.0, 1.0, 0.0], dtype=np.float32),
+            "z": np.array([0.0, 0.0, 1.0], dtype=np.float32),
+        }
+
+        verts = []        # 每条 7f：x y z r g b a
+        self.gizmo_handle_endpoints = {}
+        self.gizmo_ring_data = {}
+
+        # 箭头：杆 + 4 段头部短线（X 形）
+        head_len = arrow_world_length * 0.18
+        head_off = arrow_world_length * 0.10
+        for axis_letter, axis_vec in axes.items():
+            handle_name = f"{axis_letter}_arrow"
+            color = (_GIZMO_HOVER_COLOR if hover_handle == handle_name
+                     else _GIZMO_AXIS_COLORS[axis_letter])
+            end = pivot_arr + axis_vec * arrow_world_length
+            # 杆
+            verts.extend([*pivot_arr, *color])
+            verts.extend([*end, *color])
+            # 头部 X：用另两轴方向做一对短线
+            other = [axes[a] for a in "xyz" if a != axis_letter]
+            for perp in other:
+                base = end - axis_vec * head_len
+                tip_a = base + perp * head_off
+                tip_b = base - perp * head_off
+                verts.extend([*tip_a, *color])
+                verts.extend([*end, *color])
+                verts.extend([*tip_b, *color])
+                verts.extend([*end, *color])
+            self.gizmo_handle_endpoints[handle_name] = (pivot_arr.copy(), end.copy())
+
+        # 圆环：32 段折线（闭合）
+        ring_radius = arrow_world_length * 0.85
+        n_seg = 32
+        for axis_letter, axis_vec in axes.items():
+            handle_name = f"{axis_letter}_ring"
+            color = (_GIZMO_HOVER_COLOR if hover_handle == handle_name
+                     else _GIZMO_AXIS_COLORS[axis_letter])
+            other = [axes[a] for a in "xyz" if a != axis_letter]
+            u_basis, v_basis = other[0], other[1]
+            prev_pt = None
+            for i in range(n_seg + 1):
+                ang = 2.0 * np.pi * i / n_seg
+                pt = pivot_arr + (np.cos(ang) * u_basis + np.sin(ang) * v_basis) * ring_radius
+                if prev_pt is not None:
+                    verts.extend([*prev_pt, *color])
+                    verts.extend([*pt, *color])
+                prev_pt = pt
+            self.gizmo_ring_data[handle_name] = (pivot_arr.copy(), axis_letter, ring_radius)
+
+        # 中心：3 根十字短线
+        center_size = arrow_world_length * 0.10
+        center_color = (_GIZMO_HOVER_COLOR if hover_handle == "center"
+                        else _GIZMO_CENTER_COLOR)
+        for axis_vec in axes.values():
+            verts.extend([*(pivot_arr - axis_vec * center_size), *center_color])
+            verts.extend([*(pivot_arr + axis_vec * center_size), *center_color])
+
+        arr = np.array(verts, dtype=np.float32)
+        nbytes = arr.nbytes
+        if self.gizmo_vbo is None or self.gizmo_vbo.size != nbytes:
+            if self.gizmo_vbo:
+                self.gizmo_vbo.release()
+            if self.gizmo_vao:
+                self.gizmo_vao.release()
+            self.gizmo_vbo = self.ctx.buffer(arr.tobytes(), dynamic=True)
+            self.gizmo_vao = self.ctx.vertex_array(
+                self.line_prog,
+                [(self.gizmo_vbo, "3f 4f", "in_vert", "in_color")],
+            )
+        else:
+            self.gizmo_vbo.write(arr.tobytes())
+
+        self.gizmo_n_vertices = len(arr) // 7
+        self.gizmo_pivot = pivot_arr.copy()
+        self.gizmo_arrow_world_length = arrow_world_length
+
+    def draw_gizmo(self, mvp):
+        """画 gizmo（深度测试关，画在最上层）。"""
+        if self.gizmo_vao is None or self.gizmo_n_vertices == 0:
+            return
+        mvp_bytes = mvp.astype(np.float32).T.tobytes()
+        self.line_prog["u_mvp"].write(mvp_bytes)
+        self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 1.0)
+        self.ctx.enable(moderngl.BLEND)
+        self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
+        self.ctx.disable(moderngl.DEPTH_TEST)
+        self.ctx.line_width = 2.5
+        self.gizmo_vao.render(moderngl.LINES, vertices=self.gizmo_n_vertices)
+        self.ctx.line_width = 1.0
+        self.ctx.enable(moderngl.DEPTH_TEST)
+        self.ctx.disable(moderngl.BLEND)
+
+    def pick_gizmo_handle(self, mouse_x, mouse_y, mvp, screen_w, screen_h):
+        """屏幕空间命中测试，返回 'x_arrow' / 'y_ring' / 'center' 等或 None。"""
+        if self.gizmo_pivot is None:
+            return None
+
+        pivot_2d = _project_world_to_screen(self.gizmo_pivot, mvp, screen_w, screen_h)
+        if pivot_2d is None:
+            return None
+
+        candidates = []  # (priority, dist, name)；priority 数字小者优先
+
+        # 中心：单独阈值，最高优先级（优先级 0）
+        center_d = float(np.hypot(mouse_x - pivot_2d[0], mouse_y - pivot_2d[1]))
+        if center_d < _GIZMO_CENTER_HIT_PX:
+            candidates.append((0, center_d, "center"))
+
+        # 箭头：到屏幕空间线段的距离
+        for name, (start_w, end_w) in self.gizmo_handle_endpoints.items():
+            s2d = _project_world_to_screen(start_w, mvp, screen_w, screen_h)
+            e2d = _project_world_to_screen(end_w, mvp, screen_w, screen_h)
+            if s2d is None or e2d is None:
+                continue
+            d = _point_to_segment_dist_2d(mouse_x, mouse_y, s2d[0], s2d[1], e2d[0], e2d[1])
+            if d < _GIZMO_HIT_THRESHOLD_PX:
+                # 箭头优先级 1（高于圆环，低于中心）
+                candidates.append((1, d, name))
+
+        # 圆环：采样 24 点找最近距离
+        axes = {
+            "x": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+            "y": np.array([0.0, 1.0, 0.0], dtype=np.float32),
+            "z": np.array([0.0, 0.0, 1.0], dtype=np.float32),
+        }
+        for name, (ctr_w, axis_letter, radius) in self.gizmo_ring_data.items():
+            other = [axes[a] for a in "xyz" if a != axis_letter]
+            u_basis, v_basis = other[0], other[1]
+            min_d = float("inf")
+            for i in range(24):
+                ang = 2.0 * np.pi * i / 24
+                pt = ctr_w + (np.cos(ang) * u_basis + np.sin(ang) * v_basis) * radius
+                p2d = _project_world_to_screen(pt, mvp, screen_w, screen_h)
+                if p2d is None:
+                    continue
+                d = float(np.hypot(mouse_x - p2d[0], mouse_y - p2d[1]))
+                if d < min_d:
+                    min_d = d
+            if min_d < _GIZMO_HIT_THRESHOLD_PX:
+                candidates.append((2, min_d, name))
+
+        if not candidates:
+            return None
+        candidates.sort(key=lambda c: (c[0], c[1]))
+        return candidates[0][2]
 
     def render(self, mvp):
         mvp_bytes = mvp.astype(np.float32).T.tobytes()

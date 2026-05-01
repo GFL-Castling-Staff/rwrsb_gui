@@ -291,6 +291,8 @@ _TEXT = {
         "move_length_constraints_hint": "Keep stick lengths constant while dragging",
         "move_clamp_max": "Clamp max length",
         "move_clamp_min": "Clamp min length",
+        "gizmo_section": "Selection gizmo",
+        "gizmo_arrow_pixels": "Arrow length (px)",
         "move_skeleton_tree_section": "Skeleton tree",
         "move_skeleton_tree_root": "Root",
         "move_skeleton_tree_no_particles": "(no particles)",
@@ -595,6 +597,8 @@ _TEXT = {
         "move_length_constraints_hint": "拖动时保持 stick 长度恒定",
         "move_clamp_max": "约束最大长度",
         "move_clamp_min": "约束最小长度",
+        "gizmo_section": "选区 gizmo",
+        "gizmo_arrow_pixels": "箭头长度（像素）",
         "move_skeleton_tree_section": "骨架树",
         "move_skeleton_tree_root": "根节点",
         "move_skeleton_tree_no_particles": "（无粒子）",
@@ -757,6 +761,10 @@ class UIState:
 
         # P2：vanilla soldier_animations.xml 路径（不持久化，每次启动手动设）
         self.vanilla_animations_path = None  # str | None
+
+        # 选区 gizmo（动画工具，bone_edit 模式下选中粒子时显示）
+        self.gizmo_arrow_pixels = 80          # 屏幕像素总长，可调
+        self.gizmo_hover_handle = None        # str | None：当前 hover 的把手名
 
     def push_toast(self, message: str, level: str = "info",
                    also_log: bool = True, exc_info=None) -> None:
@@ -1921,6 +1929,18 @@ def _draw_move_settings_section(ui_state, editor_state):
     chg, v = imgui.checkbox(tr(ui_state, "move_clamp_min"), ui_state.move_clamp_min)
     if chg:
         ui_state.move_clamp_min = v
+    imgui.unindent()
+
+    imgui.separator()
+    imgui.text(tr(ui_state, "gizmo_section"))
+    imgui.indent()
+    imgui.set_next_item_width(160)
+    chg, v = imgui.slider_int(
+        tr(ui_state, "gizmo_arrow_pixels") + "##gizmo_px",
+        int(ui_state.gizmo_arrow_pixels), 40, 200,
+    )
+    if chg:
+        ui_state.gizmo_arrow_pixels = int(v)
     imgui.unindent()
 
     imgui.separator()

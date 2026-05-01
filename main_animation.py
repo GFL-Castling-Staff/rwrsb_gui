@@ -156,6 +156,29 @@ def _pick_particle(mx, my):
     return pick_particle_screen(mvp, g_positions_np, local_x, local_y, vp_w, vp_h)
 
 
+def _gizmo_pivot_world():
+    """gizmo 中心 = active particle 位置；无效时返回 None。"""
+    if g_editor is None or g_editor.mirror_mode:
+        return None
+    idx = g_editor.active_particle_idx
+    if idx < 0 or idx >= len(g_editor.particles):
+        return None
+    p = g_editor.particles[idx]
+    return np.array([p["x"], p["y"], p["z"]], dtype=np.float32)
+
+
+def _pick_gizmo_handle(mx, my):
+    """屏幕空间 gizmo 命中测试。返回把手名或 None。"""
+    if g_renderer is None:
+        return None
+    panel_w, toolbar_h, status_h = _ui_layout_metrics()
+    vp_w = WIN_W - panel_w
+    vp_h = WIN_H - toolbar_h - status_h
+    if vp_w <= 0 or vp_h <= 0:
+        return None
+    return g_renderer.pick_gizmo_handle(mx, my - toolbar_h, g_camera.get_mvp(), vp_w, vp_h)
+
+
 # ── 粒子拖动 ──────────────────────────────────
 
 def _ray_plane_hit(ray_o, ray_d, plane_pt, plane_normal):
@@ -593,6 +616,11 @@ def on_cursor_pos(window, xpos, ypos):
         g_hover_particle_idx = hover_particle
         if g_renderer:
             g_renderer.highlight_particle_idx = hover_particle
+        # gizmo hover：拖动期间不重新检测（保持把手高亮稳定）
+        if not (g_particle_drag_active or g_rotate_drag_active):
+            g_ui.gizmo_hover_handle = _pick_gizmo_handle(xpos, ypos)
+    else:
+        g_ui.gizmo_hover_handle = None
     g_camera.on_mouse_move(xpos, ypos)
 
 
@@ -952,6 +980,19 @@ def main():
                     i for i in g_editor.selected_particles if i != act
                 ]
                 g_renderer.render(mvp)
+
+                # 选区 gizmo：每帧重建几何（屏幕空间恒定缩放 + pivot 实时跟随）
+                pivot = _gizmo_pivot_world()
+                if pivot is not None:
+                    g_renderer.prepare_gizmo(
+                        pivot, mvp, vp_w, vp_h,
+                        arrow_pixels=int(g_ui.gizmo_arrow_pixels),
+                        hover_handle=g_ui.gizmo_hover_handle,
+                    )
+                    g_renderer.draw_gizmo(mvp)
+                else:
+                    g_renderer.gizmo_pivot = None
+                    g_renderer.gizmo_n_vertices = 0
 
             ctx.viewport = (0, 0, max(fb_w, 1), max(fb_h, 1))
 
