@@ -1257,7 +1257,8 @@ class EditorState:
         # 调整 current_frame_idx
         if self.current_frame_idx >= len(frames):
             self.current_frame_idx = len(frames) - 1
-        self._apply_frame_to_particles(self.current_frame_idx)
+        # 视口姿态保持在 playback_time 处的插值，不强制跳到某个 keyframe
+        self._apply_interpolated_to_particles(self.playback_time)
         return True
 
     def anim_set_frame_time(self, frame_idx, new_time):
@@ -1308,7 +1309,8 @@ class EditorState:
         frames.append(new_frame)
         frames.sort(key=lambda f: f.time)
         self.current_frame_idx = frames.index(new_frame)
-        self._apply_frame_to_particles(self.current_frame_idx)
+        # 视口姿态保持在 playback_time 处的插值，不强制跳到新复制的帧
+        self._apply_interpolated_to_particles(self.playback_time)
 
     def anim_add_control(self, frame_idx, key="shoot", value=1):
         if not self.animation_mode or not self.current_animation:
