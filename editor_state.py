@@ -183,6 +183,8 @@ class EditorState:
         # 预分组：ci -> (vis: list[int], locals_arr: np.ndarray (n,3))
         # record_voxel_bind_pose 时填充，update_voxel_positions_from_skeleton 时使用
         self._voxel_groups = {}
+        # 胯部横骨（righthip <-> lefthip）没有足够信息决定 roll。
+        # 普通骨骼继续使用 bind rotation tracking；胯部横骨用 midspine 提供 roll 参考。
 
         # 骨架树（P3）
         self._tree_parent: dict = {}       # particle idx -> parent idx；root 的 parent 是 None
@@ -1462,6 +1464,86 @@ class EditorState:
         R = np.column_stack([u, v, w]).astype(np.float32)
         return origin, R
 
+    def _basis_from_axis_and_reference(self, u, ref):
+        """用主轴 u 和参考方向 ref 构造正交基 [u, v, w]。
+
+        ref 会先投影到垂直于 u 的平面，得到尽量接近 ref 的 v 轴。
+        若 ref 与 u 接近平行，则退回到分量最小的世界轴，保证有稳定结果。
+        """
+        u = np.asarray(u, dtype=np.float32)
+        u_len = float(np.linalg.norm(u))
+        if u_len < 1e-6:
+            return np.eye(3, dtype=np.float32)
+        u = u / u_len
+
+        ref = np.asarray(ref, dtype=np.float32)
+        v = ref - u * float(np.dot(ref, u))
+        v_len = float(np.linalg.norm(v))
+        if v_len < 1e-6:
+            fallback = np.zeros(3, dtype=np.float32)
+            fallback[int(np.argmin(np.abs(u)))] = 1.0
+            v = fallback - u * float(np.dot(fallback, u))
+            v_len = float(np.linalg.norm(v))
+        if v_len < 1e-6:
+            return np.eye(3, dtype=np.float32)
+
+        v = v / v_len
+        w = np.cross(u, v)
+        w_len = float(np.linalg.norm(w))
+        if w_len < 1e-6:
+            return np.eye(3, dtype=np.float32)
+        w = w / w_len
+        return np.column_stack([u, v, w]).astype(np.float32)
+
+    def _is_hip_bridge_stick(self, stick, id_to_p):
+        """判断是否为默认人骨的 righthip <-> lefthip 胯部横骨。"""
+        ids = {int(stick.particle_a_id), int(stick.particle_b_id)}
+        if ids == {10, 20}:
+            return True
+        pa = id_to_p.get(int(stick.particle_a_id), {})
+        pb = id_to_p.get(int(stick.particle_b_id), {})
+        names = {
+            str(pa.get("name", "")).lower(),
+            str(pb.get("name", "")).lower(),
+        }
+        return names == {"righthip", "lefthip"}
+
+    def _find_midspine_particle(self, id_to_p):
+        """查找 midspine particle；默认人骨 id=1，找不到再按 name 兜底。"""
+        p = id_to_p.get(1)
+        if p is not None:
+            return p
+        for particle in id_to_p.values():
+            if str(particle.get("name", "")).lower() == "midspine":
+                return particle
+        return None
+
+    def _compute_hip_bridge_frame(self, stick, id_to_p):
+        """用 righthip/lefthip/midspine 三点构造胯部横骨局部坐标系。
+
+        stick 主轴仍按 XML 中 a->b 的方向作为 u；midspine 相对髋部中心的方向
+        投影到垂直于 u 的平面作为 v，从而给这根横骨一个身体姿态相关的 roll。
+        """
+        if not self._is_hip_bridge_stick(stick, id_to_p):
+            return None
+        pa = id_to_p.get(int(stick.particle_a_id))
+        pb = id_to_p.get(int(stick.particle_b_id))
+        pm = self._find_midspine_particle(id_to_p)
+        if pa is None or pb is None or pm is None:
+            return None
+
+        a = np.array([pa["x"], pa["y"], pa["z"]], dtype=np.float32)
+        b = np.array([pb["x"], pb["y"], pb["z"]], dtype=np.float32)
+        m = np.array([pm["x"], pm["y"], pm["z"]], dtype=np.float32)
+        origin = (a + b) * 0.5
+        diff = b - a
+        L = float(np.linalg.norm(diff))
+        if L < 1e-6:
+            return origin, np.eye(3, dtype=np.float32), np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        u = diff / L
+        R = self._basis_from_axis_and_reference(u, m - origin)
+        return origin, R, u
+
     def _rotate_basis(self, R_bind, u_bind, u_now):
         """把 R_bind 用 u_bind→u_now 的最短旋转转到 u_now 朝向。
 
@@ -1527,12 +1609,16 @@ class EditorState:
                 pa = id_to_p.get(int(stick.particle_a_id))
                 pb = id_to_p.get(int(stick.particle_b_id))
                 if pa is not None and pb is not None:
-                    a = np.array([pa["x"], pa["y"], pa["z"]], dtype=np.float32)
-                    b = np.array([pb["x"], pb["y"], pb["z"]], dtype=np.float32)
-                    diff = b - a
-                    L = float(np.linalg.norm(diff))
-                    u_bind = diff / L if L >= 1e-6 else np.array([1.0, 0.0, 0.0], dtype=np.float32)
-                    origin, R = self._compute_stick_frame(pa, pb)
+                    hip_frame = self._compute_hip_bridge_frame(stick, id_to_p)
+                    if hip_frame is not None:
+                        origin, R, u_bind = hip_frame
+                    else:
+                        a = np.array([pa["x"], pa["y"], pa["z"]], dtype=np.float32)
+                        b = np.array([pb["x"], pb["y"], pb["z"]], dtype=np.float32)
+                        diff = b - a
+                        L = float(np.linalg.norm(diff))
+                        u_bind = diff / L if L >= 1e-6 else np.array([1.0, 0.0, 0.0], dtype=np.float32)
+                        origin, R = self._compute_stick_frame(pa, pb)
                     stick_frames[ci] = (origin, R, u_bind)
 
             frame = stick_frames.get(ci)
@@ -1584,12 +1670,16 @@ class EditorState:
             b = np.array([pb['x'], pb['y'], pb['z']], dtype=np.float32)
             diff = b - a
             L = float(np.linalg.norm(diff))
-            if L < 1e-6:
+            hip_frame = self._compute_hip_bridge_frame(stick, id_to_p)
+            if hip_frame is not None:
+                origin, R, _u_now = hip_frame
+            elif L < 1e-6:
                 R = R_bind
             else:
                 u_now = diff / L
                 R = self._rotate_basis(R_bind, u_bind, u_now)
-            origin = (a + b) * 0.5
+            if hip_frame is None:
+                origin = (a + b) * 0.5
             # 批量计算：locals_arr (n,3) → worlds_arr (n,3)
             worlds_arr = locals_arr @ R.T + origin
 
