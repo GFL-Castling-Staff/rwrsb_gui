@@ -185,10 +185,16 @@ class EditorState:
         self._voxel_groups = {}
         # 胯部横骨（righthip <-> lefthip）没有足够信息决定 roll。
         # 普通骨骼继续使用 bind rotation tracking；胯部横骨用 midspine 提供 roll 参考。
-        # Oriented voxel rendering（D）：每个 voxel 自身朝向矩阵
-        # shape (N_voxels, 9) float32，每行是 mat3 列优先展平 [col0, col1, col2]
-        # 绑骨模式 + 静止 pose：identity；动画蒙皮时 = R_now @ R_bind.T
-        self._voxel_orientations: np.ndarray | None = None
+        # Oriented voxel rendering（D）：per-bone 朝向矩阵
+        # _bone_orientations: shape (MAX_BONE_SLOTS, 16) float32, mat4 列优先展平
+        #   - 槽 0：identity 哨位（未绑定体素指向这里）
+        #   - 槽 ci+1：骨段 ci 的 R_cube = R_now @ R_bind.T，mat3 嵌入 mat4 左上 3x3
+        # _voxel_bone_indices: shape (N_voxels,) float32，值 = ci+1（绑定）或 0（未绑定）
+        # 仅在 bindings 变化时重建 indices；每帧蒙皮只更新 orientations uniform，
+        # 10w 体素下每帧 GPU 上传量 ~8 KB（128 mat4），不再随 voxel 数线性增长。
+        self._MAX_BONE_SLOTS = 128
+        self._bone_orientations: np.ndarray | None = None
+        self._voxel_bone_indices: np.ndarray | None = None
 
         # 骨架树（P3）
         self._tree_parent: dict = {}       # particle idx -> parent idx；root 的 parent 是 None
@@ -897,17 +903,32 @@ class EditorState:
             return (r * 0.5, g * 0.5, b * 0.5)
         return stick.color
 
-    def _ensure_voxel_orientations(self):
-        """确保 _voxel_orientations 大小匹配 voxels 总数；不存在或 size 不对则重置为 identity。"""
+    def _ensure_bone_orientation_arrays(self):
+        """确保 _bone_orientations 和 _voxel_bone_indices 大小正确；从当前 bindings 重建 indices。
+
+        _bone_orientations 缺省为 mat4 identity（蒙皮时按 ci 覆盖，未覆盖的槽保持 identity）。
+        _voxel_bone_indices 每次都按当前 bindings 重建（O(N_voxels)，便宜）。
+        """
         n = len(self.voxels)
-        if (self._voxel_orientations is None
-                or self._voxel_orientations.shape != (n, 9)):
-            arr = np.zeros((n, 9), dtype=np.float32)
-            # identity 列优先展平：[1,0,0, 0,1,0, 0,0,1]
+
+        if (self._bone_orientations is None
+                or self._bone_orientations.shape != (self._MAX_BONE_SLOTS, 16)):
+            arr = np.zeros((self._MAX_BONE_SLOTS, 16), dtype=np.float32)
+            # mat4 identity 列优先：对角 4 个 1，下标 0/5/10/15
             arr[:, 0] = 1.0
-            arr[:, 4] = 1.0
-            arr[:, 8] = 1.0
-            self._voxel_orientations = arr
+            arr[:, 5] = 1.0
+            arr[:, 10] = 1.0
+            arr[:, 15] = 1.0
+            self._bone_orientations = arr
+
+        if self._voxel_bone_indices is None or self._voxel_bone_indices.shape != (n,):
+            self._voxel_bone_indices = np.zeros(n, dtype=np.float32)
+        else:
+            self._voxel_bone_indices.fill(0.0)
+        # bindings: {voxel_idx: constraint_idx}，bound voxel 写 ci+1
+        for vi, ci in self.bindings.items():
+            if 0 <= vi < n and 0 <= ci < self._MAX_BONE_SLOTS - 1:
+                self._voxel_bone_indices[vi] = float(ci + 1)
 
     def build_instance_arrays(self, use_original_color=False):
         n = len(self.voxels)
@@ -927,10 +948,10 @@ class EditorState:
                 colors[i] = (cr, cg, cb, 1.0)
                 selected[i] = 1.0 if i in self.selected_voxels else 0.0
 
-        self._ensure_voxel_orientations()
-        orientations = self._voxel_orientations
+        self._ensure_bone_orientation_arrays()
+        bone_indices = self._voxel_bone_indices
         self.gpu_dirty = False
-        return positions, colors, selected, orientations
+        return positions, colors, selected, bone_indices
 
     def select_stick_voxels(self, stick_idx, mode="replace"):
         """选中绑到指定骨段的所有体素。
@@ -1673,7 +1694,7 @@ class EditorState:
         if not self._voxel_groups or not self.voxels:
             return
 
-        self._ensure_voxel_orientations()
+        self._ensure_bone_orientation_arrays()
         id_to_p = {int(p["id"]): p for p in self.particles}
 
         for ci, (vis, locals_arr, u_bind, R_bind) in self._voxel_groups.items():
@@ -1702,13 +1723,14 @@ class EditorState:
             # 批量计算：locals_arr (n,3) → worlds_arr (n,3)
             worlds_arr = locals_arr @ R.T + origin
 
-            # 体素自身朝向：R_cube = R_now @ R_bind.T，bind 时 cube axis-aligned，
-            # 当前帧把每个 cube 旋转到与骨段当前姿态一致。
-            # 列优先展平 (Fortran order) → [col0, col1, col2] 依次。
-            R_cube_flat = (R @ R_bind.T).flatten('F').astype(np.float32)
-            valid_vis = [vi for vi in vis if 0 <= vi < len(self.voxels)]
-            if valid_vis:
-                self._voxel_orientations[valid_vis] = R_cube_flat
+            # 体素自身朝向：R_cube = R_now @ R_bind.T，写入 per-bone 槽 ci+1
+            # （槽 0 是 identity 哨位，未绑定体素指向那里）
+            slot = ci + 1
+            if 0 < slot < self._MAX_BONE_SLOTS:
+                R_cube = R @ R_bind.T
+                m4 = np.eye(4, dtype=np.float32)
+                m4[:3, :3] = R_cube
+                self._bone_orientations[slot] = m4.flatten('F')
 
             for k, vi in enumerate(vis):
                 if vi < len(self.voxels):

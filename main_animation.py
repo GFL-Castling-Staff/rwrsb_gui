@@ -860,17 +860,20 @@ def main():
                     if (g_editor.animation_mode and g_editor._voxel_groups
                             and g_renderer.n_voxels == _n
                             and not _color_mode_changed):
-                        # 快速路径：VBO 已建好、体素数一致、颜色模式未变，仅更新位置 + 朝向
+                        # 快速路径：VBO 已建好、体素数一致、颜色模式未变。
+                        # 仅更新位置 VBO + 上传 per-bone orientation uniform（~8 KB）。
                         arr = np.array(g_editor.voxels, dtype=np.float32)
                         g_renderer.update_voxel_positions(arr[:, :3])
-                        if g_editor._voxel_orientations is not None:
-                            g_renderer.update_voxel_orientations(g_editor._voxel_orientations)
+                        if g_editor._bone_orientations is not None:
+                            g_renderer.update_bone_orientations(g_editor._bone_orientations)
                         g_editor.gpu_dirty = False
                     else:
                         # 全量上传：首次加载、体素数变化或颜色模式切换
-                        positions, colors, selected, orientations = g_editor.build_instance_arrays(
+                        positions, colors, selected, bone_indices = g_editor.build_instance_arrays(
                             use_original_color=_color_mode)
-                        g_renderer.upload_voxels(positions, colors, selected, orientations)
+                        g_renderer.upload_voxels(positions, colors, selected, bone_indices)
+                        if g_editor._bone_orientations is not None:
+                            g_renderer.update_bone_orientations(g_editor._bone_orientations)
 
             # grid 上传（签名缓存，避免每帧重传）
             # 网格中心固定在世界原点 (0,0,0)，不跟随粒子

@@ -1101,8 +1101,11 @@ def main():
 
             # update GPU buffers when dirty
             if g_editor.gpu_dirty and g_editor.voxels:
-                positions, colors, selected, orientations = g_editor.build_instance_arrays()
-                g_renderer.upload_voxels(positions, colors, selected, orientations)
+                positions, colors, selected, bone_indices = g_editor.build_instance_arrays()
+                g_renderer.upload_voxels(positions, colors, selected, bone_indices)
+                # 初次上传后也把 bone_orientations uniform 同步一次（绑骨模式下保持 identity）
+                if g_editor._bone_orientations is not None:
+                    g_renderer.update_bone_orientations(g_editor._bone_orientations)
                 rebuild_positions_cache()
                 if not g_first_upload_logged:
                     logger.debug('uploaded %d instances to GPU (renderer.n_voxels=%d)',
