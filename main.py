@@ -60,6 +60,16 @@ g_drag_plane_normal = None
 g_drag_grab_offset = None
 g_drag_particle_origin = None
 g_drag_origins = {}  # dict[int, np.ndarray]: F5 多选整体平移的所有选中点初始位置
+# gizmo 箭头拖动期间的预设轴锁定（"x"/"y"/"z"/None），覆盖修饰键
+g_drag_axis_preset = None
+
+# 旋转拖动状态（gizmo 圆环触发，与平移拖动互斥）
+g_rotate_drag_active = False
+g_rotate_drag_start_mx = 0.0
+g_rotate_drag_snapshot = {}       # {idx: np.array([x, y, z])}
+g_rotate_drag_pivot = None        # np.array
+g_rotate_drag_axis = None         # "x" | "y" | "z"
+
 g_mirror_edit_drag_mode = None
 g_mirror_edit_plane_normal = None
 g_mirror_edit_grab_offset = None
@@ -366,8 +376,13 @@ def _pick_gizmo_handle(sx, sy):
     return g_renderer.pick_gizmo_handle(sx, sy - toolbar_h, g_camera.get_mvp(), vp_w, vp_h)
 
 
-def _begin_particle_drag(sx, sy, particle_idx, push_undo=True):
-    global g_particle_drag_active, g_drag_particle_idx, g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin, g_drag_origins
+def _begin_particle_drag(sx, sy, particle_idx, push_undo=True, axis_preset=None):
+    """启动粒子平移拖动。
+
+    axis_preset: "x"/"y"/"z"/None。来自 gizmo 箭头时预设；为 None 时
+    运行期由修饰键决定（_drag_axis_mask）。
+    """
+    global g_particle_drag_active, g_drag_particle_idx, g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin, g_drag_origins, g_drag_axis_preset
     particle = g_editor.particles[particle_idx]
     plane_point = np.array([particle['x'], particle['y'], particle['z']], dtype=np.float32)
     cam_pos = np.asarray(g_camera.get_position(), dtype=np.float32)
@@ -405,8 +420,12 @@ def _begin_particle_drag(sx, sy, particle_idx, push_undo=True):
                     dtype=np.float32)
         for i in drag_set
     }
+    g_drag_axis_preset = axis_preset
 
 def _drag_axis_mask(window):
+    """轴锁定优先级：gizmo 预设 > 修饰键。"""
+    if g_drag_axis_preset is not None:
+        return g_drag_axis_preset
     shift = (
         glfw.get_key(window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS
         or glfw.get_key(window, glfw.KEY_RIGHT_SHIFT) == glfw.PRESS
@@ -657,13 +676,94 @@ def _update_particle_drag(window, sx, sy):
 
 
 def _end_particle_drag():
-    global g_particle_drag_active, g_drag_particle_idx, g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin
+    global g_particle_drag_active, g_drag_particle_idx, g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin, g_drag_axis_preset
     g_particle_drag_active = False
     g_drag_particle_idx = -1
     g_drag_plane_normal = None
     g_drag_grab_offset = None
     g_drag_particle_origin = None
     g_drag_origins.clear()
+    g_drag_axis_preset = None
+
+
+# ── Rotate drag（gizmo 圆环触发）──────────────
+
+def _rotation_matrix(axis, angle_rad):
+    """绕世界坐标轴旋转的 3x3 矩阵；与 main_animation 同款。"""
+    c, s = float(np.cos(angle_rad)), float(np.sin(angle_rad))
+    if axis == "x":
+        return np.array([[1, 0, 0], [0, c, -s], [0, s, c]], dtype=np.float32)
+    if axis == "y":
+        return np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]], dtype=np.float32)
+    return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]], dtype=np.float32)
+
+
+def _rotate_pivot_active():
+    """旋转 pivot = active 粒子位置。bind 工具暂不提供其它 pivot 模式。"""
+    idx = g_editor.active_particle_idx
+    if 0 <= idx < len(g_editor.particles):
+        p = g_editor.particles[idx]
+        return np.array([p["x"], p["y"], p["z"]], dtype=np.float32)
+    return np.zeros(3, dtype=np.float32)
+
+
+def _start_rotate_drag(axis_preset):
+    """启动 gizmo 圆环旋转拖动。axis_preset: 'x'/'y'/'z'。"""
+    global g_rotate_drag_active, g_rotate_drag_start_mx
+    global g_rotate_drag_snapshot, g_rotate_drag_pivot, g_rotate_drag_axis
+
+    sel = set(g_editor.selected_particles)
+    if not sel:
+        # 兜底：仅 active 单选时也允许，把 active 加入选区
+        if g_editor.active_particle_idx >= 0:
+            sel = {g_editor.active_particle_idx}
+            g_editor.selected_particles.add(g_editor.active_particle_idx)
+        else:
+            return
+
+    g_editor._push_undo()
+    g_rotate_drag_snapshot = {
+        idx: np.array([g_editor.particles[idx]["x"],
+                       g_editor.particles[idx]["y"],
+                       g_editor.particles[idx]["z"]], dtype=np.float32)
+        for idx in sel
+        if 0 <= idx < len(g_editor.particles)
+    }
+    g_rotate_drag_pivot = _rotate_pivot_active()
+    g_rotate_drag_axis = axis_preset
+    g_rotate_drag_start_mx = g_mouse_x
+    g_rotate_drag_active = True
+
+
+def _update_rotate_drag(window, mx):
+    """旋转拖动每帧更新：1px = 1°，按住 Ctrl 15° 吸附。"""
+    if not g_rotate_drag_active or g_rotate_drag_pivot is None:
+        return
+    angle_deg = (mx - g_rotate_drag_start_mx) * 1.0
+    ctrl = (
+        glfw.get_key(window, glfw.KEY_LEFT_CONTROL) == glfw.PRESS
+        or glfw.get_key(window, glfw.KEY_RIGHT_CONTROL) == glfw.PRESS
+    )
+    if ctrl:
+        angle_deg = round(angle_deg / 15.0) * 15.0
+    R = _rotation_matrix(g_rotate_drag_axis, float(np.radians(angle_deg)))
+    pivot = g_rotate_drag_pivot
+    for idx, p_orig in g_rotate_drag_snapshot.items():
+        if 0 <= idx < len(g_editor.particles):
+            p_new = pivot + R @ (p_orig - pivot)
+            g_editor.particles[idx]["x"] = float(p_new[0])
+            g_editor.particles[idx]["y"] = float(p_new[1])
+            g_editor.particles[idx]["z"] = float(p_new[2])
+    g_editor._mark_skeleton_changed()
+
+
+def _end_rotate_drag():
+    global g_rotate_drag_active, g_rotate_drag_snapshot
+    global g_rotate_drag_pivot, g_rotate_drag_axis
+    g_rotate_drag_active = False
+    g_rotate_drag_snapshot = {}
+    g_rotate_drag_pivot = None
+    g_rotate_drag_axis = None
 
 
 def _update_grid():
@@ -843,6 +943,23 @@ def on_mouse_button(window, button, action, mods):
                 return
             if g_editor.mirror_mode and g_editor.mirror_edit_mode:
                 return
+            # gizmo 命中优先：箭头/中心 → 平移；圆环 → 旋转。命中即消费点击。
+            gizmo_handle = None
+            if _gizmo_pivot_world() is not None:
+                gizmo_handle = _pick_gizmo_handle(g_mouse_x, g_mouse_y)
+            if gizmo_handle is not None:
+                active = g_editor.active_particle_idx
+                if 0 <= active < len(g_editor.particles):
+                    if gizmo_handle.endswith("_arrow"):
+                        _begin_particle_drag(g_mouse_x, g_mouse_y, active,
+                                             axis_preset=gizmo_handle[0])
+                    elif gizmo_handle == "center":
+                        _begin_particle_drag(g_mouse_x, g_mouse_y, active,
+                                             axis_preset=None)
+                    elif gizmo_handle.endswith("_ring"):
+                        _start_rotate_drag(axis_preset=gizmo_handle[0])
+                return
+
             hit_particle = _pick_particle(g_mouse_x, g_mouse_y)
             shift = bool(mods & glfw.MOD_SHIFT)
             ctrl = bool(mods & glfw.MOD_CONTROL)
@@ -940,6 +1057,8 @@ def on_mouse_button(window, button, action, mods):
                 _end_mirror_edit_drag()
             if g_particle_drag_active:
                 _end_particle_drag()
+            if g_rotate_drag_active:
+                _end_rotate_drag()
             if g_brush_active:
                 g_editor.commit_brush_stroke()
                 g_brush_active = False
@@ -977,8 +1096,11 @@ def on_cursor_pos(window, xpos, ypos):
             g_renderer.highlight_particle_idx = hover_particle if hover_particle >= 0 else g_editor.active_particle_idx
             g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
     # gizmo hover：拖动期间冻结，避免误导
-    if not g_particle_drag_active:
+    if not (g_particle_drag_active or g_rotate_drag_active):
         g_ui.gizmo_hover_handle = _pick_gizmo_handle(xpos, ypos)
+    # 旋转拖动每帧更新
+    if g_rotate_drag_active:
+        _update_rotate_drag(window, xpos)
     if g_mirror_edit_drag_mode:
         _update_mirror_edit_drag(xpos, ypos)
         return
