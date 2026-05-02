@@ -290,6 +290,9 @@ _TEXT = {
         "move_clamp_min": "Clamp min length",
         "gizmo_section": "Selection gizmo",
         "gizmo_arrow_pixels": "Arrow length (px)",
+        "view_btn": "View...",
+        "view_popup_title": "View",
+        "view_show_origin": "Show world origin axes",
         "move_skeleton_tree_section": "Skeleton tree",
         "move_skeleton_tree_root": "Root",
         "move_skeleton_tree_no_particles": "(no particles)",
@@ -593,6 +596,9 @@ _TEXT = {
         "move_clamp_min": "约束最小长度",
         "gizmo_section": "选区 gizmo",
         "gizmo_arrow_pixels": "箭头长度（像素）",
+        "view_btn": "视图...",
+        "view_popup_title": "视图",
+        "view_show_origin": "显示世界原点坐标轴",
         "move_skeleton_tree_section": "骨架树",
         "move_skeleton_tree_root": "根节点",
         "move_skeleton_tree_no_particles": "（无粒子）",
@@ -892,6 +898,30 @@ def draw_toolbar(ui_state, editor_state, renderer, camera, WIN_W):
             path = path[:-4] + "_bound.xml"
         ui_state.save_path_buf = path
         ui_state._save_error = ""
+    imgui.same_line()
+
+    # View popup：世界原点开关 + 选区 gizmo 长度滑条
+    if imgui.button(tr(ui_state, "view_btn") + "##bind_view_btn"):
+        imgui.open_popup("##bind_view_popup")
+    if imgui.begin_popup("##bind_view_popup"):
+        imgui.text(tr(ui_state, "view_popup_title"))
+        imgui.separator()
+        chg_og, v_og = imgui.checkbox(
+            tr(ui_state, "view_show_origin") + "##bind_show_origin",
+            ui_state.show_origin_gizmo,
+        )
+        if chg_og:
+            ui_state.show_origin_gizmo = v_og
+        imgui.separator()
+        imgui.text(tr(ui_state, "gizmo_section"))
+        imgui.set_next_item_width(160)
+        chg_gp, v_gp = imgui.slider_int(
+            tr(ui_state, "gizmo_arrow_pixels") + "##bind_gizmo_px",
+            int(ui_state.gizmo_arrow_pixels), 40, 200,
+        )
+        if chg_gp:
+            ui_state.gizmo_arrow_pixels = int(v_gp)
+        imgui.end_popup()
     imgui.same_line()
     imgui.separator()
     imgui.same_line()
