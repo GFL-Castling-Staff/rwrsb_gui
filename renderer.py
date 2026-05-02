@@ -519,21 +519,25 @@ class VoxelRenderer:
             return
 
         pivot_arr = np.asarray(pivot, dtype=np.float32)
-        # 用 pivot 和 pivot+(1,0,0) 的屏幕投影距离推 pixels-per-world
         p2d_pivot = _project_world_to_screen(pivot_arr, mvp, screen_w, screen_h)
-        p2d_test = _project_world_to_screen(
-            pivot_arr + np.array([1.0, 0.0, 0.0], dtype=np.float32),
-            mvp, screen_w, screen_h,
-        )
-        if p2d_pivot is None or p2d_test is None:
+        if p2d_pivot is None:
             self.gizmo_pivot = None
             self.gizmo_n_vertices = 0
             return
-        pixels_per_world = float(np.hypot(
-            p2d_test[0] - p2d_pivot[0], p2d_test[1] - p2d_pivot[1]
-        ))
-        if pixels_per_world < 1e-3:
-            pixels_per_world = 1e-3
+        # 投影 3 个世界单位向量，取屏幕距离最大者作为 pixels-per-world。
+        # 单一轴（如世界 X）在侧视图下会与视线平行、屏幕距离趋零，导致 arrow_length 爆炸；
+        # 三轴里至少有一个垂直于视线，max 方案对所有视角稳定。
+        pixels_per_world = 1e-3
+        for tv in ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)):
+            p2d = _project_world_to_screen(
+                pivot_arr + np.array(tv, dtype=np.float32),
+                mvp, screen_w, screen_h,
+            )
+            if p2d is None:
+                continue
+            d = float(np.hypot(p2d[0] - p2d_pivot[0], p2d[1] - p2d_pivot[1]))
+            if d > pixels_per_world:
+                pixels_per_world = d
         arrow_world_length = float(arrow_pixels) / pixels_per_world
 
         axes = {
