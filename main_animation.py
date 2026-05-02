@@ -58,6 +58,8 @@ g_drag_plane_normal = None
 g_drag_grab_offset = None
 g_drag_particle_origin = None
 g_drag_origins = {}
+# gizmo 箭头拖动期间的预设轴锁定（"x"/"y"/"z"/None），覆盖修饰键
+g_drag_axis_preset = None
 g_grid_sig_cache = None
 
 # 旋转拖动专用状态（与平移拖动互斥）
@@ -195,10 +197,15 @@ def _ray_plane_hit(ray_o, ray_d, plane_pt, plane_normal):
     return ray_o + ray_d * t
 
 
-def _start_particle_drag(mx, my, particle_idx):
+def _start_particle_drag(mx, my, particle_idx, axis_preset=None):
+    """启动粒子平移拖动。
+
+    axis_preset: "x"/"y"/"z"/None。来自 gizmo 箭头时预设；来自直接拖粒子时
+    传 None，运行期由修饰键决定（_drag_axis_mask）。
+    """
     global g_particle_drag_active, g_drag_particle_idx
     global g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin
-    global g_drag_origins
+    global g_drag_origins, g_drag_axis_preset
 
     # 单选：锁定粒子不可拖
     if particle_idx in g_editor._baseline_locked_indices:
@@ -247,6 +254,7 @@ def _start_particle_drag(mx, my, particle_idx):
 
     g_drag_particle_idx = particle_idx
     g_particle_drag_active = True
+    g_drag_axis_preset = axis_preset
 
 
 def _rotate_drag_axis_from_camera():
@@ -365,7 +373,9 @@ def _end_rotate_drag():
 
 
 def _drag_axis_mask(window):
-    """读取 GLFW 修饰键返回轴锁定模式：Shift=X, Ctrl=Y, Alt=Z, 无=None。"""
+    """轴锁定优先级：gizmo 预设 > 修饰键。Shift=X, Ctrl=Y, Alt=Z, 无=None。"""
+    if g_drag_axis_preset is not None:
+        return g_drag_axis_preset
     shift = (
         glfw.get_key(window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS
         or glfw.get_key(window, glfw.KEY_RIGHT_SHIFT) == glfw.PRESS
@@ -466,7 +476,7 @@ def _update_particle_drag(window, mx, my):
 def _end_particle_drag():
     global g_particle_drag_active, g_drag_particle_idx
     global g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin
-    global g_drag_origins
+    global g_drag_origins, g_drag_axis_preset
 
     if g_editor.animation_mode:
         try:
@@ -480,6 +490,7 @@ def _end_particle_drag():
     g_drag_grab_offset = None
     g_drag_particle_origin = None
     g_drag_origins = {}
+    g_drag_axis_preset = None
 
 
 def _finish_particle_box_select(shift, ctrl, alt=False):
@@ -549,6 +560,22 @@ def on_mouse_button(window, button, action, mods):
     if button == glfw.MOUSE_BUTTON_LEFT:
         g_lmb_down = pressed
         if pressed:
+            # gizmo 把手优先：命中即消费点击，不再走粒子选择路径
+            gizmo_handle = None
+            if _gizmo_pivot_world() is not None:
+                gizmo_handle = _pick_gizmo_handle(g_mouse_x, g_mouse_y)
+            if gizmo_handle is not None:
+                active = g_editor.active_particle_idx
+                if 0 <= active < len(g_editor.particles):
+                    if gizmo_handle.endswith("_arrow"):
+                        _start_particle_drag(g_mouse_x, g_mouse_y, active,
+                                             axis_preset=gizmo_handle[0])
+                    elif gizmo_handle == "center":
+                        _start_particle_drag(g_mouse_x, g_mouse_y, active,
+                                             axis_preset=None)
+                    # ring 路径暂未接（commit 3）
+                return
+
             shift = bool(mods & glfw.MOD_SHIFT)
             ctrl = bool(mods & glfw.MOD_CONTROL)
             alt = bool(mods & glfw.MOD_ALT)
