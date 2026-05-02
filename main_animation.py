@@ -447,8 +447,8 @@ def _update_particle_drag(window, mx, my):
     new_anchor = _apply_particle_drag_rules_anim(new_anchor, axis_mask)
     delta = new_anchor - g_drag_particle_origin
 
-    # Length Clamp（P3）：仅 Move 模式 + 至少一个 clamp 开关开启时生效
-    if g_ui.anim_drag_mode == "move" and (g_ui.move_clamp_max or g_ui.move_clamp_min):
+    # Length Clamp（P3）：直接拖粒子 / gizmo 箭头平移时，开启对应 clamp 即生效
+    if g_ui.move_clamp_max or g_ui.move_clamp_min:
         drag_idx_set = set(g_drag_origins.keys())
         delta = g_editor.apply_length_clamp_to_drag(
             delta, drag_idx_set,
@@ -609,10 +609,8 @@ def on_mouse_button(window, button, action, mods):
                     if hit not in g_editor.selected_particles:
                         g_editor.replace_selected_particles({hit})
                     g_editor.set_active_particle(hit)
-                    if g_ui.anim_drag_mode == "rotate":
-                        _start_rotate_drag(hit)
-                    else:
-                        _start_particle_drag(g_mouse_x, g_mouse_y, hit)
+                    # 直接拖粒子 = 平移；旋转走 gizmo 圆环
+                    _start_particle_drag(g_mouse_x, g_mouse_y, hit)
             else:
                 # 未命中粒子：普通点击清空选择，所有情况都起框选
                 if not (shift or ctrl):

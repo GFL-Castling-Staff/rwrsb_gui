@@ -240,9 +240,6 @@ _TEXT = {
         "invalid_binding_skeleton_only": "Load skeleton only",
         "invalid_binding_abort": "Cancel load",
         # ── 拖动模式切换 ──
-        "drag_mode_move": "Move",
-        "drag_mode_rotate": "Rotate",
-        "drag_rotate_hint": "Drag = rotate around pivot  (axis from view direction)",
         "rotate_pivot_hint": "First click the pivot joint, then Shift-click / box-select the rest",
         # ── 半身基准 pose popup（P2）──
         "halfbody_btn": "Half-body...",
@@ -546,9 +543,6 @@ _TEXT = {
         "invalid_binding_skeleton_only": "只加载骨架",
         "invalid_binding_abort": "放弃加载",
         # ── 拖动模式切换 ──
-        "drag_mode_move": "移动",
-        "drag_mode_rotate": "旋转",
-        "drag_rotate_hint": "拖动 = 绕 pivot 旋转  （轴由视图方向决定）",
         "rotate_pivot_hint": "先单击固定关节，再 Shift 点选 / 框选其余粒子",
         # ── 半身基准 pose popup（P2）──
         "halfbody_btn": "半身...",
@@ -667,7 +661,7 @@ class UIState:
         _anim_check_lengths, _anim_length_threshold_pct — 骨段长度检查开关
         _invalid_binding_*  — 非法 binding 对话框状态
         rotate_pivot_mode, rotate_angle_* — 旋转 popup 暂存值
-        anim_drag_mode, move_clamp_max/min — 拖动模式与长度约束设置
+        move_clamp_max / move_clamp_min — 拖动平移时的 stick 长度约束
         vanilla_animations_path — vanilla 动画文件路径（不持久化）
     """
     def __init__(self):
@@ -751,9 +745,6 @@ class UIState:
         self.rotate_angle_x = 0.0
         self.rotate_angle_y = 0.0
         self.rotate_angle_z = 0.0
-
-        # 拖动模式：平移 / 旋转
-        self.anim_drag_mode = "move"        # "move" | "rotate"
 
         # Move 模式拖动设置（P3）
         self.move_clamp_max = True          # 约束 stick 不被拉长
@@ -2110,32 +2101,16 @@ def _draw_rotate_settings_section(ui_state, editor_state):
 
 def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
     """动画模式工具栏。文件操作 / undo / 视图预设。"""
-    # ── 拖动模式切换：Move / Rotate ──
-    _BTN_ACTIVE = (0.25, 0.55, 0.25, 1.0)   # 激活态：绿色底
-    _BTN_HOVER  = (0.30, 0.65, 0.30, 1.0)
-    for _mode, _key, _id in (
-        ("move",   "drag_mode_move",   "##anim_mode_move"),
-        ("rotate", "drag_mode_rotate", "##anim_mode_rotate"),
-    ):
-        _active = (ui_state.anim_drag_mode == _mode)
-        if _active:
-            imgui.push_style_color(imgui.COLOR_BUTTON,          *_BTN_ACTIVE)
-            imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED,  *_BTN_HOVER)
-            imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE,   *_BTN_ACTIVE)
-        if imgui.button(tr(ui_state, _key) + _id):
-            ui_state.anim_drag_mode = _mode
-        if _active:
-            imgui.pop_style_color(3)
-        imgui.same_line()
-
-    # 拖动模式选项（与 Move/Rotate 同组）
+    # 拖动模式由视口 gizmo 接管：直接拖粒子 = 平移，拖 gizmo 圆环 = 旋转。
+    # toolbar 只保留统一 Settings popup（move 段 + rotate 段）。
     if imgui.button(tr(ui_state, "drag_settings_btn") + "##anim_drag_settings_btn"):
         imgui.open_popup("##anim_drag_settings_popup")
     if imgui.begin_popup("##anim_drag_settings_popup"):
-        if ui_state.anim_drag_mode == "move":
-            _draw_move_settings_section(ui_state, editor_state)
-        else:
-            _draw_rotate_settings_section(ui_state, editor_state)
+        _draw_move_settings_section(ui_state, editor_state)
+        imgui.spacing()
+        imgui.separator()
+        imgui.spacing()
+        _draw_rotate_settings_section(ui_state, editor_state)
         imgui.end_popup()
     imgui.same_line()
 
@@ -2232,8 +2207,6 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
             ui_state.show_voxel_original_colors = v_oc
         imgui.separator()
         imgui.text_disabled(tr(ui_state, "tip_axis"))
-        if ui_state.anim_drag_mode == "rotate":
-            imgui.text_disabled(tr(ui_state, "drag_rotate_hint"))
         imgui.end_popup()
     imgui.same_line()
 
