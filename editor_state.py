@@ -163,10 +163,11 @@ class EditorState:
 
         # 进入动画模式前的 particle 位置备份（exit 时用于恢复）
         self._particle_positions_before_anim = None
-        # 蒙皮 bind pose 的 particle 位置：每次加载 skeleton/model 时刷新一次。
-        # enter_animation_mode 用它作为 record_voxel_bind_pose 的源，与"当前 particles"
-        # 解耦 → 切换动画时不会被上一个动画的最后一帧污染。
+        # 蒙皮 bind pose 的 canonical 状态：每次加载 skeleton/model 时刷新一次。
+        # enter_animation_mode 用作 record_voxel_bind_pose 的源，与"当前 particles
+        # / voxels"解耦 → 切换动画时不会被上一个动画的 skinning 结果污染。
         self._canonical_skeleton_pose = None
+        self._canonical_voxel_positions = None
         self._anim_dirty = False                   # 动画数据是否有未保存修改
 
         # 动画模式独立 undo 栈
@@ -478,10 +479,16 @@ class EditorState:
         self.tool_mode = mode
 
     def _snapshot_canonical_skeleton_pose(self):
-        """把当前 particles 位置存为 canonical bind pose（每次加载 skeleton/model 后调用）。"""
+        """把当前 particles + voxels 存为 canonical bind 状态（加载后调用）。
+
+        蒙皮 bind pose 来源；enter_animation_mode 时用这两组数据重建
+        voxel local offsets，保证多次切换动画后仍正确。
+        """
         self._canonical_skeleton_pose = [
             (float(p['x']), float(p['y']), float(p['z'])) for p in self.particles
         ] if self.particles else None
+        # voxels 存全 tuple（含颜色等），还原时整体替换
+        self._canonical_voxel_positions = list(self.voxels) if self.voxels else None
 
     def load_vox(self, path, trans_bias=None):
         from xml_io import parse_vox
@@ -507,8 +514,10 @@ class EditorState:
         self.active_stick_idx = 0
         self.active_particle_idx = -1
         self.skeleton_dirty = True
-        # vox 不带 skeleton，清掉旧的 canonical pose（避免与新模型错配）
+        # vox 不带 skeleton，清旧的 canonical（避免与新模型错配）；
+        # voxel canonical 留待后续 load_xml/skeleton 时再设
         self._canonical_skeleton_pose = None
+        self._canonical_voxel_positions = None
         logger.info("loaded VOX: %s (%d voxels)", path, len(self.voxels))
 
     def load_xml(self, path, trans_bias=None):
@@ -1099,14 +1108,18 @@ class EditorState:
         self._anim_undo_stack.clear()
         self._anim_redo_stack.clear()
 
-        # 蒙皮：bind pose 来源优先用 _canonical_skeleton_pose（加载 skeleton 时快照
-        # 的 T-pose），保证连续切换动画或加载新模型后 bind pose 始终对齐当前 skeleton
-        # 的"出厂姿态"，不被任何动画的当前帧污染。
-        # 兜底：旧 session 没有 canonical pose 时用 _particle_positions_before_anim。
+        # 蒙皮：bind pose 用 canonical 状态（加载 skeleton 时快照的 T-pose particles
+        # + 原始 voxels），与"当前动画状态"完全解耦。两个都从 canonical 取避免
+        # 上一个动画的 skinning 残留污染 local_offsets。
         bind_source = (self._canonical_skeleton_pose
                        if self._canonical_skeleton_pose is not None
                        else self._particle_positions_before_anim)
         if self.voxels and self.bindings and bind_source:
+            # 还原 voxels 到 canonical（如果有）：上一个动画 skinning 把 self.voxels
+            # 改到了非 T 位置，这里整体替换回出厂位置以便正确录 local_offsets。
+            if (self._canonical_voxel_positions is not None
+                    and len(self._canonical_voxel_positions) == len(self.voxels)):
+                self.voxels = list(self._canonical_voxel_positions)
             still_particles = []
             for i, (x, y, z) in enumerate(bind_source):
                 if i < len(self.particles):
