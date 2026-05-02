@@ -136,7 +136,7 @@ class EditorState:
         self.selected_particles = set()
         self.active_stick_idx = 0
         self.active_particle_idx = -1
-        self.tool_mode = "brush"
+        self.tool_mode = "voxel_select"
         self.mirror_mode = False
         self.mirror_edit_mode = False
         self.mirror_axis = "x"
