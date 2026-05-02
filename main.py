@@ -1055,6 +1055,9 @@ def main():
     ctx.enable(moderngl.DEPTH_TEST)
 
     g_renderer = VoxelRenderer(ctx)
+    # 世界原点 RGB 三轴指示（与动画工具一致）
+    g_renderer.upload_origin_axes(length=8.0)
+    g_renderer.show_origin_gizmo = bool(g_ui.show_origin_gizmo)
 
     # pyimgui
     imgui.create_context()
@@ -1137,6 +1140,7 @@ def main():
                 g_camera.resize(vp_w, vp_h)
                 mvp = g_camera.get_mvp()
                 g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
+                g_renderer.show_origin_gizmo = bool(g_ui.show_origin_gizmo)
                 g_renderer.render(mvp)
 
             # 恢复整个 framebuffer，供 imgui 绘制 UI
