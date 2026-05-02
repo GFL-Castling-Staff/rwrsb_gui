@@ -45,6 +45,7 @@ echo   Run the EXE from dist\<name>\<name>.exe
 echo   Do NOT run build\<name>\<name>.exe
 echo.
 echo Recommended release artifacts:
-echo   zip dist\rwrsb_bind  and  dist\rwrsb_anim  separately
+echo   run scripts\package_release.ps1 to create one 7z package
+echo   containing rwrsb_bind, rwrsb_anim, and release notes.
 echo.
 endlocal

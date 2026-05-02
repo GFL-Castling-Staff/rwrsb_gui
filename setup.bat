@@ -17,7 +17,7 @@ if not exist ".venv" (
 echo [2/3] Installing dependencies...
 call .venv\Scripts\activate.bat
 pip install --upgrade pip -q
-pip install moderngl glfw "imgui[glfw]" numpy -q
+pip install -r requirements.txt -q
 
 echo [3/3] Done.
 echo.

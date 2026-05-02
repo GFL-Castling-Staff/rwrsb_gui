@@ -1,0 +1,5 @@
+moderngl
+glfw
+imgui[glfw]
+numpy
+pyinstaller

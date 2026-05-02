@@ -1,0 +1,77 @@
+name: Build Windows package
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-windows:
+    name: Build Windows 7z
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\python.exe -m pip install --upgrade pip
+          .\.venv\Scripts\pip.exe install -r requirements.txt
+
+      - name: Validate tag matches VERSION
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $version = (Get-Content -Raw VERSION).Trim()
+          $expectedTag = "v$version"
+          $actualTag = "${{ github.ref_name }}"
+          if ($actualTag -ne $expectedTag) {
+            throw "Tag '$actualTag' does not match VERSION '$version'. Expected '$expectedTag'."
+          }
+
+      - name: Build executables
+        shell: cmd
+        run: build.bat
+
+      - name: Package release archive
+        shell: pwsh
+        run: .\scripts\package_release.ps1
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rwrsb-windows-7z
+          path: dist/*.7z
+          if-no-files-found: error
+
+      - name: Select release notes
+        id: notes
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $notes = "docs/release/notes/RELEASE_NOTES_$tag.md"
+          if (-not (Test-Path $notes)) {
+            $notes = "docs/release/PACKAGE_README.md"
+          }
+          "path=$notes" >> $env:GITHUB_OUTPUT
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.7z
+          body_path: ${{ steps.notes.outputs.path }}
