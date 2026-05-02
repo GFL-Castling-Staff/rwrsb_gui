@@ -161,8 +161,12 @@ class EditorState:
         self.playback_playing = False
         self.playback_loop_preview = True          # 预览循环开关（独立于 anim.loop）
 
-        # 进入动画模式前的 particle 位置备份
+        # 进入动画模式前的 particle 位置备份（exit 时用于恢复）
         self._particle_positions_before_anim = None
+        # 蒙皮 bind pose 的 particle 位置：每次加载 skeleton/model 时刷新一次。
+        # enter_animation_mode 用它作为 record_voxel_bind_pose 的源，与"当前 particles"
+        # 解耦 → 切换动画时不会被上一个动画的最后一帧污染。
+        self._canonical_skeleton_pose = None
         self._anim_dirty = False                   # 动画数据是否有未保存修改
 
         # 动画模式独立 undo 栈
@@ -473,6 +477,12 @@ class EditorState:
             self.exit_mirror_mode()
         self.tool_mode = mode
 
+    def _snapshot_canonical_skeleton_pose(self):
+        """把当前 particles 位置存为 canonical bind pose（每次加载 skeleton/model 后调用）。"""
+        self._canonical_skeleton_pose = [
+            (float(p['x']), float(p['y']), float(p['z'])) for p in self.particles
+        ] if self.particles else None
+
     def load_vox(self, path, trans_bias=None):
         from xml_io import parse_vox
         
@@ -497,6 +507,8 @@ class EditorState:
         self.active_stick_idx = 0
         self.active_particle_idx = -1
         self.skeleton_dirty = True
+        # vox 不带 skeleton，清掉旧的 canonical pose（避免与新模型错配）
+        self._canonical_skeleton_pose = None
         logger.info("loaded VOX: %s (%d voxels)", path, len(self.voxels))
 
     def load_xml(self, path, trans_bias=None):
@@ -526,6 +538,9 @@ class EditorState:
         self.active_particle_idx = -1
         self._tree_dirty = True
 
+        # 加载完 skeleton 立即快照 canonical pose（动画蒙皮 bind pose 来源）
+        self._snapshot_canonical_skeleton_pose()
+
         # 如果加载了 voxels 且 bindings 存在，记录 bind pose
         if self.voxels and self.bindings:
             self.record_voxel_bind_pose()
@@ -550,8 +565,10 @@ class EditorState:
         self.gpu_dirty = True
         self.skeleton_dirty = True
         self._tree_dirty = True
+        # 预设加载完立即快照 canonical pose
+        self._snapshot_canonical_skeleton_pose()
         return data
-    
+
     def load_skeleton_xml(self, path):
         """从 RWR XML 文件加载 skeleton（particles + sticks）及 voxels/bindings。
         仅供动画工具用。force-exit 动画模式的责任由调用方承担。
@@ -576,6 +593,9 @@ class EditorState:
         self.active_stick_idx = 0
         self.active_particle_idx = -1
         self._tree_dirty = True
+
+        # 加载完 skeleton 立即快照 canonical pose
+        self._snapshot_canonical_skeleton_pose()
 
         # 如果加载了 voxels 且 bindings 存在，记录 bind pose
         if self.voxels and self.bindings:
@@ -1059,10 +1079,8 @@ class EditorState:
             if animation.end <= 0:
                 animation.end = 1.0
 
-        # 备份原始 particle 位置（exit 时用于恢复 + 蒙皮 bind pose 来源）
-        # 仅在尚未进入动画模式时备份；连续切换动画时保留原备份，避免上一个
-        # 动画的当前帧污染 bind pose（导致下一个动画的 R_cube 算错 → 非 T-pose
-        # 帧体素 cube 朝向不跟骨段，呈现台阶状）。
+        # 备份原始 particle 位置（exit 时用于恢复）
+        # 仅 exit 用，与蒙皮 bind pose 来源已解耦（后者用 _canonical_skeleton_pose）
         if not self.animation_mode or self._particle_positions_before_anim is None:
             self._particle_positions_before_anim = [
                 (float(p['x']), float(p['y']), float(p['z'])) for p in self.particles
@@ -1081,11 +1099,16 @@ class EditorState:
         self._anim_undo_stack.clear()
         self._anim_redo_stack.clear()
 
-        # 蒙皮：以 still pose（_particle_positions_before_anim）作为 bind pose
-        # 必须在 _apply_frame_to_particles 之前调用，否则 bind pose 会变成动画第 0 帧
-        if self.voxels and self.bindings:
+        # 蒙皮：bind pose 来源优先用 _canonical_skeleton_pose（加载 skeleton 时快照
+        # 的 T-pose），保证连续切换动画或加载新模型后 bind pose 始终对齐当前 skeleton
+        # 的"出厂姿态"，不被任何动画的当前帧污染。
+        # 兜底：旧 session 没有 canonical pose 时用 _particle_positions_before_anim。
+        bind_source = (self._canonical_skeleton_pose
+                       if self._canonical_skeleton_pose is not None
+                       else self._particle_positions_before_anim)
+        if self.voxels and self.bindings and bind_source:
             still_particles = []
-            for i, (x, y, z) in enumerate(self._particle_positions_before_anim):
+            for i, (x, y, z) in enumerate(bind_source):
                 if i < len(self.particles):
                     p = dict(self.particles[i])
                     p["x"], p["y"], p["z"] = x, y, z
