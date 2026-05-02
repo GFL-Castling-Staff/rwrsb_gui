@@ -1549,16 +1549,30 @@ class EditorState:
         (frozenset({15, 25}), "midspine_to_origin"),         # shoulder bridge
         # 颈→头：纯垂直骨段，用肩部连线提供 roll 参考
         (frozenset({45, 50}), "shoulder_lateral"),
+        # 末端手骨段：手举高时方向变垂直，需肩部连线提供 roll 参考
+        (frozenset({12274576, 12274112}), "shoulder_lateral"),  # rightelbow → righthand
+        (frozenset({12273840, 12273488}), "shoulder_lateral"),  # leftelbow → lefthand
+        # 胸部 4 根交叉骨段：方向偏斜，绕躯干主轴的 roll 仍易丢失
+        (frozenset({1, 15}), "shoulder_lateral"),               # midspine → rightshoulder
+        (frozenset({1, 25}), "shoulder_lateral"),               # midspine → leftshoulder
+        (frozenset({15, 45}), "shoulder_lateral"),              # rightshoulder → neck
+        (frozenset({45, 25}), "shoulder_lateral"),              # neck → leftshoulder
         # 4 根腿骨段：纯垂直，用胯部连线提供 roll 参考
-        (frozenset({12285680, 12285328}), "hip_lateral"),    # rightfoot → rightknee
-        (frozenset({12285328, 10}), "hip_lateral"),          # rightknee → righthip
-        (frozenset({20, 21}), "hip_lateral"),                # lefthip → leftknee
-        (frozenset({21, 22}), "hip_lateral"),                # leftknee → leftfoot
+        (frozenset({12285680, 12285328}), "hip_lateral"),       # rightfoot → rightknee
+        (frozenset({12285328, 10}), "hip_lateral"),             # rightknee → righthip
+        (frozenset({20, 21}), "hip_lateral"),                   # lefthip → leftknee
+        (frozenset({21, 22}), "hip_lateral"),                   # leftknee → leftfoot
     )
     _LATERAL_REF_RULES_BY_NAME = (
         (frozenset({"righthip", "lefthip"}), "midspine_to_origin"),
         (frozenset({"rightshoulder", "leftshoulder"}), "midspine_to_origin"),
         (frozenset({"neck", "head"}), "shoulder_lateral"),
+        (frozenset({"rightelbow", "righthand"}), "shoulder_lateral"),
+        (frozenset({"leftelbow", "lefthand"}), "shoulder_lateral"),
+        (frozenset({"midspine", "rightshoulder"}), "shoulder_lateral"),
+        (frozenset({"midspine", "leftshoulder"}), "shoulder_lateral"),
+        (frozenset({"rightshoulder", "neck"}), "shoulder_lateral"),
+        (frozenset({"neck", "leftshoulder"}), "shoulder_lateral"),
         (frozenset({"rightfoot", "rightknee"}), "hip_lateral"),
         (frozenset({"rightknee", "righthip"}), "hip_lateral"),
         (frozenset({"lefthip", "leftknee"}), "hip_lateral"),
