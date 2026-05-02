@@ -1535,61 +1535,110 @@ class EditorState:
         w = w / w_len
         return np.column_stack([u, v, w]).astype(np.float32)
 
-    # 默认人骨身体横骨的 id 对：(髋部, 肩部)。name 兜底覆盖非 vanilla id 的预设。
-    _BODY_BRIDGE_ID_PAIRS = ({10, 20}, {15, 25})
-    _BODY_BRIDGE_NAME_PAIRS = (
-        {"righthip", "lefthip"},
-        {"rightshoulder", "leftshoulder"},
+    # ──────────────────────────────────────────────
+    # Body bridge sticks：表驱动
+    # ──────────────────────────────────────────────
+    # 某些骨段单凭自身方向无法约束绕主轴的滚转角（roll），需要外部参考向量。
+    # 三种类型：
+    #   "midspine_to_origin" — 横骨用 midspine 相对桥中心的方向（hip / shoulder bridge）
+    #   "shoulder_lateral"   — 肩部连线作为横向参考（用于 neck → head 等纯垂直骨段）
+    #   "hip_lateral"        — 胯部连线作为横向参考（用于腿骨段等）
+    # 表按 id 优先匹配，name 兜底覆盖非 vanilla id 预设。
+    _LATERAL_REF_RULES_BY_ID = (
+        (frozenset({10, 20}), "midspine_to_origin"),         # hip bridge
+        (frozenset({15, 25}), "midspine_to_origin"),         # shoulder bridge
+    )
+    _LATERAL_REF_RULES_BY_NAME = (
+        (frozenset({"righthip", "lefthip"}), "midspine_to_origin"),
+        (frozenset({"rightshoulder", "leftshoulder"}), "midspine_to_origin"),
     )
 
-    def _is_body_bridge_stick(self, stick, id_to_p):
-        """判断是否为默认人骨的身体横骨（胯部或肩部）。"""
-        ids = {int(stick.particle_a_id), int(stick.particle_b_id)}
-        if ids in self._BODY_BRIDGE_ID_PAIRS:
-            return True
+    def _lookup_lateral_ref_type(self, stick, id_to_p):
+        """查表：id 优先 + name 兜底。返回类型字符串或 None。"""
+        ids = frozenset({int(stick.particle_a_id), int(stick.particle_b_id)})
+        for pair, ref_type in self._LATERAL_REF_RULES_BY_ID:
+            if ids == pair:
+                return ref_type
         pa = id_to_p.get(int(stick.particle_a_id), {})
         pb = id_to_p.get(int(stick.particle_b_id), {})
-        names = {
+        names = frozenset({
             str(pa.get("name", "")).lower(),
             str(pb.get("name", "")).lower(),
-        }
-        return names in self._BODY_BRIDGE_NAME_PAIRS
+        })
+        for pair, ref_type in self._LATERAL_REF_RULES_BY_NAME:
+            if names == pair:
+                return ref_type
+        return None
 
-    def _find_midspine_particle(self, id_to_p):
-        """查找 midspine particle；默认人骨 id=1，找不到再按 name 兜底。"""
-        p = id_to_p.get(1)
+    def _find_particle_by_id_or_name(self, id_to_p, target_id, target_name):
+        """先按 id 找，找不到再按 name（小写）匹配。"""
+        p = id_to_p.get(target_id)
         if p is not None:
             return p
         for particle in id_to_p.values():
-            if str(particle.get("name", "")).lower() == "midspine":
+            if str(particle.get("name", "")).lower() == target_name:
                 return particle
         return None
 
-    def _compute_body_bridge_frame(self, stick, id_to_p):
-        """用身体横骨两端 + midspine 三点构造局部坐标系（胯部 / 肩部通用）。
+    def _find_midspine_particle(self, id_to_p):
+        """查找 midspine particle；默认人骨 id=1，找不到再按 name 兜底。"""
+        return self._find_particle_by_id_or_name(id_to_p, 1, "midspine")
 
-        stick 主轴仍按 XML 中 a->b 的方向作为 u；midspine 相对横骨中心的方向
-        投影到垂直于 u 的平面作为 v，从而给这根横骨一个身体姿态相关的 roll。
-        bind 时和 now 时用同一种构基方案，自洽。
+    def _resolve_lateral_vector(self, ref_type, id_to_p, bridge_origin):
+        """根据 lateral ref 类型计算参考向量；缺失关键粒子时返回 None。"""
+        if ref_type == "midspine_to_origin":
+            pm = self._find_midspine_particle(id_to_p)
+            if pm is None:
+                return None
+            m = np.array([pm["x"], pm["y"], pm["z"]], dtype=np.float32)
+            return m - bridge_origin
+        if ref_type == "shoulder_lateral":
+            rs = self._find_particle_by_id_or_name(id_to_p, 15, "rightshoulder")
+            ls = self._find_particle_by_id_or_name(id_to_p, 25, "leftshoulder")
+            if rs is None or ls is None:
+                return None
+            return np.array(
+                [ls["x"] - rs["x"], ls["y"] - rs["y"], ls["z"] - rs["z"]],
+                dtype=np.float32,
+            )
+        if ref_type == "hip_lateral":
+            rh = self._find_particle_by_id_or_name(id_to_p, 10, "righthip")
+            lh = self._find_particle_by_id_or_name(id_to_p, 20, "lefthip")
+            if rh is None or lh is None:
+                return None
+            return np.array(
+                [lh["x"] - rh["x"], lh["y"] - rh["y"], lh["z"] - rh["z"]],
+                dtype=np.float32,
+            )
+        return None
+
+    def _compute_body_bridge_frame(self, stick, id_to_p):
+        """统一入口：表驱动选择 lateral 参考类型，构造正交基。
+
+        bind 时和 now 时用同一种构基方案，local↔world 映射自洽。
+        任一步缺信息（粒子缺失 / 长度退化）返回 None，调用方落回最短旋转路径。
         """
-        if not self._is_body_bridge_stick(stick, id_to_p):
+        ref_type = self._lookup_lateral_ref_type(stick, id_to_p)
+        if ref_type is None:
             return None
         pa = id_to_p.get(int(stick.particle_a_id))
         pb = id_to_p.get(int(stick.particle_b_id))
-        pm = self._find_midspine_particle(id_to_p)
-        if pa is None or pb is None or pm is None:
+        if pa is None or pb is None:
             return None
 
         a = np.array([pa["x"], pa["y"], pa["z"]], dtype=np.float32)
         b = np.array([pb["x"], pb["y"], pb["z"]], dtype=np.float32)
-        m = np.array([pm["x"], pm["y"], pm["z"]], dtype=np.float32)
         origin = (a + b) * 0.5
         diff = b - a
         L = float(np.linalg.norm(diff))
         if L < 1e-6:
             return origin, np.eye(3, dtype=np.float32), np.array([1.0, 0.0, 0.0], dtype=np.float32)
         u = diff / L
-        R = self._basis_from_axis_and_reference(u, m - origin)
+
+        ref = self._resolve_lateral_vector(ref_type, id_to_p, origin)
+        if ref is None:
+            return None
+        R = self._basis_from_axis_and_reference(u, ref)
         return origin, R, u
 
     def _rotate_basis(self, R_bind, u_bind, u_now):
