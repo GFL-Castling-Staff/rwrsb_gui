@@ -290,8 +290,12 @@ def _compute_rotate_pivot():
     return np.zeros(3, dtype=np.float32)
 
 
-def _start_rotate_drag(particle_idx):
-    """旋转模式下开始拖动：保存快照，计算 pivot + 轴，推 undo。"""
+def _start_rotate_drag(particle_idx, axis_preset=None):
+    """旋转模式下开始拖动：保存快照，计算 pivot + 轴，推 undo。
+
+    axis_preset: "x"/"y"/"z"/None。来自 gizmo 圆环时预设；为 None 时按
+    相机视线推断（_rotate_drag_axis_from_camera）。
+    """
     global g_rotate_drag_active, g_rotate_drag_start_mx
     global g_rotate_drag_snapshot, g_rotate_drag_pivot, g_rotate_drag_axis
 
@@ -314,7 +318,7 @@ def _start_rotate_drag(particle_idx):
         and idx not in g_editor._baseline_locked_indices
     }
     g_rotate_drag_pivot = _compute_rotate_pivot()
-    g_rotate_drag_axis  = _rotate_drag_axis_from_camera()
+    g_rotate_drag_axis  = axis_preset if axis_preset is not None else _rotate_drag_axis_from_camera()
     g_rotate_drag_start_mx = g_mouse_x
     g_rotate_drag_active = True
 
@@ -573,7 +577,12 @@ def on_mouse_button(window, button, action, mods):
                     elif gizmo_handle == "center":
                         _start_particle_drag(g_mouse_x, g_mouse_y, active,
                                              axis_preset=None)
-                    # ring 路径暂未接（commit 3）
+                    elif gizmo_handle.endswith("_ring"):
+                        # 拖圆环旋转：要求至少一个选中粒子（否则 _start_rotate_drag 会 early-return）
+                        # 兜底：active 单选时也允许（把 active 加入选区一份临时副本）
+                        if not g_editor.selected_particles:
+                            g_editor.selected_particles.add(active)
+                        _start_rotate_drag(active, axis_preset=gizmo_handle[0])
                 return
 
             shift = bool(mods & glfw.MOD_SHIFT)
