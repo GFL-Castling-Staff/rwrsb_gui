@@ -330,6 +330,42 @@ def _pick_particle(sx, sy):
     return pick_particle_screen(mvp, positions, sx, sy - toolbar_h, vp_w, vp_h)
 
 
+def _gizmo_pivot_world():
+    """选区 gizmo 中心 = active particle 位置；不满足条件返回 None。
+
+    bind 工具的可见条件：
+    - tool_mode == 'bone_edit'（其它模式没有粒子选择语义）
+    - allow_particle_edit 为 True（编辑被禁用时不显示）
+    - 不在 mirror_mode（镜像模式有自己的拖动语义，先回避）
+    - active_particle_idx 有效
+    """
+    if g_editor is None:
+        return None
+    if g_editor.tool_mode != 'bone_edit':
+        return None
+    if not g_ui.allow_particle_edit:
+        return None
+    if g_editor.mirror_mode:
+        return None
+    idx = g_editor.active_particle_idx
+    if idx < 0 or idx >= len(g_editor.particles):
+        return None
+    p = g_editor.particles[idx]
+    return np.array([p["x"], p["y"], p["z"]], dtype=np.float32)
+
+
+def _pick_gizmo_handle(sx, sy):
+    """屏幕空间命中测试，返回把手名或 None。"""
+    if g_renderer is None:
+        return None
+    panel_w, toolbar_h, status_h = _ui_layout_metrics()
+    vp_w = WIN_W - panel_w
+    vp_h = WIN_H - toolbar_h - status_h
+    if vp_w <= 0 or vp_h <= 0:
+        return None
+    return g_renderer.pick_gizmo_handle(sx, sy - toolbar_h, g_camera.get_mvp(), vp_w, vp_h)
+
+
 def _begin_particle_drag(sx, sy, particle_idx, push_undo=True):
     global g_particle_drag_active, g_drag_particle_idx, g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin, g_drag_origins
     particle = g_editor.particles[particle_idx]
@@ -929,6 +965,7 @@ def on_cursor_pos(window, xpos, ypos):
         if g_renderer is not None:
             g_renderer.highlight_particle_idx = g_editor.active_particle_idx
             g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
+        g_ui.gizmo_hover_handle = None
         return
     hover_particle = _pick_particle(xpos, ypos)
     g_hover_particle_idx = hover_particle
@@ -939,6 +976,9 @@ def on_cursor_pos(window, xpos, ypos):
         else:
             g_renderer.highlight_particle_idx = hover_particle if hover_particle >= 0 else g_editor.active_particle_idx
             g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
+    # gizmo hover：拖动期间冻结，避免误导
+    if not g_particle_drag_active:
+        g_ui.gizmo_hover_handle = _pick_gizmo_handle(xpos, ypos)
     if g_mirror_edit_drag_mode:
         _update_mirror_edit_drag(xpos, ypos)
         return
@@ -1142,6 +1182,19 @@ def main():
                 g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
                 g_renderer.show_origin_gizmo = bool(g_ui.show_origin_gizmo)
                 g_renderer.render(mvp)
+
+                # 选区 gizmo（每帧重建几何，screen-space 恒定大小）
+                pivot = _gizmo_pivot_world()
+                if pivot is not None:
+                    g_renderer.prepare_gizmo(
+                        pivot, mvp, vp_w, vp_h,
+                        arrow_pixels=int(g_ui.gizmo_arrow_pixels),
+                        hover_handle=g_ui.gizmo_hover_handle,
+                    )
+                    g_renderer.draw_gizmo(mvp)
+                else:
+                    g_renderer.gizmo_pivot = None
+                    g_renderer.gizmo_n_vertices = 0
 
             # 恢复整个 framebuffer，供 imgui 绘制 UI
             ctx.viewport = (0, 0, max(fb_w, 1), max(fb_h, 1))
