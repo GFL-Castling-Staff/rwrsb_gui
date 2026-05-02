@@ -1059,10 +1059,14 @@ class EditorState:
             if animation.end <= 0:
                 animation.end = 1.0
 
-        # 备份原始 particle 位置（exit 时用于恢复）
-        self._particle_positions_before_anim = [
-            (float(p['x']), float(p['y']), float(p['z'])) for p in self.particles
-        ]
+        # 备份原始 particle 位置（exit 时用于恢复 + 蒙皮 bind pose 来源）
+        # 仅在尚未进入动画模式时备份；连续切换动画时保留原备份，避免上一个
+        # 动画的当前帧污染 bind pose（导致下一个动画的 R_cube 算错 → 非 T-pose
+        # 帧体素 cube 朝向不跟骨段，呈现台阶状）。
+        if not self.animation_mode or self._particle_positions_before_anim is None:
+            self._particle_positions_before_anim = [
+                (float(p['x']), float(p['y']), float(p['z'])) for p in self.particles
+            ]
 
         # 进入模式时清空 selected_particles 和镜像
         self.selected_particles.clear()
