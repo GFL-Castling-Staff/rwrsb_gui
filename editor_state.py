@@ -1552,11 +1552,14 @@ class EditorState:
         # 末端手骨段：手举高时方向变垂直，需肩部连线提供 roll 参考
         (frozenset({12274576, 12274112}), "shoulder_lateral"),  # rightelbow → righthand
         (frozenset({12273840, 12273488}), "shoulder_lateral"),  # leftelbow → lefthand
-        # 胸部 4 根交叉骨段：方向偏斜，绕躯干主轴的 roll 仍易丢失
+        # 上半身 4 根交叉骨段：连 midspine ↔ shoulders / shoulders ↔ neck
         (frozenset({1, 15}), "shoulder_lateral"),               # midspine → rightshoulder
         (frozenset({1, 25}), "shoulder_lateral"),               # midspine → leftshoulder
         (frozenset({15, 45}), "shoulder_lateral"),              # rightshoulder → neck
         (frozenset({45, 25}), "shoulder_lateral"),              # neck → leftshoulder
+        # 下半身 2 根交叉骨段：连 midspine ↔ hips（离 hip 端更近，用胯部连线）
+        (frozenset({10, 1}), "hip_lateral"),                    # righthip → midspine
+        (frozenset({20, 1}), "hip_lateral"),                    # lefthip → midspine
         # 4 根腿骨段：纯垂直，用胯部连线提供 roll 参考
         (frozenset({12285680, 12285328}), "hip_lateral"),       # rightfoot → rightknee
         (frozenset({12285328, 10}), "hip_lateral"),             # rightknee → righthip
@@ -1573,6 +1576,8 @@ class EditorState:
         (frozenset({"midspine", "leftshoulder"}), "shoulder_lateral"),
         (frozenset({"rightshoulder", "neck"}), "shoulder_lateral"),
         (frozenset({"neck", "leftshoulder"}), "shoulder_lateral"),
+        (frozenset({"righthip", "midspine"}), "hip_lateral"),
+        (frozenset({"lefthip", "midspine"}), "hip_lateral"),
         (frozenset({"rightfoot", "rightknee"}), "hip_lateral"),
         (frozenset({"rightknee", "righthip"}), "hip_lateral"),
         (frozenset({"lefthip", "leftknee"}), "hip_lateral"),
