@@ -341,13 +341,13 @@ def _pick_particle(sx, sy):
 
 
 def _gizmo_pivot_world():
-    """选区 gizmo 中心 = active particle 位置；不满足条件返回 None。
+    """选区 gizmo 中心位置由 ui_state.rotate_pivot_mode 决定，与旋转 pivot 一致。
 
     bind 工具的可见条件：
     - tool_mode == 'bone_edit'（其它模式没有粒子选择语义）
     - allow_particle_edit 为 True（编辑被禁用时不显示）
     - 不在 mirror_mode（镜像模式有自己的拖动语义，先回避）
-    - active_particle_idx 有效
+    - active_particle_idx 有效（保证选区非空）
     """
     if g_editor is None:
         return None
@@ -360,8 +360,7 @@ def _gizmo_pivot_world():
     idx = g_editor.active_particle_idx
     if idx < 0 or idx >= len(g_editor.particles):
         return None
-    p = g_editor.particles[idx]
-    return np.array([p["x"], p["y"], p["z"]], dtype=np.float32)
+    return _compute_rotate_pivot()
 
 
 def _pick_gizmo_handle(sx, sy):
@@ -698,12 +697,27 @@ def _rotation_matrix(axis, angle_rad):
     return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]], dtype=np.float32)
 
 
-def _rotate_pivot_active():
-    """旋转 pivot = active 粒子位置。bind 工具暂不提供其它 pivot 模式。"""
-    idx = g_editor.active_particle_idx
-    if 0 <= idx < len(g_editor.particles):
-        p = g_editor.particles[idx]
-        return np.array([p["x"], p["y"], p["z"]], dtype=np.float32)
+def _compute_rotate_pivot():
+    """根据 g_ui.rotate_pivot_mode 计算旋转中心（世界坐标）。
+
+    模式：active / centroid / world_origin。与 main_animation 保持一致。
+    active 模式下若 active 不在选择集中，fallback 到 centroid。
+    """
+    mode = g_ui.rotate_pivot_mode
+    sel = g_editor.selected_particles
+    if mode == "active":
+        act = g_editor.active_particle_idx
+        if act >= 0 and act in sel:
+            p = g_editor.particles[act]
+            return np.array([p["x"], p["y"], p["z"]], dtype=np.float32)
+        # fallback: centroid
+    if mode in ("active", "centroid") and sel:
+        coords = np.array(
+            [[g_editor.particles[i]["x"], g_editor.particles[i]["y"], g_editor.particles[i]["z"]]
+             for i in sel],
+            dtype=np.float32,
+        )
+        return coords.mean(axis=0)
     return np.zeros(3, dtype=np.float32)
 
 
@@ -729,7 +743,7 @@ def _start_rotate_drag(axis_preset):
         for idx in sel
         if 0 <= idx < len(g_editor.particles)
     }
-    g_rotate_drag_pivot = _rotate_pivot_active()
+    g_rotate_drag_pivot = _compute_rotate_pivot()
     g_rotate_drag_axis = axis_preset
     g_rotate_drag_start_mx = g_mouse_x
     g_rotate_drag_active = True

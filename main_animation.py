@@ -159,14 +159,16 @@ def _pick_particle(mx, my):
 
 
 def _gizmo_pivot_world():
-    """gizmo 中心 = active particle 位置；无效时返回 None。"""
+    """gizmo 中心位置由 ui_state.rotate_pivot_mode 决定，与旋转 pivot 一致。
+
+    可见前提：active_particle_idx 有效（保证选区非空）+ 不在 mirror。
+    """
     if g_editor is None or g_editor.mirror_mode:
         return None
     idx = g_editor.active_particle_idx
     if idx < 0 or idx >= len(g_editor.particles):
         return None
-    p = g_editor.particles[idx]
-    return np.array([p["x"], p["y"], p["z"]], dtype=np.float32)
+    return _compute_rotate_pivot()
 
 
 def _pick_gizmo_handle(mx, my):
