@@ -1547,10 +1547,22 @@ class EditorState:
     _LATERAL_REF_RULES_BY_ID = (
         (frozenset({10, 20}), "midspine_to_origin"),         # hip bridge
         (frozenset({15, 25}), "midspine_to_origin"),         # shoulder bridge
+        # 颈→头：纯垂直骨段，用肩部连线提供 roll 参考
+        (frozenset({45, 50}), "shoulder_lateral"),
+        # 4 根腿骨段：纯垂直，用胯部连线提供 roll 参考
+        (frozenset({12285680, 12285328}), "hip_lateral"),    # rightfoot → rightknee
+        (frozenset({12285328, 10}), "hip_lateral"),          # rightknee → righthip
+        (frozenset({20, 21}), "hip_lateral"),                # lefthip → leftknee
+        (frozenset({21, 22}), "hip_lateral"),                # leftknee → leftfoot
     )
     _LATERAL_REF_RULES_BY_NAME = (
         (frozenset({"righthip", "lefthip"}), "midspine_to_origin"),
         (frozenset({"rightshoulder", "leftshoulder"}), "midspine_to_origin"),
+        (frozenset({"neck", "head"}), "shoulder_lateral"),
+        (frozenset({"rightfoot", "rightknee"}), "hip_lateral"),
+        (frozenset({"rightknee", "righthip"}), "hip_lateral"),
+        (frozenset({"lefthip", "leftknee"}), "hip_lateral"),
+        (frozenset({"leftknee", "leftfoot"}), "hip_lateral"),
     )
 
     def _lookup_lateral_ref_type(self, stick, id_to_p):
