@@ -17,11 +17,14 @@ It loads `.vox` files or project XML directly, lets you edit the skeleton struct
 - Re-bind voxels to skeleton segments
 - Save and reuse skeleton presets
 - Drag particles directly in the viewport
+- **Blender-style selection gizmo** (3-axis arrows + rings) — click handles for axis-locked translate / rotate
+- World origin RGB axes indicator
 - Grid display, major/minor grid, and grid snapping
 - Chinese / English bilingual UI
 - UI scaling
 - Camera Y-axis inversion
 - Export to XML
+- Defaults to voxel box-select on launch (avoids accidental painting)
 
 ## Requirements
 
@@ -104,6 +107,12 @@ The "Grid..." button in the toolbar toggles the viewport grid and particle drag 
 ### Stick Length Check
 
 The "Check stick lengths" checkbox in the lower-right of the animation panel enables real-time display of sticks whose length deviates from the frame-0 reference length by more than the configured threshold, highlighted in red in the viewport. The default threshold is 1% (matching the natural drift in vanilla animations).
+
+### Selection Gizmo / Skinning / Voxel Orientation
+
+- Selecting a particle shows a Blender-style 3-axis gizmo in the viewport: drag arrows to translate along an axis, drag rings to rotate around an axis (Ctrl for 15° snap), drag the center handle to translate freely. The Shift / Ctrl / Alt modifier-key axis lock still works as a shortcut when dragging particles directly.
+- Skinning: hip (`righthip<->lefthip`) and shoulder (`rightshoulder<->leftshoulder`) bridge sticks use midspine as a roll reference when constructing their local frame, avoiding twisty drift around the main axis.
+- Oriented voxel rendering: in animation mode each voxel cube's orientation rotates with its bone, eliminating the "staircase" silhouette at non-90° rotations. GPU data flows through a per-bone uniform — even 100k voxels only need 8 KB per frame.
 
 ### Planned
 
@@ -299,7 +308,7 @@ If these files are accidentally tracked later, remove them from the Git index ra
 
 Release process: see [RELEASE_EN.md](RELEASE_EN.md).
 
-Release notes: see [RELEASE_NOTES_v1.0.0_EN.md](RELEASE_NOTES_v1.0.0_EN.md).
+Release notes: see [RELEASE_NOTES_v1.1.0_EN.md](RELEASE_NOTES_v1.1.0_EN.md) (history: [v1.0.0](RELEASE_NOTES_v1.0.0_EN.md) / [v0.1.0](RELEASE_NOTES_v0.1.0.md)).
 
 ## Known Limitations
 

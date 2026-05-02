@@ -17,11 +17,14 @@
 - 给体素重新绑定骨段
 - 保存和复用骨架预设
 - 在视口中直接拖拽粒子点
+- **Blender 风格选区 gizmo**（3 轴箭头 + 圆环），点把手锁轴平移 / 旋转
+- 世界原点 RGB 三轴指示
 - 网格显示、主次网格和网格吸附
 - 中英双语界面
 - UI 缩放
 - 相机 Y 轴反转
 - 导出 XML
+- 默认进入体素框选模式（避免误涂）
 
 ## 运行环境
 
@@ -104,6 +107,12 @@ run.bat
 ### 骨段长度检查
 
 动画面板右下角 "Check stick lengths" 复选框，开启后实时显示相对于第 0 帧参考长度偏差超过阈值的骨段，并在视口中用红色高亮。默认阈值 1%（与 vanilla 动画的自然漂移量匹配）。
+
+### 选区 gizmo / 蒙皮 / 体素朝向
+
+- 选中粒子后视口出现 Blender 风格 3 轴 gizmo：拖箭头沿轴平移、拖圆环绕轴旋转（Ctrl 15° 吸附）、拖中心球自由平移。修饰键 Shift/Ctrl/Alt 仍可作为快捷锁轴方式直接拖粒子。
+- 蒙皮：胯部 (`righthip<->lefthip`) 和肩部 (`rightshoulder<->leftshoulder`) 横骨用 midspine 作为 roll 参考构造局部坐标系，避免绕主轴的扭转漂移。
+- Oriented voxel rendering：动画模式下每个体素 cube 朝向跟随骨段一起旋转，消除非 90° 旋转下的"楼梯"边缘。GPU 数据走 per-bone uniform，10w 体素也只需每帧 8 KB 上传。
 
 ### 待实现
 
@@ -302,7 +311,7 @@ dist/
 
 发版流程见 [RELEASE.md](RELEASE.md)。
 
-本次版本说明稿见 [RELEASE_NOTES_v0.1.0.md](RELEASE_NOTES_v0.1.0.md)。
+本次版本说明稿见 [RELEASE_NOTES_v1.1.0.md](RELEASE_NOTES_v1.1.0.md)（历史版本：[v1.0.0](RELEASE_NOTES_v1.0.0.md) / [v0.1.0](RELEASE_NOTES_v0.1.0.md)）。
 
 ## 已知限制
 

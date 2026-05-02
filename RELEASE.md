@@ -48,7 +48,7 @@ dist\rwrsb_bind\rwrsb_bind.exe
 
 建议文件名：
 
-- `rwrsb_bind-v1.0.0-windows.zip`
+- `rwrsb_bind-v1.1.0-windows.zip`
 
 zip 内应包含：
 
@@ -61,11 +61,11 @@ zip 内应包含：
 
 建议标题：
 
-- `rwrsb_bind v1.0.0`
+- `rwrsb_bind v1.1.0`
 
 建议正文：
 
-- 可以直接使用 [RELEASE_NOTES_v1.0.0.md](RELEASE_NOTES_v1.0.0.md)
+- 可以直接使用 [RELEASE_NOTES_v1.1.0.md](RELEASE_NOTES_v1.1.0.md)
 
 ## 发版前检查清单
 

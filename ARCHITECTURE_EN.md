@@ -103,6 +103,8 @@ The main loop structure is identical in both entry points (GLFW init → frame l
 | `skeleton_dirty` | Skeleton line data needs to be re-uploaded to the renderer |
 | `_voxel_local_offsets` | `{voxel_index: np.ndarray(3,)}` — fixed local-space offset of each bound voxel within its stick's coordinate frame (skinning bind pose) |
 | `_voxel_groups` | Skinning data pre-grouped by `constraint_index`; used by `update_voxel_positions_from_skeleton` |
+| `_bone_orientations` | `np.ndarray(MAX_BONE_SLOTS, 16)` — per-bone R_cube matrix (mat4 column-major), used for oriented voxel rendering. Slot 0 is the identity sentinel |
+| `_voxel_bone_indices` | `np.ndarray(N_voxels,)` — per-voxel bone slot index (bound voxel = ci+1, unbound = 0); used by the shader as a uniform array index |
 
 ---
 
@@ -133,7 +135,9 @@ Key constraint: **deleting or reordering a stick must always update bindings in 
 |-------|-----------|---------------------|
 | `"brush"` | Voxel painting | Click a voxel to bind/paint it |
 | `"voxel_select"` | Voxel box-select | Drag to draw a box; updates `selected_voxels` |
-| `"bone_edit"` | Bone editing | Click a particle to select it; supports multi-select/box-select; **particle dragging only works in this mode** |
+| `"bone_edit"` | Bone editing | Click a particle to select it; supports multi-select/box-select; **particle dragging and the selection gizmo only work in this mode** |
+
+**Default value (since v1.1.0): `"voxel_select"`**. Newly opened models start in an observation-friendly mode to avoid accidental painting.
 
 > Note: `tool_mode` (what the mouse does in the viewport) and `allow_skeleton_edit` / `allow_stick_edit` / `allow_particle_edit` (whether data modification is permitted) are two orthogonal concepts — do not confuse them.
 
@@ -156,6 +160,8 @@ The same modifier key has different meanings in different contexts:
 | Box-select particles | Add (append) | Toggle | — | Remove (deselect) |
 
 Axis constraints (during drag) and multi-select (during click/box-select) read modifier keys at different times: axis constraints are read at **drag start (mousedown + movement)**; multi-select is read at **click (mousedown + no movement + mouseup)**. Therefore they do not conflict.
+
+**Gizmo precedence**: When mouse-down hits a gizmo handle (arrow / ring / center), the axis is fixed by the handle and **modifier keys are ignored**. See Section 10.
 
 ---
 
@@ -210,6 +216,15 @@ Changing `trans_bias` shifts all voxel and skeleton coordinates together, so the
 
 Skeleton presets (`presets/*.json`) store only `particles` + `sticks`, not `bindings`. Bindings are project-specific data tied to a particular voxel model and have no cross-model reuse value. Loading a preset clears the bindings.
 
+### Body bridge sticks: midspine provides the roll reference
+
+Body bridge sticks (`righthip<->lefthip`, `rightshoulder<->leftshoulder`) have only two endpoints — there's no third vector to define the roll angle. The generic "shortest bind→now rotation" algorithm (`_rotate_basis`) leaves an unpredictable twist.
+
+The skinning code special-cases body bridge sticks:
+- Recognition is narrow: only the pairs `{10,20}/(righthip,lefthip)` and `{15,25}/(rightshoulder,leftshoulder)`. Id is matched first, name as a fallback (covers presets with non-vanilla ids).
+- Goes through `_compute_body_bridge_frame`: builds an orthonormal basis from three points (the two endpoints + midspine). `u` = bridge main axis; `v` = (midspine − bridge_origin) projected onto the plane perpendicular to `u`; `w = u × v`. Bind-time and now-time use the same construction so the local↔world mapping stays self-consistent.
+- Do not extend the bridge set further (neck / wrists do not need it). With oriented voxel rendering (Section 10), most remaining visual quirks should be attributed to the render layer, not the skinning layer.
+
 ### stick.visible is not cloned — it goes through the visible_by_pair channel
 
 `StickEntry.clone()` does not copy the `visible` field (counterintuitive!). Reason: `visible` is UI state (the user's display preference) and should not be reset by undo/redo. `_snapshot()` separately saves visibility state in a `visible_by_pair` dict (key = `(particle_a_id, particle_b_id)`); `_restore_snapshot()` matches it back by particle pair on restore — unmatched sticks default to `True`. See Section 8.
@@ -252,3 +267,64 @@ A particle has two kinds of "number" with different semantics and uses:
 | Stability | Does not change when particles are added or deleted | May change for other particles when a particle is added or deleted |
 
 Rule: **use `id` for anything that must be persisted to file or kept stable across undo frames; use `index` for UI state that is only valid within the current session.**
+
+---
+
+## 10. Selection Gizmo and Oriented Voxel Rendering (v1.1.0)
+
+### 10.1 Selection gizmo
+
+A Blender-style 3-axis widget that follows the active particle in the viewport. Available in both tools.
+
+**Visibility conditions**:
+- Animation tool: `active_particle_idx` is valid + not in mirror mode
+- Binding tool: above + `tool_mode == 'bone_edit'` + `allow_particle_edit` is `True`
+
+The gizmo is hidden if any condition fails.
+
+**Geometry**:
+- Three line arrows (X red / Y green / Z blue), each with an X-shaped head at the tip
+- Three 32-segment polyline rings (matching colors, in the plane perpendicular to the corresponding axis)
+- A small 3-axis cross at the center
+- Depth test off — drawn on top; the hovered handle turns yellow
+
+**Screen-space constant scale**: each frame, project three world unit vectors (X/Y/Z) and take the maximum screen-space distance as `pixels_per_world`. **Do not use a single vector**: in side views the chosen world axis can be parallel to the view direction, collapsing the projected distance to ~0 and blowing the arrow length to infinity (this was a real bug fixed mid-v1.1.0). `arrow_world_length = arrow_pixels / pixels_per_world`. `arrow_pixels` defaults to 80, adjustable in the toolbar settings popup (40–200).
+
+**Hit test** (screen-space 2D distance):
+- Center: distance to `pivot_2d` < 8 px
+- Arrow: distance to the projected line segment < 10 px
+- Ring: minimum distance from any of 24 sampled points on the ring < 10 px
+- Priority: center > arrow > ring (ties broken by priority)
+
+**Interaction routing**:
+- Hit arrow / center → start `_begin_particle_drag` / `_start_particle_drag` with an `axis_preset` that overrides modifier keys
+- Hit ring → start a rotate drag around the preset world axis; 1 px = 1°, hold Ctrl for 15° snap
+- Direct particle drag (no gizmo hit): legacy path unchanged; modifier keys Shift/Ctrl/Alt still lock X/Y/Z
+
+The binding tool had no rotate drag before v1.1.0; it was ported from the animation tool (does not call `commit_particle_move_to_frame` / `apply_baseline_lock` / live skinning, uses `_push_undo` instead of `_anim_push_undo`).
+
+### 10.2 Oriented voxel rendering
+
+When the skeleton rotates, each voxel cube's **own orientation** must rotate with it; otherwise non-90° rotations produce a "staircase" silhouette on limb edges.
+
+**Data layout** (per-bone uniform, **not** per-voxel attribute):
+- `_bone_orientations`: shape `(128, 16)` — each row is a column-major-flattened mat4
+- Slot 0: identity sentinel — unbound voxels' `i_bone_idx` points here
+- Slot ci+1: `R_cube = R_now @ R_bind.T` for stick `ci` (R_bind is recorded by `record_voxel_bind_pose`; body bridge sticks go through the body bridge path with the same self-consistent construction)
+- `_voxel_bone_indices`: shape `(N_voxels,)` float32 — bound voxel = `ci+1`, unbound = 0
+
+**Why per-bone, not per-voxel**: for a 100k-voxel model, a per-voxel orientation VBO would re-upload 3.6 MB per frame. The per-bone uniform only needs 8 KB (128 mat4) per frame, independent of voxel count.
+
+**Shader ([shaders/voxel.vert](shaders/voxel.vert))**:
+```glsl
+uniform mat4 u_bone_orientations[128];
+in float i_bone_idx;
+...
+mat3 R = mat3(u_bone_orientations[int(i_bone_idx)]);
+vec3 world_pos = R * in_vert + i_pos;
+v_normal = R * in_normal;   // R is orthonormal; no inverse-transpose needed
+```
+
+**Trigger**: animation mode only. `update_voxel_positions_from_skeleton` computes `R_cube` per stick and writes it into `_bone_orientations[ci+1]`. In binding mode all slots stay identity, voxel cubes remain axis-aligned, preserving historical behavior.
+
+**Bone idx VBO upload timing**: only when bindings change (rebuilt inside `build_instance_arrays`). Each animation tick only uploads the orientations uniform.

@@ -48,7 +48,7 @@ Note:
 
 Suggested file name:
 
-- `rwrsb_bind-v1.0.0-windows.zip`
+- `rwrsb_bind-v1.1.0-windows.zip`
 
 The zip should include:
 
@@ -61,11 +61,11 @@ The zip should include:
 
 Suggested title:
 
-- `rwrsb_bind v1.0.0`
+- `rwrsb_bind v1.1.0`
 
 Suggested body:
 
-- Use [RELEASE_NOTES_v1.0.0_EN.md](RELEASE_NOTES_v1.0.0_EN.md) directly.
+- Use [RELEASE_NOTES_v1.1.0_EN.md](RELEASE_NOTES_v1.1.0_EN.md) directly.
 
 ## Pre-Release Checklist
 

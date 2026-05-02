@@ -105,6 +105,8 @@
 | `skeleton_dirty` | 骨架线段数据需要重传给 renderer |
 | `_voxel_local_offsets` | `{voxel_index: np.ndarray(3,)}`，每个绑定体素在其骨段局部坐标系里的固定偏移（蒙皮 bind pose） |
 | `_voxel_groups` | 按 constraint_index 预分组的蒙皮数据，`update_voxel_positions_from_skeleton` 使用 |
+| `_bone_orientations` | `np.ndarray(MAX_BONE_SLOTS, 16)`，每根骨段的 R_cube 矩阵（mat4 列优先），用于 oriented voxel 渲染。槽 0 为 identity 哨位 |
+| `_voxel_bone_indices` | `np.ndarray(N_voxels,)`，每个体素的骨段下标（绑定 voxel = ci+1，未绑定 = 0）；shader 用作 uniform 数组下标 |
 
 ---
 
@@ -135,7 +137,9 @@ particles ──── sticks ──── bindings
 |----|------|------------|
 | `"brush"` | 体素涂刷 | 点击体素做绑定/涂色 |
 | `"voxel_select"` | 体素框选 | 拖动画框，选中范围内体素更新 `selected_voxels` |
-| `"bone_edit"` | 骨骼编辑 | 点击 particle 选中，支持多选/框选；**只有此模式下粒子拖拽生效** |
+| `"bone_edit"` | 骨骼编辑 | 点击 particle 选中，支持多选/框选；**只有此模式下粒子拖拽和选区 gizmo 生效** |
+
+**默认值（v1.1.0 起）：`"voxel_select"`**。新打开模型默认进入观察类工作流，避免误涂。
 
 > 注意：`tool_mode`（鼠标在视口里做什么）和 `allow_skeleton_edit` / `allow_stick_edit` / `allow_particle_edit`（是否允许修改数据）是两个正交的概念，不要混淆。
 
@@ -158,6 +162,8 @@ particles ──── sticks ──── bindings
 | 框选 particle | 加选（追加） | Toggle | — | 减选（移出） |
 
 轴约束（拖拽时）和多选（点击/框选时）读修饰键的时机不同：轴约束在**拖动开始（mousedown + 移动）**时读，多选在**点击（mousedown + 无移动 + mouseup）**时读，因此不冲突。
+
+**Gizmo 优先级**：当鼠标按下命中 gizmo 把手（箭头/圆环/中心球）时，轴由把手预设决定，**修饰键被忽略**。详见第 10 节。
 
 ---
 
@@ -212,6 +218,15 @@ particles ──── sticks ──── bindings
 
 骨架预设（`presets/*.json`）只保存 `particles` + `sticks`，不保存 `bindings`。binding 属于具体体素模型的项目数据，不具有跨模型复用价值。加载预设时 bindings 会被清空。
 
+### 身体横骨蒙皮：用 midspine 提供 roll 参考
+
+横骨（`righthip<->lefthip`、`rightshoulder<->leftshoulder`）只有两个端点，没有第三向量定义滚转角，普通的"bind→now 最短旋转"算法（`_rotate_basis`）会留下不可预测的扭转。
+
+蒙皮单独识别身体横骨：
+- 识别窗口窄：仅 `{10,20}/(righthip,lefthip)` 和 `{15,25}/(rightshoulder,leftshoulder)` 两对，id 优先 + name 兜底（覆盖非 vanilla id 的预设）。
+- 走 `_compute_body_bridge_frame`：用三点（横骨两端 + midspine）构造正交基。`u` = 横骨主轴，`v` = midspine 相对横骨中心的方向投影到垂直 `u` 平面，`w = u × v`。bind 时和 now 时用同一种构基方案，local↔world 映射闭环。
+- 不要再扩 bridge 集合（颈部/腕部都不需要），有 oriented voxel rendering（第 10 节）后多数残留视觉问题应当归为渲染层而非蒙皮层。
+
 ### stick.visible 不进 clone，走 visible_by_pair 通道
 
 `StickEntry.clone()` 不拷贝 `visible` 字段（反直觉！）。原因：`visible` 是 UI 状态（用户的可视偏好），undo/redo 不应该重置它。`_snapshot()` 里通过 `visible_by_pair` 字典（key = `(particle_a_id, particle_b_id)`）独立保存可视状态，`_restore_snapshot()` 恢复时按 particle pair 匹配回写，没匹配到的 stick 默认 `True`。见第 8 节。
@@ -254,3 +269,64 @@ particle 有两种"编号"，语义和用途不同：
 | 稳定性 | 增删 particle 后 id 不变 | 增删 particle 后其他 particle 的 index 可能变 |
 
 规则：**凡是需要持久化到文件或跨 undo 帧保持引用的，用 id；凡是只在当前会话内用的 UI 状态，用 index。**
+
+---
+
+## 10. 选区 gizmo 与 oriented voxel rendering（v1.1.0）
+
+### 10.1 选区 gizmo
+
+视口里跟随 active 粒子的 Blender 风格 3 轴控件，两个工具都有。
+
+**显示条件**：
+- 动画工具：`active_particle_idx` 有效 + 不在 mirror 模式
+- 绑骨工具：上述 + `tool_mode == 'bone_edit'` + `allow_particle_edit` 为 True
+
+任一不满足时 gizmo 隐藏。
+
+**几何**：
+- 3 根线条箭头（X 红 / Y 绿 / Z 蓝），头部用 X 形短线表示
+- 3 个 32 段折线圆环（同色，垂直对应轴的平面）
+- 中心 3 轴十字小标
+- 深度测试关，画在最上层；hover 把手切黄色
+
+**屏幕空间恒定缩放**：每帧投影 3 个世界单位向量（X/Y/Z），取屏幕距离最大者作为 `pixels_per_world`。**不能用单一向量**（侧视图下世界 X 与视线平行 → 投影距离趋零 → 箭头长度爆炸；这是 v1.1.0 中途修过的 bug）。`arrow_world_length = arrow_pixels / pixels_per_world`，`arrow_pixels` 默认 80，可在 toolbar 设置 popup 调 40-200。
+
+**hit test**（屏幕空间 2D 距离）：
+- 中心：到 pivot_2d 距离 < 8px
+- 箭头：到屏幕空间线段距离 < 10px
+- 圆环：环上 24 个采样点的最近距离 < 10px
+- 优先级：center > arrow > ring（同等距离时取优先级高的）
+
+**交互路由**：
+- 命中箭头/中心 → 启动现有 `_begin_particle_drag` / `_start_particle_drag`，预设 `axis_preset` 覆盖修饰键
+- 命中圆环 → 启动 rotate drag，绕预设世界轴旋转，1px=1°，按 Ctrl 15° 吸附
+- 直接拖粒子（非 gizmo 命中）：旧路径不变，修饰键 Shift/Ctrl/Alt 锁 X/Y/Z
+
+绑骨工具 v1.1.0 之前没有 rotate drag，是从动画工具移植过来的（不调 `commit_particle_move_to_frame` / `apply_baseline_lock` / 实时蒙皮，走 `_push_undo` 而非 `_anim_push_undo`）。
+
+### 10.2 Oriented voxel rendering
+
+骨架旋转时，体素 cube **自身朝向**也要跟着转，否则非 90° 旋转下肢体边缘呈"楼梯"状。
+
+**数据布局**（per-bone uniform，不是 per-voxel attribute）：
+- `_bone_orientations`: shape `(128, 16)`，每行是 mat4 列优先展平
+- 槽 0：identity 哨位，未绑定体素的 `i_bone_idx` 指这里
+- 槽 ci+1：骨段 ci 的 `R_cube = R_now @ R_bind.T`（R_bind 由 `record_voxel_bind_pose` 录入；横骨走 body bridge 路径同样自洽）
+- `_voxel_bone_indices`: shape `(N_voxels,)` float32，绑定 voxel = `ci+1`，未绑定 = 0
+
+**为什么 per-bone 而非 per-voxel**：10w 体素的模型下，per-voxel orientation VBO 每帧重传 3.6 MB；per-bone uniform 只需 8 KB（128 mat4），与体素总数无关。
+
+**shader（[shaders/voxel.vert](shaders/voxel.vert)）**：
+```glsl
+uniform mat4 u_bone_orientations[128];
+in float i_bone_idx;
+...
+mat3 R = mat3(u_bone_orientations[int(i_bone_idx)]);
+vec3 world_pos = R * in_vert + i_pos;
+v_normal = R * in_normal;   // R 正交，无需逆转置
+```
+
+**触发**：仅动画模式。`update_voxel_positions_from_skeleton` 内每根骨段算 R_cube 后写入 `_bone_orientations[ci+1]`。绑骨模式下所有槽保持 identity，cube axis-aligned 兼容历史行为。
+
+**bone idx VBO 重传时机**：仅 bindings 变化时（在 `build_instance_arrays` 内重建）。每帧动画 tick 只上传 orientations uniform。
