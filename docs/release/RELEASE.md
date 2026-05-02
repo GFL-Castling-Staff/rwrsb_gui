@@ -25,7 +25,7 @@
 2. 激活 `.venv`
 3. 自动安装 `PyInstaller`（如果缺失）
 4. 清理旧的 `build/` 和 `dist/`
-5. 根据 [rwrsb_bind.spec](rwrsb_bind.spec) 重新构建发布包
+5. 根据 [rwrsb_bind.spec](../../rwrsb_bind.spec) 重新构建发布包
 
 执行方式：
 
@@ -48,7 +48,7 @@ dist\rwrsb_bind\rwrsb_bind.exe
 
 建议文件名：
 
-- `rwrsb_bind-v1.1.0-windows.zip`
+- `rwrsb_bind-v1.1.1-windows.zip`
 
 zip 内应包含：
 
@@ -61,11 +61,11 @@ zip 内应包含：
 
 建议标题：
 
-- `rwrsb_bind v1.1.0`
+- `rwrsb_bind v1.1.1`
 
 建议正文：
 
-- 可以直接使用 [RELEASE_NOTES_v1.1.0.md](RELEASE_NOTES_v1.1.0.md)
+- 可以直接使用 [RELEASE_NOTES_v1.1.1.md](notes/RELEASE_NOTES_v1.1.1.md)
 
 ## 发版前检查清单
 

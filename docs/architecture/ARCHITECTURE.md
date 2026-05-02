@@ -78,7 +78,9 @@
 | `playback_time` | 播放时间（秒） |
 | `playback_playing` | `bool`，是否正在播放 |
 | `playback_loop_preview` | `bool`，循环预览开关（独立于 `anim.loop`） |
-| `_particle_positions_before_anim` | 进入动画模式前的 particle 位置备份，`exit_animation_mode` 时用于恢复 |
+| `_particle_positions_before_anim` | 进入动画模式前的 particle 位置备份，仅用于 `exit_animation_mode` 恢复 |
+| `_canonical_skeleton_pose` | 加载 skeleton/model 后快照的 canonical particle 坐标；动画蒙皮 bind pose 优先使用它 |
+| `_canonical_voxel_positions` | 加载 skeleton/model 后快照的 canonical voxel 列表；进入动画模式录 bind pose 前用于还原体素 |
 | `_anim_dirty` | 动画数据是否有未保存修改 |
 | `_anim_undo_stack` | 动画模式独立 undo 栈 |
 | `_anim_redo_stack` | 动画模式独立 redo 栈 |
@@ -175,12 +177,14 @@ particles ──── sticks ──── bindings
 
 执行顺序：
 1. 若 `animation.frames` 为空，自动追加一帧（= 当前 particle 姿态）
-2. 备份当前 particle 位置到 `_particle_positions_before_anim`
+2. 若还没有退出恢复用备份，则备份当前 particle 位置到 `_particle_positions_before_anim`
 3. 清空 `selected_particles` 和镜像模式
 4. 设 `animation_mode = True`，清空动画 undo/redo 栈
-5. 以 still pose（备份的位置）作为 bind pose 调用 `record_voxel_bind_pose()`
-6. 调用 `_apply_frame_to_particles(0)` 把 particle 位置设为第 0 帧
-7. 调用 `_record_reference_lengths()` 记录各骨段参考长度
+5. 选择 bind pose 来源：优先 `_canonical_skeleton_pose`，缺失时才 fallback 到 `_particle_positions_before_anim`
+6. 若 `_canonical_voxel_positions` 与当前 voxel 数量匹配，先把 `self.voxels` 还原到 canonical 位置，避免上一段动画的蒙皮结果污染 local offsets
+7. 用上述 bind pose 调用 `record_voxel_bind_pose()`
+8. 调用 `_apply_frame_to_particles(0)` 把 particle 位置设为第 0 帧
+9. 调用 `_record_reference_lengths()` 记录各骨段参考长度
 
 ### 退出动画模式：`exit_animation_mode(force=False)`
 
@@ -218,14 +222,17 @@ particles ──── sticks ──── bindings
 
 骨架预设（`presets/*.json`）只保存 `particles` + `sticks`，不保存 `bindings`。binding 属于具体体素模型的项目数据，不具有跨模型复用价值。加载预设时 bindings 会被清空。
 
-### 身体横骨蒙皮：用 midspine 提供 roll 参考
+### 表驱动 lateral reference 蒙皮
 
-横骨（`righthip<->lefthip`、`rightshoulder<->leftshoulder`）只有两个端点，没有第三向量定义滚转角，普通的"bind→now 最短旋转"算法（`_rotate_basis`）会留下不可预测的扭转。
+只有两个端点的骨段没有第三向量定义绕主轴的 roll。普通的"bind→now 最短旋转"算法（`_rotate_basis`）在这类骨段接近垂直或姿态大幅变化时会留下不可预测的扭转。
 
-蒙皮单独识别身体横骨：
-- 识别窗口窄：仅 `{10,20}/(righthip,lefthip)` 和 `{15,25}/(rightshoulder,leftshoulder)` 两对，id 优先 + name 兜底（覆盖非 vanilla id 的预设）。
-- 走 `_compute_body_bridge_frame`：用三点（横骨两端 + midspine）构造正交基。`u` = 横骨主轴，`v` = midspine 相对横骨中心的方向投影到垂直 `u` 平面，`w = u × v`。bind 时和 now 时用同一种构基方案，local↔world 映射闭环。
-- 不要再扩 bridge 集合（颈部/腕部都不需要），有 oriented voxel rendering（第 10 节）后多数残留视觉问题应当归为渲染层而非蒙皮层。
+现在蒙皮通过 `_LATERAL_REF_RULES_BY_ID` / `_LATERAL_REF_RULES_BY_NAME` 查表决定是否为某根 stick 构造带横向参考的正交基。id 优先匹配，name 兜底覆盖非 vanilla id 的预设。规则类型：
+
+- `"midspine_to_origin"`：用于 hip / shoulder bridge。参考向量取 midspine 相对桥中心的方向。
+- `"shoulder_lateral"`：用于 neck→head、elbow→hand、midspine/shoulder 和 shoulder/neck 等上半身骨段。参考向量取左右肩连线。
+- `"hip_lateral"`：用于 hip→midspine 和腿部骨段。参考向量取左右胯连线。
+
+统一入口是 `_compute_body_bridge_frame()`：先查表得到 lateral reference 类型，再用 `_basis_from_axis_and_reference()` 构造正交基。bind 时和 now 时使用同一套规则，local↔world 映射自洽；如果缺少关键参考粒子或长度退化，则返回 `None`，调用方落回 `_rotate_basis` 最短旋转路径。
 
 ### stick.visible 不进 clone，走 visible_by_pair 通道
 
@@ -276,7 +283,11 @@ particle 有两种"编号"，语义和用途不同：
 
 ### 10.1 选区 gizmo
 
-视口里跟随 active 粒子的 Blender 风格 3 轴控件，两个工具都有。
+视口里的 Blender 风格 3 轴控件，两个工具都有。gizmo 中心与旋转 pivot 一致，均由 `UIState.rotate_pivot_mode` 决定：
+
+- `"active"`：active particle；若 active 不在选择集内，fallback 到 centroid
+- `"centroid"`：当前 `selected_particles` 的几何中心
+- `"world_origin"`：世界原点 `(0, 0, 0)`
 
 **显示条件**：
 - 动画工具：`active_particle_idx` 有效 + 不在 mirror 模式
@@ -300,7 +311,7 @@ particle 有两种"编号"，语义和用途不同：
 
 **交互路由**：
 - 命中箭头/中心 → 启动现有 `_begin_particle_drag` / `_start_particle_drag`，预设 `axis_preset` 覆盖修饰键
-- 命中圆环 → 启动 rotate drag，绕预设世界轴旋转，1px=1°，按 Ctrl 15° 吸附
+- 命中圆环 → 启动 rotate drag，绕 `rotate_pivot_mode` 计算出的 pivot 和预设世界轴旋转，1px=1°，按 Ctrl 15° 吸附
 - 直接拖粒子（非 gizmo 命中）：旧路径不变，修饰键 Shift/Ctrl/Alt 锁 X/Y/Z
 
 绑骨工具 v1.1.0 之前没有 rotate drag，是从动画工具移植过来的（不调 `commit_particle_move_to_frame` / `apply_baseline_lock` / 实时蒙皮，走 `_push_undo` 而非 `_anim_push_undo`）。

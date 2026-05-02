@@ -17,7 +17,7 @@
 - 给体素重新绑定骨段
 - 保存和复用骨架预设
 - 在视口中直接拖拽粒子点
-- **Blender 风格选区 gizmo**（3 轴箭头 + 圆环），点把手锁轴平移 / 旋转
+- **Blender 风格选区 gizmo**（3 轴箭头 + 圆环），点把手锁轴平移 / 旋转，支持 Active / 中心 / 世界原点三种旋转中心
 - 世界原点 RGB 三轴指示
 - 网格显示、主次网格和网格吸附
 - 中英双语界面
@@ -110,8 +110,9 @@ run.bat
 
 ### 选区 gizmo / 蒙皮 / 体素朝向
 
-- 选中粒子后视口出现 Blender 风格 3 轴 gizmo：拖箭头沿轴平移、拖圆环绕轴旋转（Ctrl 15° 吸附）、拖中心球自由平移。修饰键 Shift/Ctrl/Alt 仍可作为快捷锁轴方式直接拖粒子。
-- 蒙皮：胯部 (`righthip<->lefthip`) 和肩部 (`rightshoulder<->leftshoulder`) 横骨用 midspine 作为 roll 参考构造局部坐标系，避免绕主轴的扭转漂移。
+- 选中粒子后视口出现 Blender 风格 3 轴 gizmo：拖箭头沿轴平移、拖圆环绕轴旋转（Ctrl 15° 吸附）、拖中心球自由平移。两个工具的圆环旋转中心都跟随工具栏下拉框，可选 Active 粒子、选区几何中心或世界原点；修饰键 Shift/Ctrl/Alt 仍可作为快捷锁轴方式直接拖粒子。
+- 蒙皮：容易发生 roll 漂移的骨段走表驱动 lateral reference 规则。胯/肩横骨用 midspine 参考，颈头、手部末端、胸肩交叉骨和腿部骨段分别用肩线或胯线提供横向参考，避免纯两点骨段绕主轴扭转不稳定。
+- bind pose 稳定性：动画模式录制蒙皮局部偏移时优先使用加载 skeleton/model 时快照的 canonical pose，并先把体素还原到 canonical 位置，避免切换动画后被上一段动画的蒙皮结果污染。
 - Oriented voxel rendering：动画模式下每个体素 cube 朝向跟随骨段一起旋转，消除非 90° 旋转下的"楼梯"边缘。GPU 数据走 per-bone uniform，10w 体素也只需每帧 8 KB 上传。
 
 ### 待实现
@@ -156,7 +157,7 @@ dist\rwrsb_bind\rwrsb_bind.exe
 1. 打开 `.vox` 或 `.xml`
 2. 在右侧面板检查或编辑骨架
 3. 新增、修改或删除 `particle` / `stick`
-4. 用 `brush` 或 `select` 做体素绑定
+4. 用 `brush` 或 `voxel_select` 做体素绑定
 5. 在视口中拖动粒子点微调骨架
 6. 保存为 XML
 7. 如有需要，把当前骨架另存为预设
@@ -177,51 +178,28 @@ dist\rwrsb_bind\rwrsb_bind.exe
 
 ## 项目结构
 
-- `main.py`
-  - 绑骨工具主入口（`rwrsb_bind.exe`）
-  - GLFW 窗口生命周期
-  - 输入事件
-  - 视口拖拽
-  - UI 生效逻辑
-- `main_animation.py`
-  - 动画工具主入口（`rwrsb_anim.exe`）
-  - 粒子拾取/拖动、drop 加载
-  - 动画播放主循环
-- `animation_io.py`
-  - `Animation` / `AnimationFrame` 数据类
-  - soldier animation XML 解析与写出
-  - 帧间插值
-- `editor_state.py`
-  - 可编辑项目状态
-  - Undo/Redo
-  - 骨架 CRUD
-  - 绑定数据
-  - 预设 CRUD
-- `ui_panels.py`
-  - 右侧面板和弹窗
-  - 中英双语文案
-  - UI 设置项
-- `renderer.py`
-  - 体素渲染
-  - 骨架渲染
-  - 粒子拾取
-  - 网格渲染
-- `camera.py`
-  - Orbit / Ortho 相机
-  - 视角预设
-  - 射线构造
-- `xml_io.py`
-  - `.vox` 解析
-  - XML 解析
-  - XML 写出
-  - 坐标转换
-- `resource_utils.py`
-  - 统一资源路径
-  - 兼容源码运行和 PyInstaller 打包
-- `presets/`
-  - 骨架预设 JSON
-- `shaders/`
-  - GLSL 着色器
+当前工程仍然是扁平 Python 工具仓库，运行时代码集中在根目录，资源按用途放在少量子目录。核心文件如下：
+
+| 路径 | 职责 |
+|------|------|
+| `main.py` | 绑骨工具入口（`rwrsb_bind.exe`）；GLFW 主循环、视口输入、体素绑定、骨骼编辑 gizmo |
+| `main_animation.py` | 动画工具入口（`rwrsb_anim.exe`）；动画播放 tick、关键帧编辑、动画工具视口交互 |
+| `editor_state.py` | 核心状态中心；voxels / particles / sticks / bindings、undo/redo、预设、动画模式、蒙皮、canonical bind pose |
+| `ui_panels.py` | ImGui 面板、弹窗、工具栏、双语文案、toast、gizmo pivot 下拉和动画时间线 UI |
+| `renderer.py` | OpenGL 渲染；体素、骨架、粒子、网格、gizmo、oriented voxel shader 数据上传 |
+| `animation_io.py` | soldier animation XML 的解析、写出、索引、插值和 `Animation` / `AnimationFrame` 数据类 |
+| `xml_io.py` | `.vox` 解析、项目 XML 解析/写出、RWR/MagicaVoxel 坐标转换 |
+| `camera.py` | Orbit / Ortho 相机、视角预设、屏幕射线构造 |
+| `file_dialogs.py` | Windows 文件打开/保存对话框封装 |
+| `logger_setup.py` | 日志目录、文件日志和默认 logger 初始化 |
+| `resource_utils.py` | 资源路径解析，兼容源码运行和 PyInstaller 打包 |
+| `build.bat` / `setup.bat` / `run.bat` | 环境初始化、开发运行和打包脚本 |
+| `rwrsb_bind.spec` / `rwrsb_anim.spec` | PyInstaller 打包配置 |
+| `presets/` | 骨架预设 JSON |
+| `shaders/` | GLSL shader |
+| `docs/` | README 使用的截图等公开文档资源 |
+
+本地调试材料和 AI 协作材料不属于发布结构：`logs/`、`claude_use/`、`history/`、`.claude/worktrees/` 以及临时 XML 样例默认不应进入发布提交。
 
 ## XML 数据模型
 
@@ -309,9 +287,9 @@ dist/
 
 ## 发布
 
-发版流程见 [RELEASE.md](RELEASE.md)。
+发版流程见 [docs/release/RELEASE.md](docs/release/RELEASE.md)。
 
-本次版本说明稿见 [RELEASE_NOTES_v1.1.0.md](RELEASE_NOTES_v1.1.0.md)（历史版本：[v1.0.0](RELEASE_NOTES_v1.0.0.md) / [v0.1.0](RELEASE_NOTES_v0.1.0.md)）。
+本次版本说明稿见 [docs/release/notes/RELEASE_NOTES_v1.1.1.md](docs/release/notes/RELEASE_NOTES_v1.1.1.md)（历史版本：[v1.1.0](docs/release/notes/RELEASE_NOTES_v1.1.0.md) / [v1.0.0](docs/release/notes/RELEASE_NOTES_v1.0.0.md) / [v0.1.0](docs/release/notes/RELEASE_NOTES_v0.1.0.md)）。
 
 ## 已知限制
 

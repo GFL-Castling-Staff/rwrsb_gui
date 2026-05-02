@@ -25,7 +25,7 @@ It automatically:
 2. Activates `.venv`
 3. Installs `PyInstaller` if missing
 4. Cleans up old `build/` and `dist/` directories
-5. Rebuilds the distribution package using [rwrsb_bind.spec](rwrsb_bind.spec)
+5. Rebuilds the distribution package using [rwrsb_bind.spec](../../rwrsb_bind.spec)
 
 Run it with:
 
@@ -48,7 +48,7 @@ Note:
 
 Suggested file name:
 
-- `rwrsb_bind-v1.1.0-windows.zip`
+- `rwrsb_bind-v1.1.1-windows.zip`
 
 The zip should include:
 
@@ -61,11 +61,11 @@ The zip should include:
 
 Suggested title:
 
-- `rwrsb_bind v1.1.0`
+- `rwrsb_bind v1.1.1`
 
 Suggested body:
 
-- Use [RELEASE_NOTES_v1.1.0_EN.md](RELEASE_NOTES_v1.1.0_EN.md) directly.
+- Use [RELEASE_NOTES_v1.1.1_EN.md](notes/RELEASE_NOTES_v1.1.1_EN.md) directly.
 
 ## Pre-Release Checklist
 

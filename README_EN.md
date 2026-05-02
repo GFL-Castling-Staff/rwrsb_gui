@@ -17,7 +17,7 @@ It loads `.vox` files or project XML directly, lets you edit the skeleton struct
 - Re-bind voxels to skeleton segments
 - Save and reuse skeleton presets
 - Drag particles directly in the viewport
-- **Blender-style selection gizmo** (3-axis arrows + rings) — click handles for axis-locked translate / rotate
+- **Blender-style selection gizmo** (3-axis arrows + rings) — click handles for axis-locked translate / rotate, with Active / Median / World pivot modes
 - World origin RGB axes indicator
 - Grid display, major/minor grid, and grid snapping
 - Chinese / English bilingual UI
@@ -110,8 +110,9 @@ The "Check stick lengths" checkbox in the lower-right of the animation panel ena
 
 ### Selection Gizmo / Skinning / Voxel Orientation
 
-- Selecting a particle shows a Blender-style 3-axis gizmo in the viewport: drag arrows to translate along an axis, drag rings to rotate around an axis (Ctrl for 15° snap), drag the center handle to translate freely. The Shift / Ctrl / Alt modifier-key axis lock still works as a shortcut when dragging particles directly.
-- Skinning: hip (`righthip<->lefthip`) and shoulder (`rightshoulder<->leftshoulder`) bridge sticks use midspine as a roll reference when constructing their local frame, avoiding twisty drift around the main axis.
+- Selecting a particle shows a Blender-style 3-axis gizmo in the viewport: drag arrows to translate along an axis, drag rings to rotate around an axis (Ctrl for 15° snap), drag the center handle to translate freely. Ring rotation in both tools follows the toolbar pivot selector: active particle, selection centroid, or world origin. The Shift / Ctrl / Alt modifier-key axis lock still works as a shortcut when dragging particles directly.
+- Skinning: sticks that are prone to roll drift use table-driven lateral reference rules. Hip/shoulder bridges use midspine; neck/head, hand endpoints, chest/shoulder cross sticks, and leg sticks use shoulder or hip lateral lines as roll references so two-point sticks do not twist unpredictably around their main axis.
+- Bind-pose stability: when animation mode records skinning local offsets, it prefers the canonical pose captured when the skeleton/model was loaded, and restores voxels to their canonical positions first. This prevents one animation's skinned voxel positions from contaminating the next animation switch.
 - Oriented voxel rendering: in animation mode each voxel cube's orientation rotates with its bone, eliminating the "staircase" silhouette at non-90° rotations. GPU data flows through a per-bone uniform — even 100k voxels only need 8 KB per frame.
 
 ### Planned
@@ -154,7 +155,7 @@ When distributing, it is recommended to zip the entire `dist\rwrsb_bind` folder 
 1. Open a `.vox` or `.xml` file
 2. Inspect or edit the skeleton in the right panel
 3. Add, modify, or delete `particle` / `stick` entries
-4. Use `brush` or `select` for voxel binding
+4. Use `brush` or `voxel_select` for voxel binding
 5. Drag particles in the viewport to fine-tune the skeleton
 6. Save as XML
 7. Optionally save the current skeleton as a preset
@@ -175,51 +176,28 @@ When distributing, it is recommended to zip the entire `dist\rwrsb_bind` folder 
 
 ## Project Structure
 
-- `main.py`
-  - Entry point for the binding tool (`rwrsb_bind.exe`)
-  - GLFW window lifecycle
-  - Input events
-  - Viewport drag
-  - UI logic
-- `main_animation.py`
-  - Entry point for the animation tool (`rwrsb_anim.exe`)
-  - Particle picking/dragging, drag-and-drop file loading
-  - Animation playback main loop
-- `animation_io.py`
-  - `Animation` / `AnimationFrame` data classes
-  - Soldier animation XML parsing and writing
-  - Frame interpolation
-- `editor_state.py`
-  - Editable project state
-  - Undo/Redo
-  - Skeleton CRUD
-  - Binding data
-  - Preset CRUD
-- `ui_panels.py`
-  - Right-side panel and popups
-  - Chinese/English bilingual strings
-  - UI settings
-- `renderer.py`
-  - Voxel rendering
-  - Skeleton rendering
-  - Particle picking
-  - Grid rendering
-- `camera.py`
-  - Orbit / Ortho camera
-  - View presets
-  - Ray construction
-- `xml_io.py`
-  - `.vox` parsing
-  - XML parsing
-  - XML writing
-  - Coordinate conversion
-- `resource_utils.py`
-  - Unified resource path resolution
-  - Compatibility between source and PyInstaller builds
-- `presets/`
-  - Skeleton preset JSON files
-- `shaders/`
-  - GLSL shaders
+The project is still a flat Python tool repository. Runtime code lives in the repository root, with resources grouped into a few purpose-specific directories:
+
+| Path | Responsibility |
+|------|----------------|
+| `main.py` | Binding tool entry point (`rwrsb_bind.exe`); GLFW loop, viewport input, voxel binding, bone-edit gizmo |
+| `main_animation.py` | Animation tool entry point (`rwrsb_anim.exe`); playback tick, keyframe editing, animation viewport interaction |
+| `editor_state.py` | Core state center; voxels / particles / sticks / bindings, undo/redo, presets, animation mode, skinning, canonical bind pose |
+| `ui_panels.py` | ImGui panels, popups, toolbar, bilingual text, toasts, gizmo pivot selector, animation timeline UI |
+| `renderer.py` | OpenGL rendering; voxels, skeleton, particles, grid, gizmo, oriented-voxel shader data upload |
+| `animation_io.py` | Soldier animation XML parsing, writing, indexing, interpolation, and `Animation` / `AnimationFrame` data classes |
+| `xml_io.py` | `.vox` parsing, project XML parsing/writing, RWR/MagicaVoxel coordinate conversion |
+| `camera.py` | Orbit / Ortho camera, view presets, screen-ray construction |
+| `file_dialogs.py` | Windows open/save file dialog wrapper |
+| `logger_setup.py` | Log directory, file logging, and default logger initialization |
+| `resource_utils.py` | Resource path resolution for source runs and PyInstaller builds |
+| `build.bat` / `setup.bat` / `run.bat` | Environment setup, development launch, and packaging scripts |
+| `rwrsb_bind.spec` / `rwrsb_anim.spec` | PyInstaller packaging configs |
+| `presets/` | Skeleton preset JSON files |
+| `shaders/` | GLSL shaders |
+| `docs/` | Public documentation assets such as README screenshots |
+
+Local debug material and AI collaboration material are not part of the release structure: `logs/`, `claude_use/`, `history/`, `.claude/worktrees/`, and temporary XML samples should normally stay out of release commits.
 
 ## XML Data Model
 
@@ -306,9 +284,9 @@ If these files are accidentally tracked later, remove them from the Git index ra
 
 ## Releases
 
-Release process: see [RELEASE_EN.md](RELEASE_EN.md).
+Release process: see [docs/release/RELEASE_EN.md](docs/release/RELEASE_EN.md).
 
-Release notes: see [RELEASE_NOTES_v1.1.0_EN.md](RELEASE_NOTES_v1.1.0_EN.md) (history: [v1.0.0](RELEASE_NOTES_v1.0.0_EN.md) / [v0.1.0](RELEASE_NOTES_v0.1.0.md)).
+Release notes: see [docs/release/notes/RELEASE_NOTES_v1.1.1_EN.md](docs/release/notes/RELEASE_NOTES_v1.1.1_EN.md) (history: [v1.1.0](docs/release/notes/RELEASE_NOTES_v1.1.0_EN.md) / [v1.0.0](docs/release/notes/RELEASE_NOTES_v1.0.0_EN.md) / [v0.1.0](docs/release/notes/RELEASE_NOTES_v0.1.0.md)).
 
 ## Known Limitations
 

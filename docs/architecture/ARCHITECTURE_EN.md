@@ -76,7 +76,9 @@ The main loop structure is identical in both entry points (GLFW init → frame l
 | `playback_time` | Playback time in seconds |
 | `playback_playing` | `bool` — whether playback is running |
 | `playback_loop_preview` | `bool` — loop preview toggle (independent of `anim.loop`) |
-| `_particle_positions_before_anim` | Particle position backup taken before entering animation mode; restored by `exit_animation_mode` |
+| `_particle_positions_before_anim` | Particle position backup taken before entering animation mode; used only for `exit_animation_mode` restore |
+| `_canonical_skeleton_pose` | Canonical particle coordinates captured after skeleton/model load; preferred source for animation skinning bind pose |
+| `_canonical_voxel_positions` | Canonical voxel list captured after skeleton/model load; restored before recording animation bind-pose local offsets |
 | `_anim_dirty` | Whether animation data has unsaved changes |
 | `_anim_undo_stack` | Animation-mode-specific undo stack |
 | `_anim_redo_stack` | Animation-mode-specific redo stack |
@@ -173,12 +175,14 @@ Precondition: `len(particles) == EXPECTED_PARTICLE_COUNT (15)`, otherwise raises
 
 Execution order:
 1. If `animation.frames` is empty, automatically append one frame (= current particle pose)
-2. Back up current particle positions to `_particle_positions_before_anim`
+2. If no exit-restore backup exists yet, back up current particle positions to `_particle_positions_before_anim`
 3. Clear `selected_particles` and mirror mode
 4. Set `animation_mode = True`, clear animation undo/redo stacks
-5. Call `record_voxel_bind_pose()` with the still pose (the backed-up positions) as the bind pose
-6. Call `_apply_frame_to_particles(0)` to set particle positions to frame 0
-7. Call `_record_reference_lengths()` to record per-stick reference lengths
+5. Choose the bind-pose source: prefer `_canonical_skeleton_pose`, fallback to `_particle_positions_before_anim` only if canonical data is unavailable
+6. If `_canonical_voxel_positions` exists and matches the current voxel count, restore `self.voxels` to canonical positions first so the previous animation's skinned voxel positions cannot contaminate local offsets
+7. Call `record_voxel_bind_pose()` with that bind pose
+8. Call `_apply_frame_to_particles(0)` to set particle positions to frame 0
+9. Call `_record_reference_lengths()` to record per-stick reference lengths
 
 ### Exiting animation mode: `exit_animation_mode(force=False)`
 
@@ -216,14 +220,17 @@ Changing `trans_bias` shifts all voxel and skeleton coordinates together, so the
 
 Skeleton presets (`presets/*.json`) store only `particles` + `sticks`, not `bindings`. Bindings are project-specific data tied to a particular voxel model and have no cross-model reuse value. Loading a preset clears the bindings.
 
-### Body bridge sticks: midspine provides the roll reference
+### Table-driven lateral-reference skinning
 
-Body bridge sticks (`righthip<->lefthip`, `rightshoulder<->leftshoulder`) have only two endpoints — there's no third vector to define the roll angle. The generic "shortest bind→now rotation" algorithm (`_rotate_basis`) leaves an unpredictable twist.
+Two-endpoint sticks do not have a third vector to define roll around their main axis. The generic "shortest bind→now rotation" algorithm (`_rotate_basis`) can leave unpredictable twist when such sticks become nearly vertical or change pose significantly.
 
-The skinning code special-cases body bridge sticks:
-- Recognition is narrow: only the pairs `{10,20}/(righthip,lefthip)` and `{15,25}/(rightshoulder,leftshoulder)`. Id is matched first, name as a fallback (covers presets with non-vanilla ids).
-- Goes through `_compute_body_bridge_frame`: builds an orthonormal basis from three points (the two endpoints + midspine). `u` = bridge main axis; `v` = (midspine − bridge_origin) projected onto the plane perpendicular to `u`; `w = u × v`. Bind-time and now-time use the same construction so the local↔world mapping stays self-consistent.
-- Do not extend the bridge set further (neck / wrists do not need it). With oriented voxel rendering (Section 10), most remaining visual quirks should be attributed to the render layer, not the skinning layer.
+Skinning now consults `_LATERAL_REF_RULES_BY_ID` / `_LATERAL_REF_RULES_BY_NAME` to decide whether a stick should build an orthonormal basis with a lateral reference. Id rules match first; name rules are the fallback for presets with non-vanilla ids. Rule types:
+
+- `"midspine_to_origin"`: used by hip / shoulder bridges. The reference vector is midspine relative to the bridge center.
+- `"shoulder_lateral"`: used by neck→head, elbow→hand, midspine/shoulder, and shoulder/neck upper-body sticks. The reference vector is the left-right shoulder line.
+- `"hip_lateral"`: used by hip→midspine and leg sticks. The reference vector is the left-right hip line.
+
+The unified entry point is `_compute_body_bridge_frame()`: it looks up the lateral reference type, then calls `_basis_from_axis_and_reference()` to build the basis. Bind-time and now-time use the same rules, keeping the local↔world mapping self-consistent. If required reference particles are missing or a vector degenerates, it returns `None` and the caller falls back to the `_rotate_basis` shortest-rotation path.
 
 ### stick.visible is not cloned — it goes through the visible_by_pair channel
 
@@ -274,7 +281,11 @@ Rule: **use `id` for anything that must be persisted to file or kept stable acro
 
 ### 10.1 Selection gizmo
 
-A Blender-style 3-axis widget that follows the active particle in the viewport. Available in both tools.
+A Blender-style 3-axis widget available in both tools. The gizmo center and rotation pivot are the same point, computed from `UIState.rotate_pivot_mode`:
+
+- `"active"`: active particle; if active is not in the selection, fallback to centroid
+- `"centroid"`: geometric center of current `selected_particles`
+- `"world_origin"`: world origin `(0, 0, 0)`
 
 **Visibility conditions**:
 - Animation tool: `active_particle_idx` is valid + not in mirror mode
@@ -298,7 +309,7 @@ The gizmo is hidden if any condition fails.
 
 **Interaction routing**:
 - Hit arrow / center → start `_begin_particle_drag` / `_start_particle_drag` with an `axis_preset` that overrides modifier keys
-- Hit ring → start a rotate drag around the preset world axis; 1 px = 1°, hold Ctrl for 15° snap
+- Hit ring → start a rotate drag around the pivot computed from `rotate_pivot_mode` and the preset world axis; 1 px = 1°, hold Ctrl for 15° snap
 - Direct particle drag (no gizmo hit): legacy path unchanged; modifier keys Shift/Ctrl/Alt still lock X/Y/Z
 
 The binding tool had no rotate drag before v1.1.0; it was ported from the animation tool (does not call `commit_particle_move_to_frame` / `apply_baseline_lock` / live skinning, uses `_push_undo` instead of `_anim_push_undo`).
