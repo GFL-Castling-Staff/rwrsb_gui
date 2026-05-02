@@ -293,6 +293,10 @@ _TEXT = {
         "view_btn": "View...",
         "view_popup_title": "View",
         "view_show_origin": "Show world origin axes",
+        "pivot_short_active": "Active",
+        "pivot_short_centroid": "Median",
+        "pivot_short_world": "World",
+        "pivot_dropdown_tooltip": "Rotate pivot for gizmo rings",
         "move_skeleton_tree_section": "Skeleton tree",
         "move_skeleton_tree_root": "Root",
         "move_skeleton_tree_no_particles": "(no particles)",
@@ -599,6 +603,10 @@ _TEXT = {
         "view_btn": "视图...",
         "view_popup_title": "视图",
         "view_show_origin": "显示世界原点坐标轴",
+        "pivot_short_active": "Active",
+        "pivot_short_centroid": "中心",
+        "pivot_short_world": "世界",
+        "pivot_dropdown_tooltip": "gizmo 圆环旋转中心",
         "move_skeleton_tree_section": "骨架树",
         "move_skeleton_tree_root": "根节点",
         "move_skeleton_tree_no_particles": "（无粒子）",
@@ -855,6 +863,26 @@ def _mirror_grid_step(ui_state):
     return float(max(1, int(ui_state.mirror_grid_multiple)))
 
 
+def _draw_pivot_dropdown(ui_state, id_suffix=""):
+    """gizmo 旋转 pivot mode 下拉，绑骨工具和动画工具共用。
+
+    id_suffix 用于 imgui 的 ## 唯一标识；两个工具的 toolbar 各自传不同后缀。
+    """
+    options = ["active", "centroid", "world_origin"]
+    labels = [
+        tr(ui_state, "pivot_short_active"),
+        tr(ui_state, "pivot_short_centroid"),
+        tr(ui_state, "pivot_short_world"),
+    ]
+    cur = options.index(ui_state.rotate_pivot_mode) if ui_state.rotate_pivot_mode in options else 0
+    imgui.set_next_item_width(90)
+    chg, new = imgui.combo(f"##pivot_mode_{id_suffix}", cur, labels)
+    if chg:
+        ui_state.rotate_pivot_mode = options[int(new)]
+    if imgui.is_item_hovered():
+        imgui.set_tooltip(tr(ui_state, "pivot_dropdown_tooltip"))
+
+
 def _disabled_button(label):
     """灰显且不可点的按钮（兼容不同 pyimgui 版本）。"""
     if hasattr(imgui, "begin_disabled"):
@@ -923,6 +951,11 @@ def draw_toolbar(ui_state, editor_state, renderer, camera, WIN_W):
             ui_state.gizmo_arrow_pixels = int(v_gp)
         imgui.end_popup()
     imgui.same_line()
+
+    # gizmo 旋转 pivot 下拉
+    _draw_pivot_dropdown(ui_state, id_suffix="bind")
+    imgui.same_line()
+
     imgui.separator()
     imgui.same_line()
 
@@ -2142,6 +2175,10 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
         imgui.spacing()
         _draw_rotate_settings_section(ui_state, editor_state)
         imgui.end_popup()
+    imgui.same_line()
+
+    # gizmo 旋转 pivot 下拉
+    _draw_pivot_dropdown(ui_state, id_suffix="anim")
     imgui.same_line()
 
     imgui.text("|")
