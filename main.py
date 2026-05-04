@@ -611,6 +611,9 @@ def _snap_to_mirror_grid(pos):
     step = mirror_grid_step_value()
     u = round(u / step) * step
     v = round(v / step) * step
+    # 法向也量化：镜像 pair 的伙伴位置由 axis 分量翻转得到，源粒子 w 不量化
+    # 会让整对都偏离网格 —— 用户表现为"某一个方向不对齐"
+    w = round(w / step) * step
     return origin + tangent * u + bitangent * v + normal * w
 
 
