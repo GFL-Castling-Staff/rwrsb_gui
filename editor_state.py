@@ -873,8 +873,9 @@ class EditorState:
         self.active_particle_idx = particle_index
         self._mark_skeleton_changed()
 
-    def add_particle(self, name=None, x=0.0, y=0.0, z=0.0, invMass=10.0, bodyAreaHint=1, particle_id=None):
-        self._push_undo()
+    def add_particle(self, name=None, x=0.0, y=0.0, z=0.0, invMass=10.0, bodyAreaHint=1, particle_id=None, push_undo=True):
+        if push_undo:
+            self._push_undo()
         pid = self._next_particle_id() if particle_id is None else int(particle_id)
         if any(int(p["id"]) == pid for p in self.particles):
             raise ValueError(f"Particle id already exists: {pid}")
@@ -893,7 +894,7 @@ class EditorState:
         self._mark_skeleton_changed()
         return len(self.particles) - 1
 
-    def add_particle_near(self, reference_index, axis="x", distance=2.0):
+    def add_particle_near(self, reference_index, axis="x", distance=2.0, push_undo=True):
         """在 reference 粒子附近沿指定轴偏移生成新粒子。
 
         reference_index 越界 / 无效 → 落回原点 (0, 0, 0)。
@@ -914,10 +915,36 @@ class EditorState:
             x, y, z = base_x, base_y, base_z + d
         else:
             x, y, z = base_x + d, base_y, base_z
-        new_idx = self.add_particle(x=x, y=y, z=z)
+        new_idx = self.add_particle(x=x, y=y, z=z, push_undo=push_undo)
         # 自动选中新粒子，便于接力 connect_selected / extend_chain
         self.selected_particles = {new_idx}
         self.set_active_particle(new_idx)
+        return new_idx
+
+    def extend_chain_from(self, reference_index, axis="x", distance=2.0) -> int:
+        """从 reference 粒子沿轴生成新粒子并自动用 stick 接到 reference。
+
+        建骨架最常用工作流：选中粒子 → 拉链 → 选中新粒子 → 再拉链。
+        整批两步操作（new particle + new stick）合并为一次 undo。
+        """
+        if not (0 <= reference_index < len(self.particles)):
+            raise ValueError("reference particle index out of range")
+        ref_id = int(self.particles[reference_index]["id"])
+        self._push_undo()
+        new_idx = self.add_particle_near(
+            reference_index, axis=axis, distance=distance, push_undo=False,
+        )
+        new_id = int(self.particles[new_idx]["id"])
+        if any({s.particle_a_id, s.particle_b_id} == {ref_id, new_id} for s in self.sticks):
+            return new_idx
+        ci = len(self.sticks)
+        stick_name = _make_stick_name(
+            {p["id"]: p for p in self.particles}, ref_id, new_id,
+        )
+        self.sticks.append(StickEntry(ci, ref_id, new_id, stick_name))
+        self.active_stick_idx = ci
+        self._tree_dirty = True
+        self._mark_skeleton_changed()
         return new_idx
 
     def update_particle(self, particle_index, **fields):

@@ -90,6 +90,10 @@ _TEXT = {
         "spawn_y": "+Y",
         "spawn_z": "+Z",
         "spawn_near_no_active": "Select 1 particle to spawn nearby",
+        "extend_chain": "Extend chain (new particle + stick)",
+        "extend_chain_x": "Chain +X",
+        "extend_chain_y": "Chain +Y",
+        "extend_chain_z": "Chain +Z",
         "delete_selected_btn": "Delete selected",
         "deleted_particles": "Deleted {n} particle(s)",
         "deleted_active_stick": "Deleted active stick",
@@ -427,6 +431,10 @@ _TEXT = {
         "spawn_y": "+Y",
         "spawn_z": "+Z",
         "spawn_near_no_active": "选中 1 个粒子启用邻近添加",
+        "extend_chain": "拉链：新粒子 + 自动连骨段",
+        "extend_chain_x": "拉链 +X",
+        "extend_chain_y": "拉链 +Y",
+        "extend_chain_z": "拉链 +Z",
         "delete_selected_btn": "删除选中",
         "deleted_particles": "已删除 {n} 个粒子",
         "deleted_active_stick": "已删除当前骨段",
@@ -1238,6 +1246,23 @@ def _draw_particle_editor(ui_state, editor_state):
                 if imgui.button(tr(ui_state, label_key) + f"##spawn_{axis_key}", width=btn_w):
                     try:
                         editor_state.add_particle_near(active_idx, axis=axis_key, distance=2.0)
+                        ui_state._bone_error = ""
+                    except Exception as exc:
+                        ui_state._bone_error = str(exc)
+                        ui_state.push_toast(
+                            tr(ui_state, "add_particle_failed", error=exc),
+                            "error", exc_info=True,
+                        )
+            finally:
+                if axis_key != "z":
+                    imgui.same_line()
+        # 拉链：相比 spawn_near，会同时建 stick；适合接力拉骨架
+        imgui.text(tr(ui_state, "extend_chain"))
+        for axis_key, label_key in (("x", "extend_chain_x"), ("y", "extend_chain_y"), ("z", "extend_chain_z")):
+            try:
+                if imgui.button(tr(ui_state, label_key) + f"##chain_{axis_key}", width=btn_w):
+                    try:
+                        editor_state.extend_chain_from(active_idx, axis=axis_key, distance=2.0)
                         ui_state._bone_error = ""
                     except Exception as exc:
                         ui_state._bone_error = str(exc)
