@@ -4,3 +4,1632 @@
 2026-04-18 19:01:20 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_hvy_mk153_3.xml
 2026-04-18 19:01:20 [INFO] editor_state: loaded XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_hvy_mk153_3.xml (4657 voxels, 15 particles, 17 sticks)
 2026-04-18 19:01:20 [INFO] ui_panels: 已加载: gkd_hvy_mk153_3.xml
+2026-04-25 10:21:32 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 10:21:32 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 10:21:33 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 13:36:58 [INFO] rwrsb: rwrsb_gui started, log dir: d:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 13:36:58 [CRITICAL] rwrsb: Uncaught exception
+Traceback (most recent call last):
+  File "d:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 17, in <module>
+    import glfw
+ModuleNotFoundError: No module named 'glfw'
+2026-04-25 13:37:13 [INFO] rwrsb: rwrsb_gui started, log dir: d:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 13:37:13 [CRITICAL] rwrsb: Uncaught exception
+Traceback (most recent call last):
+  File "d:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 17, in <module>
+    import glfw
+ModuleNotFoundError: No module named 'glfw'
+2026-04-25 13:37:35 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 13:37:36 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 13:37:36 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 13:37:43 [ERROR] __main__: main loop error
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 1134, in main
+    draw_bone_panel(g_ui, g_editor, WIN_W, WIN_H,
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\ui_panels.py", line 1139, in draw_bone_panel
+    imgui.end()
+  File "imgui\core.pyx", line 4242, in imgui.core.end
+imgui.core.ImGuiError: ImGui assertion error (SizeOfColorStack >= g.ColorStack.Size && "PushStyleColor/PopStyleColor Mismatch!") at imgui-cpp/imgui.cpp:7250
+2026-04-25 13:37:43 [ERROR] __main__: main loop error
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 1071, in main
+    imgui.new_frame()
+  File "imgui\core.pyx", line 3901, in imgui.core.new_frame
+imgui.core.ImGuiError: ImGui assertion error ((g.FrameCount == 0 || g.FrameCountEnded == g.FrameCount) && "Forgot to call Render() or EndFrame() at the end of the previous frame?") at imgui-cpp/imgui.cpp:7090
+2026-04-25 13:38:08 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 13:38:08 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 13:38:09 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 13:38:20 [ERROR] __main__: main loop error
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 1134, in main
+    draw_bone_panel(g_ui, g_editor, WIN_W, WIN_H,
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\ui_panels.py", line 1139, in draw_bone_panel
+    imgui.end()
+  File "imgui\core.pyx", line 4242, in imgui.core.end
+imgui.core.ImGuiError: ImGui assertion error (SizeOfColorStack >= g.ColorStack.Size && "PushStyleColor/PopStyleColor Mismatch!") at imgui-cpp/imgui.cpp:7250
+2026-04-25 13:38:20 [ERROR] __main__: main loop error
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 1071, in main
+    imgui.new_frame()
+  File "imgui\core.pyx", line 3901, in imgui.core.new_frame
+imgui.core.ImGuiError: ImGui assertion error ((g.FrameCount == 0 || g.FrameCountEnded == g.FrameCount) && "Forgot to call Render() or EndFrame() at the end of the previous frame?") at imgui-cpp/imgui.cpp:7090
+2026-04-25 13:38:42 [INFO] rwrsb: rwrsb_gui started, log dir: d:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 13:38:42 [CRITICAL] rwrsb: Uncaught exception
+Traceback (most recent call last):
+  File "d:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 17, in <module>
+    import glfw
+ModuleNotFoundError: No module named 'glfw'
+2026-04-25 13:38:46 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 13:38:46 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 13:38:47 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 13:39:08 [INFO] editor_state: loaded XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml (5738 voxels, 15 particles, 17 sticks)
+2026-04-25 13:39:08 [INFO] ui_panels: 已加载: kccod_archer.xml
+2026-04-25 13:39:14 [ERROR] __main__: main loop error
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 1134, in main
+    draw_bone_panel(g_ui, g_editor, WIN_W, WIN_H,
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\ui_panels.py", line 1139, in draw_bone_panel
+    imgui.end()
+  File "imgui\core.pyx", line 4242, in imgui.core.end
+imgui.core.ImGuiError: ImGui assertion error (SizeOfColorStack >= g.ColorStack.Size && "PushStyleColor/PopStyleColor Mismatch!") at imgui-cpp/imgui.cpp:7250
+2026-04-25 13:39:14 [ERROR] __main__: main loop error
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 1071, in main
+    imgui.new_frame()
+  File "imgui\core.pyx", line 3901, in imgui.core.new_frame
+imgui.core.ImGuiError: ImGui assertion error ((g.FrameCount == 0 || g.FrameCountEnded == g.FrameCount) && "Forgot to call Render() or EndFrame() at the end of the previous frame?") at imgui-cpp/imgui.cpp:7090
+2026-04-25 13:41:01 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 13:41:01 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 13:41:02 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 13:41:20 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 13:41:20 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 13:41:21 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 13:41:21 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 13:41:21 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 13:44:03 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 13:44:03 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 13:44:04 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 14:57:52 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 14:57:52 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 14:57:53 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 14:57:53 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 14:57:53 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 14:57:53 [ERROR] __main__: main loop error
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 566, in main
+    draw_animation_panel(g_ui, g_editor, WIN_W, WIN_H)
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\ui_panels.py", line 1927, in draw_animation_panel
+    _, ui_state.__dict__.setdefault("_loop_preview_ck", True)
+    ^
+NameError: name '_' is not defined
+2026-04-25 14:57:53 [ERROR] __main__: main loop error
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 502, in main
+    imgui.new_frame()
+  File "imgui\core.pyx", line 3901, in imgui.core.new_frame
+imgui.core.ImGuiError: ImGui assertion error ((g.FrameCount == 0 || g.FrameCountEnded == g.FrameCount) && "Forgot to call Render() or EndFrame() at the end of the previous frame?") at imgui-cpp/imgui.cpp:7090
+2026-04-25 15:01:28 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 15:01:28 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 15:01:29 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 15:01:29 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 15:01:29 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 15:02:04 [ERROR] __main__: GLFW callback on_mouse_button failed
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 245, in wrapper
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 282, in on_mouse_button
+    _start_particle_drag(g_mouse_x, g_mouse_y, hit)
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 176, in _start_particle_drag
+    forward = g_camera.get_forward()
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'OrbitCamera' object has no attribute 'get_forward'
+2026-04-25 15:02:05 [ERROR] __main__: GLFW callback on_mouse_button failed
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 245, in wrapper
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 282, in on_mouse_button
+    _start_particle_drag(g_mouse_x, g_mouse_y, hit)
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 176, in _start_particle_drag
+    forward = g_camera.get_forward()
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'OrbitCamera' object has no attribute 'get_forward'
+2026-04-25 15:02:28 [ERROR] __main__: GLFW callback on_mouse_button failed
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 245, in wrapper
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 282, in on_mouse_button
+    _start_particle_drag(g_mouse_x, g_mouse_y, hit)
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 176, in _start_particle_drag
+    forward = g_camera.get_forward()
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'OrbitCamera' object has no attribute 'get_forward'
+2026-04-25 15:02:32 [ERROR] __main__: GLFW callback on_mouse_button failed
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 245, in wrapper
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 282, in on_mouse_button
+    _start_particle_drag(g_mouse_x, g_mouse_y, hit)
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 176, in _start_particle_drag
+    forward = g_camera.get_forward()
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'OrbitCamera' object has no attribute 'get_forward'
+2026-04-25 15:02:33 [ERROR] __main__: GLFW callback on_mouse_button failed
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 245, in wrapper
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 282, in on_mouse_button
+    _start_particle_drag(g_mouse_x, g_mouse_y, hit)
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 176, in _start_particle_drag
+    forward = g_camera.get_forward()
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'OrbitCamera' object has no attribute 'get_forward'
+2026-04-25 15:02:40 [ERROR] __main__: GLFW callback on_mouse_button failed
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 245, in wrapper
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 282, in on_mouse_button
+    _start_particle_drag(g_mouse_x, g_mouse_y, hit)
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 176, in _start_particle_drag
+    forward = g_camera.get_forward()
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'OrbitCamera' object has no attribute 'get_forward'
+2026-04-25 15:03:01 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 15:03:01 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 15:03:02 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 15:03:02 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 15:03:02 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 15:03:15 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 15:03:16 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 15:03:33 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 15:03:33 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 15:03:34 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 15:03:34 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 15:03:34 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 15:03:43 [ERROR] __main__: GLFW callback on_mouse_button failed
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 245, in wrapper
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 282, in on_mouse_button
+    _start_particle_drag(g_mouse_x, g_mouse_y, hit)
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 176, in _start_particle_drag
+    forward = g_camera.get_forward()
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'OrbitCamera' object has no attribute 'get_forward'
+2026-04-25 15:03:44 [ERROR] __main__: GLFW callback on_mouse_button failed
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 245, in wrapper
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 282, in on_mouse_button
+    _start_particle_drag(g_mouse_x, g_mouse_y, hit)
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 176, in _start_particle_drag
+    forward = g_camera.get_forward()
+              ^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'OrbitCamera' object has no attribute 'get_forward'
+2026-04-25 15:06:55 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 15:06:55 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 15:06:56 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 15:06:56 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 15:06:56 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 15:07:00 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 15:07:00 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 15:07:01 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 15:07:01 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 15:07:01 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 15:07:48 [ERROR] ui_panels: 不能删除最后一帧
+2026-04-25 15:08:21 [ERROR] ui_panels: 不能删除最后一帧
+2026-04-25 15:10:48 [INFO] animation_io: wrote animation 'new_animation' to D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\new_animation.xml (3 frames)
+2026-04-25 15:10:48 [INFO] ui_panels: 已保存: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\new_animation.xml
+2026-04-25 15:10:56 [INFO] ui_panels: 正在索引动画...
+2026-04-25 15:10:56 [INFO] animation_io: indexed 1 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\new_animation.xml
+2026-04-25 15:10:56 [INFO] editor_state: entered animation mode: new_animation (3 frames)
+2026-04-25 15:10:56 [INFO] ui_panels: 已加载动画: new_animation
+2026-04-25 15:11:44 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 15:11:49 [INFO] editor_state: entered animation mode: medic1 (14 frames)
+2026-04-25 15:11:49 [INFO] ui_panels: 已加载动画: medic1
+2026-04-25 15:12:07 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 15:12:09 [INFO] editor_state: entered animation mode: still, single hand carry (1 frames)
+2026-04-25 15:12:09 [INFO] ui_panels: 已加载动画: still, single hand carry
+2026-04-25 15:12:20 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 15:12:23 [INFO] editor_state: entered animation mode: running, no weapon, 60 (7 frames)
+2026-04-25 15:12:23 [INFO] ui_panels: 已加载动画: running, no weapon, 60
+2026-04-25 15:13:06 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml
+2026-04-25 15:13:06 [INFO] editor_state: exited animation mode
+2026-04-25 15:13:06 [INFO] editor_state: loaded skeleton-only XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml (15 particles, 17 sticks)
+2026-04-25 15:13:06 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 15:13:06 [INFO] ui_panels: 已加载骨架
+2026-04-25 15:45:59 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 15:45:59 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 15:46:00 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 15:46:00 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 15:46:00 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 17:13:16 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 17:13:16 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 17:13:17 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 17:13:17 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 17:13:17 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 17:14:02 [ERROR] ui_panels: 不能删除最后一帧
+2026-04-25 17:14:14 [ERROR] ui_panels: 不能删除最后一帧
+2026-04-25 17:14:21 [ERROR] ui_panels: 不能删除最后一帧
+2026-04-25 17:15:51 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml
+2026-04-25 17:15:51 [INFO] editor_state: exited animation mode
+2026-04-25 17:15:51 [INFO] editor_state: loaded skeleton-only XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml (15 particles, 17 sticks)
+2026-04-25 17:15:51 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 17:15:51 [INFO] ui_panels: 已加载骨架
+2026-04-25 17:37:56 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 17:37:57 [INFO] editor_state: entered animation mode: jumping (4 frames)
+2026-04-25 17:37:57 [INFO] ui_panels: 已加载动画: jumping
+2026-04-25 17:38:01 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 17:38:03 [INFO] editor_state: entered animation mode: stabbing (6 frames)
+2026-04-25 17:38:03 [INFO] ui_panels: 已加载动画: stabbing
+2026-04-25 17:38:05 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 17:38:08 [INFO] editor_state: entered animation mode: crouching forwards short, no weapon (4 frames)
+2026-04-25 17:38:08 [INFO] ui_panels: 已加载动画: crouching forwards short, no weapon
+2026-04-25 17:52:07 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 17:52:07 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 17:52:08 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 17:52:08 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 17:52:08 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 17:52:14 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 17:52:18 [INFO] editor_state: entered animation mode: driving car (5 frames)
+2026-04-25 17:52:18 [INFO] ui_panels: 已加载动画: driving car
+2026-04-25 17:53:13 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 17:53:13 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 17:53:14 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 17:53:14 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 17:53:14 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 17:53:24 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 17:53:24 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 17:53:25 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 17:53:25 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 17:53:25 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 17:53:32 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 17:53:35 [INFO] editor_state: entered animation mode: throwing, upside (8 frames)
+2026-04-25 17:53:35 [INFO] ui_panels: 已加载动画: throwing, upside
+2026-04-25 17:56:59 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 17:56:59 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 17:57:00 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 17:57:00 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 17:57:00 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 17:57:09 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 17:57:11 [INFO] editor_state: entered animation mode: throwing, upside (8 frames)
+2026-04-25 17:57:11 [INFO] ui_panels: 已加载动画: throwing, upside
+2026-04-25 17:58:57 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 17:58:57 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 17:58:58 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 17:58:58 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 17:58:58 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 17:59:10 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 17:59:11 [INFO] editor_state: entered animation mode: crouch still (1 frames)
+2026-04-25 17:59:11 [INFO] ui_panels: 已加载动画: crouch still
+2026-04-25 17:59:24 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 17:59:25 [INFO] editor_state: entered animation mode: recoil2 (3 frames)
+2026-04-25 17:59:25 [INFO] ui_panels: 已加载动画: recoil2
+2026-04-25 17:59:27 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 17:59:28 [INFO] editor_state: entered animation mode: stabbing (6 frames)
+2026-04-25 17:59:28 [INFO] ui_panels: 已加载动画: stabbing
+2026-04-25 17:59:30 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 17:59:31 [INFO] editor_state: entered animation mode: swimming forwards (5 frames)
+2026-04-25 17:59:31 [INFO] ui_panels: 已加载动画: swimming forwards
+2026-04-25 18:01:37 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 18:01:37 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 18:01:38 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 18:01:38 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 18:01:38 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 18:01:50 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 18:01:52 [INFO] editor_state: entered animation mode: recoil2 (3 frames)
+2026-04-25 18:01:52 [INFO] ui_panels: 已加载动画: recoil2
+2026-04-25 18:03:54 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 18:03:54 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 18:03:55 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 18:03:55 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 18:03:55 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 18:04:01 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 18:04:02 [INFO] editor_state: entered animation mode: still against wall (1 frames)
+2026-04-25 18:04:02 [INFO] ui_panels: 已加载动画: still against wall
+2026-04-25 18:04:04 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 18:04:06 [INFO] editor_state: entered animation mode: recoil3 (3 frames)
+2026-04-25 18:04:06 [INFO] ui_panels: 已加载动画: recoil3
+2026-04-25 18:04:08 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 18:04:09 [INFO] editor_state: entered animation mode: still, heavy weapon (1 frames)
+2026-04-25 18:04:09 [INFO] ui_panels: 已加载动画: still, heavy weapon
+2026-04-25 18:04:11 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 18:04:13 [INFO] editor_state: entered animation mode: tank mg still (1 frames)
+2026-04-25 18:04:13 [INFO] ui_panels: 已加载动画: tank mg still
+2026-04-25 18:04:14 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 18:04:16 [INFO] editor_state: entered animation mode: running, pistol (7 frames)
+2026-04-25 18:04:16 [INFO] ui_panels: 已加载动画: running, pistol
+2026-04-25 18:30:01 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 18:30:01 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 18:30:02 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 18:30:02 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 18:30:02 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 18:31:14 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml
+2026-04-25 18:31:14 [INFO] editor_state: exited animation mode
+2026-04-25 18:31:15 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml (5738 voxels, 15 particles, 17 sticks)
+2026-04-25 18:31:15 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 18:31:15 [INFO] ui_panels: 已加载骨架
+2026-04-25 18:31:35 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 18:31:37 [INFO] editor_state: entered animation mode: jumping (4 frames)
+2026-04-25 18:31:37 [INFO] ui_panels: 已加载动画: jumping
+2026-04-25 19:07:57 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 19:07:57 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 19:07:58 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 19:07:58 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 19:07:58 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:08:04 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml
+2026-04-25 19:08:04 [INFO] editor_state: exited animation mode
+2026-04-25 19:08:04 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml (5738 voxels, 15 particles, 17 sticks)
+2026-04-25 19:08:04 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:08:04 [INFO] ui_panels: 已加载骨架
+2026-04-25 19:08:23 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_aegis_ga.xml
+2026-04-25 19:08:23 [INFO] editor_state: exited animation mode
+2026-04-25 19:08:23 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_aegis_ga.xml (5462 voxels, 15 particles, 17 sticks)
+2026-04-25 19:08:23 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:08:23 [INFO] ui_panels: 已加载骨架
+2026-04-25 19:08:46 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml
+2026-04-25 19:08:46 [INFO] editor_state: exited animation mode
+2026-04-25 19:08:46 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml (5738 voxels, 15 particles, 17 sticks)
+2026-04-25 19:08:46 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:08:46 [INFO] ui_panels: 已加载骨架
+2026-04-25 19:08:54 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:09:01 [INFO] editor_state: entered animation mode: melee, ninjato slash (7 frames)
+2026-04-25 19:09:01 [INFO] ui_panels: 已加载动画: melee, ninjato slash
+2026-04-25 19:12:44 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 19:12:44 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 19:12:45 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 19:12:45 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 19:12:45 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:12:50 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml
+2026-04-25 19:12:50 [INFO] editor_state: exited animation mode
+2026-04-25 19:12:50 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml (5738 voxels, 15 particles, 17 sticks)
+2026-04-25 19:12:50 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:12:50 [INFO] ui_panels: 已加载骨架
+2026-04-25 19:13:05 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_aegis.xml
+2026-04-25 19:13:05 [INFO] editor_state: exited animation mode
+2026-04-25 19:13:05 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_aegis.xml (4310 voxels, 15 particles, 17 sticks)
+2026-04-25 19:13:05 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:13:05 [INFO] ui_panels: 已加载骨架
+2026-04-25 19:13:09 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml
+2026-04-25 19:13:09 [INFO] editor_state: exited animation mode
+2026-04-25 19:13:09 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml (5738 voxels, 15 particles, 17 sticks)
+2026-04-25 19:13:09 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:13:09 [INFO] ui_panels: 已加载骨架
+2026-04-25 19:13:16 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:13:19 [INFO] editor_state: entered animation mode: throwing, upside (8 frames)
+2026-04-25 19:13:19 [INFO] ui_panels: 已加载动画: throwing, upside
+2026-04-25 19:13:30 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:13:34 [INFO] editor_state: entered animation mode: crouching forwards, riot shield, reversed (5 frames)
+2026-04-25 19:13:34 [INFO] ui_panels: 已加载动画: crouching forwards, riot shield, reversed
+2026-04-25 19:20:35 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 19:20:35 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 19:20:36 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 19:20:36 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 19:20:36 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:20:40 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml
+2026-04-25 19:20:40 [INFO] editor_state: exited animation mode
+2026-04-25 19:20:40 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml (5738 voxels, 15 particles, 17 sticks)
+2026-04-25 19:20:40 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:20:40 [INFO] ui_panels: 已加载骨架
+2026-04-25 19:21:03 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:21:05 [INFO] editor_state: entered animation mode: lifting up (2 frames)
+2026-04-25 19:21:05 [INFO] ui_panels: 已加载动画: lifting up
+2026-04-25 19:21:13 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:21:14 [INFO] editor_state: entered animation mode: throwing, upside (8 frames)
+2026-04-25 19:21:14 [INFO] ui_panels: 已加载动画: throwing, upside
+2026-04-25 19:21:21 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:21:23 [INFO] editor_state: entered animation mode: walking, carrying load (5 frames)
+2026-04-25 19:21:23 [INFO] ui_panels: 已加载动画: walking, carrying load
+2026-04-25 19:23:04 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:23:06 [INFO] editor_state: entered animation mode: change weapon in, single hand carry (3 frames)
+2026-04-25 19:23:06 [INFO] ui_panels: 已加载动画: change weapon in, single hand carry
+2026-04-25 19:23:10 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:23:12 [INFO] editor_state: entered animation mode: driving car, headbang (19 frames)
+2026-04-25 19:23:12 [INFO] ui_panels: 已加载动画: driving car, headbang
+2026-04-25 19:23:20 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:23:23 [INFO] editor_state: entered animation mode: crouch still calm (1 frames)
+2026-04-25 19:23:23 [INFO] ui_panels: 已加载动画: crouch still calm
+2026-04-25 19:23:29 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:23:35 [INFO] editor_state: entered animation mode: mount bayonet part 1 (6 frames)
+2026-04-25 19:23:35 [INFO] ui_panels: 已加载动画: mount bayonet part 1
+2026-04-25 19:23:42 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:23:45 [INFO] editor_state: entered animation mode: Pshotgun_hip0.5 (3 frames)
+2026-04-25 19:23:45 [INFO] ui_panels: 已加载动画: Pshotgun_hip0.5
+2026-04-25 19:23:49 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:23:55 [INFO] editor_state: entered animation mode: walking2, thunder (5 frames)
+2026-04-25 19:23:55 [INFO] ui_panels: 已加载动画: walking2, thunder
+2026-04-25 19:29:59 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 19:29:59 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 19:30:00 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 19:30:00 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 19:30:00 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:30:07 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml
+2026-04-25 19:30:07 [INFO] editor_state: exited animation mode
+2026-04-25 19:30:07 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml (5738 voxels, 15 particles, 17 sticks)
+2026-04-25 19:30:07 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:30:07 [INFO] ui_panels: 已加载骨架
+2026-04-25 19:30:12 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:30:13 [INFO] editor_state: entered animation mode: walking backwards (5 frames)
+2026-04-25 19:30:13 [INFO] ui_panels: 已加载动画: walking backwards
+2026-04-25 19:30:35 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:30:39 [INFO] editor_state: entered animation mode: hold, pistol (1 frames)
+2026-04-25 19:30:39 [INFO] ui_panels: 已加载动画: hold, pistol
+2026-04-25 19:30:43 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:30:45 [INFO] editor_state: entered animation mode: travelling car, aiming (1 frames)
+2026-04-25 19:30:45 [INFO] ui_panels: 已加载动画: travelling car, aiming
+2026-04-25 19:30:50 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:30:53 [INFO] editor_state: entered animation mode: reloading, dragunov_svd (13 frames)
+2026-04-25 19:30:53 [INFO] ui_panels: 已加载动画: reloading, dragunov_svd
+2026-04-25 19:30:59 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:31:02 [INFO] editor_state: entered animation mode: hold_casual, pistol 3 (1 frames)
+2026-04-25 19:31:02 [INFO] ui_panels: 已加载动画: hold_casual, pistol 3
+2026-04-25 19:31:06 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:31:13 [INFO] editor_state: entered animation mode: crouching backwards, ninjato (5 frames)
+2026-04-25 19:31:13 [INFO] ui_panels: 已加载动画: crouching backwards, ninjato
+2026-04-25 19:35:31 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_human_2_4.xml
+2026-04-25 19:35:31 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_human_2_4.xml
+2026-04-25 19:35:31 [INFO] editor_state: exited animation mode
+2026-04-25 19:35:31 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_human_2_4.xml
+2026-04-25 19:35:31 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_human_2_4.xml (4386 voxels, 15 particles, 17 sticks)
+2026-04-25 19:35:31 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:35:31 [INFO] ui_panels: 已加载骨架
+2026-04-25 19:35:45 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:35:47 [INFO] editor_state: entered animation mode: melee, ninjato slap (6 frames)
+2026-04-25 19:35:47 [INFO] ui_panels: 已加载动画: melee, ninjato slap
+2026-04-25 19:35:51 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:36:03 [INFO] editor_state: entered animation mode: crouching backwards, ninjato (5 frames)
+2026-04-25 19:36:03 [INFO] ui_panels: 已加载动画: crouching backwards, ninjato
+2026-04-25 19:36:42 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_gatling2.xml
+2026-04-25 19:36:42 [INFO] editor_state: exited animation mode
+2026-04-25 19:36:42 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_gatling2.xml (3727 voxels, 15 particles, 17 sticks)
+2026-04-25 19:36:42 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:36:42 [INFO] ui_panels: 已加载骨架
+2026-04-25 19:37:25 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml
+2026-04-25 19:37:25 [INFO] editor_state: exited animation mode
+2026-04-25 19:37:25 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\kccod_archer.xml (5738 voxels, 15 particles, 17 sticks)
+2026-04-25 19:37:25 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 19:37:25 [INFO] ui_panels: 已加载骨架
+2026-04-25 19:41:31 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 19:41:33 [INFO] editor_state: entered animation mode: melee, ninjato slash (7 frames)
+2026-04-25 19:41:33 [INFO] ui_panels: 已加载动画: melee, ninjato slash
+2026-04-25 22:32:22 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 22:32:23 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 22:32:23 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 22:32:23 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 22:32:23 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 23:05:49 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 23:05:49 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 23:05:50 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 23:05:50 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 23:05:50 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 23:18:48 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 23:18:48 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 23:18:49 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 23:18:49 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 23:18:49 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 23:33:37 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-25 23:33:37 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-25 23:33:38 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-25 23:33:38 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-25 23:33:38 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-25 23:34:04 [INFO] ui_panels: vanilla 路径已设置
+2026-04-25 23:34:06 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-25 23:34:06 [INFO] ui_panels: 已加载: Vanilla Still Pose
+2026-04-26 00:02:05 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 00:02:06 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 00:02:07 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 00:02:07 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-26 00:02:07 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 01:24:38 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 01:24:38 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 01:24:39 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 01:24:39 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-26 01:24:39 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 01:41:15 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 01:41:15 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 01:41:16 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 01:41:16 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-26 01:41:16 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 01:50:42 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 01:50:42 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 01:50:43 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 01:50:43 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-26 01:50:43 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 01:53:52 [INFO] ui_panels: vanilla 路径已设置
+2026-04-26 01:53:54 [INFO] ui_panels: 已加载: 当前帧 (15 粒子)
+2026-04-26 01:55:15 [INFO] ui_panels: 基准已清空
+2026-04-26 02:12:30 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 02:12:30 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 02:12:31 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 02:12:31 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-26 02:12:31 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 02:12:50 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 02:12:50 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 02:12:51 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 02:12:51 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-26 02:12:51 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 10:29:55 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 10:29:55 [CRITICAL] rwrsb: Uncaught exception
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 17, in <module>
+    import glfw
+ModuleNotFoundError: No module named 'glfw'
+2026-04-26 10:42:18 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 10:42:18 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 10:42:19 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 10:42:19 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-26 10:42:19 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 10:42:31 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 10:42:31 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 10:42:32 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 10:42:37 [INFO] editor_state: loaded XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_ar_95type_405.xml (2247 voxels, 15 particles, 17 sticks)
+2026-04-26 10:42:37 [INFO] ui_panels: 已加载: gkd_ar_95type_405.xml
+2026-04-26 11:17:23 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 11:17:24 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 11:17:24 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 11:17:24 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-26 11:17:24 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 12:56:37 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 12:56:37 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 12:56:38 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 12:56:38 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-26 12:56:38 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 12:56:48 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 12:56:48 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 12:56:49 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 12:57:09 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 12:57:09 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 12:57:10 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 12:57:24 [INFO] editor_state: loaded XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_ar_95type_405.xml (2247 voxels, 15 particles, 17 sticks)
+2026-04-26 12:57:24 [INFO] ui_panels: 已加载: gkd_ar_95type_405.xml
+2026-04-26 12:57:53 [INFO] editor_state: loaded XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_rf_m14mod3.xml (3142 voxels, 15 particles, 17 sticks)
+2026-04-26 12:57:53 [INFO] ui_panels: 已加载: gkd_rf_m14mod3.xml
+2026-04-26 12:58:31 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 12:58:31 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 12:58:32 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 12:58:32 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-26 12:58:32 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 12:58:34 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 12:58:34 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 12:58:35 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 12:58:35 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-26 12:58:35 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 14:27:27 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 14:27:27 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 14:27:28 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 14:27:28 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-26 14:27:28 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 14:27:37 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_rf_ksvk_7807.xml
+2026-04-26 14:27:37 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_rf_ksvk_7807.xml
+2026-04-26 14:27:37 [INFO] editor_state: exited animation mode
+2026-04-26 14:27:37 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_rf_ksvk_7807.xml
+2026-04-26 14:27:37 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_rf_ksvk_7807.xml (3581 voxels, 15 particles, 17 sticks)
+2026-04-26 14:27:37 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 14:27:37 [INFO] ui_panels: 已加载骨架
+2026-04-26 14:27:46 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-26 14:27:54 [INFO] editor_state: entered animation mode: RT20_reload (12 frames)
+2026-04-26 14:27:54 [INFO] ui_panels: 已加载动画: RT20_reload
+2026-04-26 14:28:32 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_rf_m1.xml
+2026-04-26 14:28:32 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_rf_m1.xml
+2026-04-26 14:28:32 [INFO] editor_state: exited animation mode
+2026-04-26 14:28:32 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_rf_m1.xml
+2026-04-26 14:28:32 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_rf_m1.xml (2086 voxels, 15 particles, 17 sticks)
+2026-04-26 14:28:32 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 14:28:32 [INFO] ui_panels: 已加载骨架
+2026-04-26 14:28:37 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-26 14:28:42 [INFO] editor_state: entered animation mode: RT20_reload (12 frames)
+2026-04-26 14:28:42 [INFO] ui_panels: 已加载动画: RT20_reload
+2026-04-26 14:55:00 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-04-26 14:55:00 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-04-26 14:55:01 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-04-26 14:55:01 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-04-26 14:55:01 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 14:55:06 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_rf_m1.xml
+2026-04-26 14:55:06 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_rf_m1.xml
+2026-04-26 14:55:06 [INFO] editor_state: exited animation mode
+2026-04-26 14:55:06 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_rf_m1.xml
+2026-04-26 14:55:06 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_rf_m1.xml (2086 voxels, 15 particles, 17 sticks)
+2026-04-26 14:55:06 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 14:55:06 [INFO] ui_panels: 已加载骨架
+2026-04-26 14:55:15 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-04-26 14:55:19 [INFO] editor_state: entered animation mode: RT20_reload (12 frames)
+2026-04-26 14:55:19 [INFO] ui_panels: 已加载动画: RT20_reload
+2026-04-26 14:55:50 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳骨架.xml
+2026-04-26 14:55:50 [INFO] editor_state: exited animation mode
+2026-04-26 14:55:50 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳骨架.xml (15888 voxels, 15 particles, 17 sticks)
+2026-04-26 14:55:50 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-04-26 14:55:50 [INFO] ui_panels: 已加载骨架
+2026-04-26 14:55:55 [INFO] animation_io: indexed 1 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳行走.xml
+2026-04-26 14:55:55 [INFO] editor_state: entered animation mode: new_animation (3 frames)
+2026-04-26 14:55:55 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-02 01:01:49 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 01:01:50 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 01:01:51 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 01:18:22 [INFO] rwrsb: rwrsb_gui started, log dir: d:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 01:18:23 [CRITICAL] rwrsb: Uncaught exception
+Traceback (most recent call last):
+  File "d:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main_animation.py", line 18, in <module>
+    import glfw
+ModuleNotFoundError: No module named 'glfw'
+2026-05-02 01:18:44 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 01:18:44 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 01:18:45 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 01:18:45 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 01:18:45 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 01:18:49 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_smg_type82.xml
+2026-05-02 01:18:49 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_smg_type82.xml
+2026-05-02 01:18:49 [INFO] editor_state: exited animation mode
+2026-05-02 01:18:49 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_smg_type82.xml
+2026-05-02 01:18:49 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 01:18:49 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 01:18:49 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 01:59:08 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 01:59:08 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 01:59:09 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 01:59:09 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 01:59:09 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 01:59:14 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_smg_type82.xml
+2026-05-02 01:59:14 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_smg_type82.xml
+2026-05-02 01:59:14 [INFO] editor_state: exited animation mode
+2026-05-02 01:59:14 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_smg_type82.xml
+2026-05-02 01:59:14 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 01:59:14 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 01:59:14 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 01:59:43 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 01:59:51 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-02 01:59:51 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-02 02:02:22 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 02:02:22 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 02:02:22 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 02:02:22 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 02:02:22 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:02:30 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳骨架.xml
+2026-05-02 02:02:30 [INFO] editor_state: exited animation mode
+2026-05-02 02:02:30 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳骨架.xml (15888 voxels, 15 particles, 17 sticks)
+2026-05-02 02:02:30 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:02:30 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 02:02:35 [INFO] animation_io: indexed 1 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳行走.xml
+2026-05-02 02:02:35 [INFO] editor_state: entered animation mode: new_animation (3 frames)
+2026-05-02 02:02:35 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-02 02:03:11 [INFO] __main__: not an animation file, try as skeleton: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_smg_type82.xml
+2026-05-02 02:03:11 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_smg_type82.xml
+2026-05-02 02:03:11 [INFO] editor_state: exited animation mode
+2026-05-02 02:03:11 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_smg_type82.xml
+2026-05-02 02:03:11 [INFO] editor_state: loaded skeleton XML: D:\Program_Files\Steam\steamapps\workshop\content\270150\2606099273\media\packages\GFL_Castling\models\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 02:03:11 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:03:11 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 02:03:15 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:03:17 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-02 02:03:17 [INFO] ui_panels: 已加载动画: running
+2026-05-02 02:04:01 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:04:08 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-02 02:04:08 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-02 02:19:29 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 02:19:29 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 02:19:30 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 02:19:30 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 02:19:30 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:19:45 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳骨架.xml
+2026-05-02 02:19:45 [INFO] editor_state: exited animation mode
+2026-05-02 02:19:45 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳骨架.xml (15888 voxels, 15 particles, 17 sticks)
+2026-05-02 02:19:45 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:19:45 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 02:19:47 [INFO] animation_io: indexed 1 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳行走.xml
+2026-05-02 02:19:47 [INFO] editor_state: entered animation mode: new_animation (3 frames)
+2026-05-02 02:19:47 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-02 02:20:17 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:20:17 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:20:17 [INFO] editor_state: exited animation mode
+2026-05-02 02:20:17 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:20:17 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 02:20:17 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:20:17 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 02:20:19 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:20:25 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-02 02:20:25 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-02 02:21:11 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:21:14 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-02 02:21:14 [INFO] ui_panels: 已加载动画: running
+2026-05-02 02:24:19 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:24:25 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-02 02:24:25 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-02 02:28:59 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 02:28:59 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 02:29:00 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 02:29:00 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 02:29:00 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:32:29 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 02:32:29 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 02:32:29 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 02:32:29 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 02:32:29 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:32:47 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:32:47 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:32:47 [INFO] editor_state: exited animation mode
+2026-05-02 02:32:47 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:32:47 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 02:32:47 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:32:47 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 02:32:50 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:32:55 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-02 02:32:55 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-02 02:33:06 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:33:08 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-02 02:33:08 [INFO] ui_panels: 已加载动画: running
+2026-05-02 02:33:29 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳骨架.xml
+2026-05-02 02:33:29 [INFO] editor_state: exited animation mode
+2026-05-02 02:33:29 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳骨架.xml (15888 voxels, 15 particles, 17 sticks)
+2026-05-02 02:33:29 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:33:29 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 02:33:34 [INFO] animation_io: indexed 1 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳行走.xml
+2026-05-02 02:33:34 [INFO] editor_state: entered animation mode: new_animation (3 frames)
+2026-05-02 02:33:34 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-02 02:34:02 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:34:02 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:34:02 [INFO] editor_state: exited animation mode
+2026-05-02 02:34:02 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:34:02 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 02:34:02 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:34:02 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 02:34:04 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:34:06 [INFO] editor_state: entered animation mode: throwing, upside (8 frames)
+2026-05-02 02:34:06 [INFO] ui_panels: 已加载动画: throwing, upside
+2026-05-02 02:34:11 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:34:13 [INFO] editor_state: entered animation mode: crouch still (1 frames)
+2026-05-02 02:34:13 [INFO] ui_panels: 已加载动画: crouch still
+2026-05-02 02:34:16 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:34:20 [INFO] editor_state: entered animation mode: falling (1 frames)
+2026-05-02 02:34:20 [INFO] ui_panels: 已加载动画: falling
+2026-05-02 02:34:25 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:34:27 [INFO] editor_state: entered animation mode: prone (1 frames)
+2026-05-02 02:34:27 [INFO] ui_panels: 已加载动画: prone
+2026-05-02 02:34:47 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:34:52 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-02 02:34:52 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-02 02:34:59 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:35:08 [INFO] editor_state: entered animation mode: prone, moving forwards (5 frames)
+2026-05-02 02:35:08 [INFO] ui_panels: 已加载动画: prone, moving forwards
+2026-05-02 02:35:28 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:35:39 [INFO] editor_state: entered animation mode: prone, without weapon, 63 (1 frames)
+2026-05-02 02:35:39 [INFO] ui_panels: 已加载动画: prone, without weapon, 63
+2026-05-02 02:35:43 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:35:52 [INFO] editor_state: entered animation mode: prone moving, ninjato (5 frames)
+2026-05-02 02:35:52 [INFO] ui_panels: 已加载动画: prone moving, ninjato
+2026-05-02 02:35:58 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:36:04 [INFO] editor_state: entered animation mode: prone moving, sword (5 frames)
+2026-05-02 02:36:04 [INFO] ui_panels: 已加载动画: prone moving, sword
+2026-05-02 02:36:11 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:36:22 [INFO] editor_state: entered animation mode: rt20_prone (1 frames)
+2026-05-02 02:36:22 [INFO] ui_panels: 已加载动画: rt20_prone
+2026-05-02 02:36:30 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:36:36 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-02 02:36:36 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-02 02:37:00 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:37:05 [INFO] editor_state: entered animation mode: RT20_reload (12 frames)
+2026-05-02 02:37:05 [INFO] ui_panels: 已加载动画: RT20_reload
+2026-05-02 02:37:16 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:37:17 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-02 02:37:17 [INFO] ui_panels: 已加载动画: running
+2026-05-02 02:37:33 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 02:37:34 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 02:37:34 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 02:37:34 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 02:37:34 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:37:47 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:37:47 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:37:47 [INFO] editor_state: exited animation mode
+2026-05-02 02:37:47 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:37:47 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 02:37:47 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:37:47 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 02:37:48 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:37:50 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-02 02:37:50 [INFO] ui_panels: 已加载动画: running
+2026-05-02 02:37:54 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:38:01 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-02 02:38:01 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-02 02:38:10 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:38:17 [INFO] editor_state: entered animation mode: prone (1 frames)
+2026-05-02 02:38:17 [INFO] ui_panels: 已加载动画: prone
+2026-05-02 02:38:24 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 02:38:24 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 02:38:25 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 02:38:25 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 02:38:25 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:38:31 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:38:31 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:38:31 [INFO] editor_state: exited animation mode
+2026-05-02 02:38:31 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:38:31 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 02:38:31 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:38:31 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 02:38:33 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:38:38 [INFO] editor_state: entered animation mode: crouch still (1 frames)
+2026-05-02 02:38:38 [INFO] ui_panels: 已加载动画: crouch still
+2026-05-02 02:38:40 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:38:43 [INFO] editor_state: entered animation mode: prone (1 frames)
+2026-05-02 02:38:43 [INFO] ui_panels: 已加载动画: prone
+2026-05-02 02:38:58 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:39:01 [INFO] editor_state: entered animation mode: prone, moving forwards (5 frames)
+2026-05-02 02:39:01 [INFO] ui_panels: 已加载动画: prone, moving forwards
+2026-05-02 02:39:21 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:39:24 [INFO] editor_state: entered animation mode: still (1 frames)
+2026-05-02 02:39:24 [INFO] ui_panels: 已加载动画: still
+2026-05-02 02:40:11 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:40:14 [INFO] editor_state: entered animation mode: still, heavy weapon (1 frames)
+2026-05-02 02:40:14 [INFO] ui_panels: 已加载动画: still, heavy weapon
+2026-05-02 02:40:17 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:40:24 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-02 02:40:24 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-02 02:40:35 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:40:37 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-02 02:40:37 [INFO] ui_panels: 已加载动画: running
+2026-05-02 02:49:12 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 02:49:12 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 02:49:13 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 02:49:13 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 02:49:13 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:49:20 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:49:20 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:49:20 [INFO] editor_state: exited animation mode
+2026-05-02 02:49:20 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 02:49:20 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 02:49:20 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:49:20 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 02:49:22 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:49:24 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-02 02:49:24 [INFO] ui_panels: 已加载动画: running
+2026-05-02 02:49:33 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 02:49:39 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-02 02:49:39 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-02 02:49:51 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 02:49:52 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 02:49:52 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 02:49:52 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 02:49:52 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:50:01 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 02:50:01 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 02:50:02 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 02:50:02 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 02:50:02 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:50:08 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳骨架.xml
+2026-05-02 02:50:08 [INFO] editor_state: exited animation mode
+2026-05-02 02:50:08 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳骨架.xml (15888 voxels, 15 particles, 17 sticks)
+2026-05-02 02:50:08 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 02:50:08 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 02:50:10 [INFO] animation_io: indexed 1 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳行走.xml
+2026-05-02 02:50:10 [INFO] editor_state: entered animation mode: new_animation (3 frames)
+2026-05-02 02:50:10 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-02 03:10:44 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 03:10:44 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 03:10:45 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 03:10:45 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 03:10:45 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 03:10:52 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:10:52 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:10:52 [INFO] editor_state: exited animation mode
+2026-05-02 03:10:52 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:10:52 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 03:10:52 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 03:10:52 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 03:10:58 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 03:11:00 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-02 03:11:00 [INFO] ui_panels: 已加载动画: running
+2026-05-02 03:11:14 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳骨架.xml
+2026-05-02 03:11:14 [INFO] editor_state: exited animation mode
+2026-05-02 03:11:14 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳骨架.xml (15888 voxels, 15 particles, 17 sticks)
+2026-05-02 03:11:14 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 03:11:14 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 03:11:17 [INFO] animation_io: indexed 1 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\伯劳行走.xml
+2026-05-02 03:11:17 [INFO] editor_state: entered animation mode: new_animation (3 frames)
+2026-05-02 03:11:17 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-02 03:12:13 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:12:13 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:12:13 [INFO] editor_state: exited animation mode
+2026-05-02 03:12:13 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:12:13 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 03:12:13 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 03:12:13 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 03:12:22 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 03:12:23 [INFO] editor_state: entered animation mode: walking backwards (5 frames)
+2026-05-02 03:12:23 [INFO] ui_panels: 已加载动画: walking backwards
+2026-05-02 03:12:42 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 03:12:55 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-02 03:12:55 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-02 03:20:22 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 03:20:22 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 03:20:23 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 03:20:23 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 03:20:23 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 03:20:38 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:20:38 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:20:38 [INFO] editor_state: exited animation mode
+2026-05-02 03:20:38 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:20:38 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 03:20:38 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 03:20:38 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 03:20:40 [INFO] animation_io: indexed 1 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\new_animation.xml
+2026-05-02 03:20:40 [INFO] editor_state: entered animation mode: new_animation (3 frames)
+2026-05-02 03:20:40 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-02 03:20:45 [INFO] animation_io: indexed 1 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\new_animation.xml
+2026-05-02 03:20:45 [INFO] editor_state: entered animation mode: new_animation (3 frames)
+2026-05-02 03:20:45 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-02 03:20:49 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:20:49 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:20:49 [INFO] editor_state: exited animation mode
+2026-05-02 03:20:49 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:20:49 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 03:20:49 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 03:20:49 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 03:20:51 [INFO] animation_io: indexed 1 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\new_animation.xml
+2026-05-02 03:20:51 [INFO] editor_state: entered animation mode: new_animation (3 frames)
+2026-05-02 03:20:51 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-02 03:20:55 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:20:55 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:20:55 [INFO] editor_state: exited animation mode
+2026-05-02 03:20:55 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:20:56 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 03:20:56 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 03:20:56 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 03:20:57 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 03:20:58 [INFO] editor_state: entered animation mode: jumping (4 frames)
+2026-05-02 03:20:58 [INFO] ui_panels: 已加载动画: jumping
+2026-05-02 03:21:06 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 03:21:08 [INFO] editor_state: entered animation mode: throwing, upside (8 frames)
+2026-05-02 03:21:08 [INFO] ui_panels: 已加载动画: throwing, upside
+2026-05-02 03:21:55 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 03:21:55 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 03:21:56 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 03:21:56 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 03:21:56 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 03:22:03 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:22:03 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:22:03 [INFO] editor_state: exited animation mode
+2026-05-02 03:22:03 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:22:03 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 03:22:03 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 03:22:03 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 03:22:04 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 03:22:08 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-02 03:22:08 [INFO] ui_panels: 已加载动画: running
+2026-05-02 03:22:19 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 03:22:26 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-02 03:22:26 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-02 03:26:09 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 03:26:09 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 03:26:10 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 03:26:10 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 03:26:10 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 03:26:15 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:26:15 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:26:15 [INFO] editor_state: exited animation mode
+2026-05-02 03:26:15 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 03:26:15 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 03:26:15 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 03:26:15 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 03:26:16 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 03:26:22 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-02 03:26:22 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-02 03:55:30 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 03:55:30 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 03:55:31 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 03:55:31 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 03:55:31 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 09:04:56 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 09:04:56 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 09:04:57 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 09:04:57 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 09:04:57 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 09:05:07 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 09:05:07 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 09:05:07 [INFO] editor_state: exited animation mode
+2026-05-02 09:05:07 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 09:05:07 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 09:05:07 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 09:05:07 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 09:05:35 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 09:05:35 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 09:05:35 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 09:05:35 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 09:05:35 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 09:11:33 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 09:11:33 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 09:11:34 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 09:11:34 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 09:11:34 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 09:39:42 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 09:39:42 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 09:39:43 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 09:39:43 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 09:39:43 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 09:44:47 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 09:44:48 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 09:44:48 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 09:44:48 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 09:44:48 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 09:55:15 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 09:55:15 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 09:55:16 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 09:55:20 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 09:55:20 [INFO] editor_state: loaded XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 09:55:20 [INFO] ui_panels: 已加载: gkd_smg_type82.xml
+2026-05-02 10:46:11 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 10:46:11 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 10:46:12 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 10:46:26 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 10:46:26 [INFO] editor_state: loaded XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 10:46:26 [INFO] ui_panels: 已加载: gkd_smg_type82.xml
+2026-05-02 11:54:19 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 11:54:19 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 11:54:20 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 17:13:21 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 17:13:21 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 17:13:22 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 17:13:22 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 17:13:22 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 17:13:29 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:13:29 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:13:29 [INFO] editor_state: exited animation mode
+2026-05-02 17:13:29 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:13:29 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 17:13:29 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 17:13:29 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 17:25:39 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 17:25:40 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 17:25:41 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 17:25:41 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 17:25:41 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 17:25:47 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:25:47 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:25:47 [INFO] editor_state: exited animation mode
+2026-05-02 17:25:47 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:25:47 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 17:25:47 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 17:25:47 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 17:32:58 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 17:32:58 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 17:32:59 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 17:32:59 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 17:32:59 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 17:33:05 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:33:05 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:33:05 [INFO] editor_state: exited animation mode
+2026-05-02 17:33:05 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:33:05 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 17:33:05 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 17:33:05 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 17:38:10 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 17:38:10 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 17:38:11 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 17:38:11 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 17:38:11 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 17:38:16 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:38:16 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:38:16 [INFO] editor_state: exited animation mode
+2026-05-02 17:38:16 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:38:16 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 17:38:16 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 17:38:16 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 17:38:18 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 17:38:24 [INFO] editor_state: entered animation mode: dance, groove battle (7 frames)
+2026-05-02 17:38:24 [INFO] ui_panels: 已加载动画: dance, groove battle
+2026-05-02 17:38:29 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 17:38:34 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-02 17:38:34 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-02 17:38:55 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 17:39:01 [INFO] editor_state: entered animation mode: driving car, dance (3 frames)
+2026-05-02 17:39:01 [INFO] ui_panels: 已加载动画: driving car, dance
+2026-05-02 17:39:49 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 17:39:49 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 17:39:50 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 17:39:50 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 17:39:50 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 17:39:56 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:39:56 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:39:56 [INFO] editor_state: exited animation mode
+2026-05-02 17:39:56 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 17:39:56 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 17:39:56 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 17:39:56 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 17:39:59 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 17:40:04 [INFO] editor_state: entered animation mode: dancing, kazachok (11 frames)
+2026-05-02 17:40:04 [INFO] ui_panels: 已加载动画: dancing, kazachok
+2026-05-02 17:40:09 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 17:40:18 [INFO] editor_state: entered animation mode: dancing, zoufang (5 frames)
+2026-05-02 17:40:18 [INFO] ui_panels: 已加载动画: dancing, zoufang
+2026-05-02 17:40:21 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 17:40:26 [INFO] editor_state: entered animation mode: dancing, ten years old ass (33 frames)
+2026-05-02 17:40:26 [INFO] ui_panels: 已加载动画: dancing, ten years old ass
+2026-05-02 17:40:34 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 17:40:46 [INFO] editor_state: entered animation mode: dancing, phut hon (5 frames)
+2026-05-02 17:40:46 [INFO] ui_panels: 已加载动画: dancing, phut hon
+2026-05-02 17:40:53 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 17:41:00 [INFO] editor_state: entered animation mode: dancing, helltaker (5 frames)
+2026-05-02 17:41:00 [INFO] ui_panels: 已加载动画: dancing, helltaker
+2026-05-02 17:41:07 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 17:41:13 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-02 17:41:13 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-02 17:45:00 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 17:45:00 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 17:45:01 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 17:45:01 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 17:45:01 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 17:45:06 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:10:46 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 18:10:46 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 18:10:47 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 18:10:47 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 18:10:47 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:10:55 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:10:55 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:10:55 [INFO] editor_state: exited animation mode
+2026-05-02 18:10:55 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:10:56 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 18:10:56 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:10:56 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 18:10:58 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:11:10 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-02 18:11:10 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-02 18:19:57 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 18:19:57 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 18:19:58 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 18:19:58 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 18:19:58 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:20:07 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:20:07 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:20:07 [INFO] editor_state: exited animation mode
+2026-05-02 18:20:07 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:20:07 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 18:20:07 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:20:07 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 18:20:09 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:20:14 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-02 18:20:14 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-02 18:20:39 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 18:20:39 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 18:20:39 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 18:20:39 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 18:20:39 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:20:48 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:20:48 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:20:48 [INFO] editor_state: exited animation mode
+2026-05-02 18:20:48 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:20:48 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 18:20:48 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:20:48 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 18:20:49 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:20:53 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-02 18:20:53 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-02 18:25:33 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 18:25:33 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 18:25:34 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 18:25:34 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 18:25:34 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:25:41 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:25:41 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:25:41 [INFO] editor_state: exited animation mode
+2026-05-02 18:25:41 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:25:41 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 18:25:41 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:25:41 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 18:25:43 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:25:45 [INFO] editor_state: entered animation mode: crouch still (1 frames)
+2026-05-02 18:25:45 [INFO] ui_panels: 已加载动画: crouch still
+2026-05-02 18:25:47 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:25:53 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-02 18:25:53 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-02 18:26:00 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:26:07 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-02 18:26:07 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-02 18:31:06 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 18:31:06 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 18:31:07 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 18:31:07 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 18:31:07 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:31:12 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:31:12 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:31:12 [INFO] editor_state: exited animation mode
+2026-05-02 18:31:12 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:31:12 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 18:31:12 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:31:12 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 18:31:18 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:31:19 [INFO] editor_state: entered animation mode: arriving ground (4 frames)
+2026-05-02 18:31:19 [INFO] ui_panels: 已加载动画: arriving ground
+2026-05-02 18:31:26 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:31:32 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-02 18:31:32 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-02 18:31:51 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:31:52 [INFO] editor_state: entered animation mode: lifting up (2 frames)
+2026-05-02 18:31:52 [INFO] ui_panels: 已加载动画: lifting up
+2026-05-02 18:49:53 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 18:49:53 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 18:49:54 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 18:49:54 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 18:49:54 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:49:58 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:50:08 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-02 18:50:08 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-02 18:50:10 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:50:10 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:50:10 [INFO] editor_state: exited animation mode
+2026-05-02 18:50:10 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:50:10 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 18:50:10 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:50:10 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 18:50:17 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:50:22 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-02 18:50:22 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-02 18:50:45 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:50:48 [INFO] editor_state: entered animation mode: falling (1 frames)
+2026-05-02 18:50:48 [INFO] ui_panels: 已加载动画: falling
+2026-05-02 18:50:52 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:50:53 [INFO] editor_state: entered animation mode: lifting up (2 frames)
+2026-05-02 18:50:53 [INFO] ui_panels: 已加载动画: lifting up
+2026-05-02 18:50:57 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:51:01 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-02 18:51:01 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-02 18:59:04 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 18:59:04 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 18:59:05 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 18:59:05 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 18:59:05 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:59:48 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 18:59:48 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 18:59:49 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 18:59:49 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 18:59:49 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:59:53 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:59:53 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:59:53 [INFO] editor_state: exited animation mode
+2026-05-02 18:59:53 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 18:59:53 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 18:59:53 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 18:59:53 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 18:59:56 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 18:59:58 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-02 18:59:58 [INFO] ui_panels: 已加载动画: running
+2026-05-02 19:00:05 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 19:00:09 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-02 19:00:09 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-02 19:00:48 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 19:00:48 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 19:00:49 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 19:00:49 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 19:00:49 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 19:00:57 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 19:00:57 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 19:00:57 [INFO] editor_state: exited animation mode
+2026-05-02 19:00:57 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 19:00:57 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 19:00:57 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 19:00:57 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 19:00:58 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 19:01:00 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-02 19:01:00 [INFO] ui_panels: 已加载动画: running
+2026-05-02 19:01:13 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 19:01:20 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-02 19:01:20 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-02 19:01:29 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 19:01:29 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 19:01:29 [INFO] editor_state: exited animation mode
+2026-05-02 19:01:29 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 19:01:29 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 19:01:29 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 19:01:29 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 19:01:32 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 19:01:36 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-02 19:01:36 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-02 19:01:39 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 19:01:40 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-02 19:01:40 [INFO] ui_panels: 已加载动画: running
+2026-05-02 19:06:43 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 19:06:43 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 19:06:44 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 19:06:44 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 19:06:44 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 19:06:49 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 19:06:49 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 19:06:49 [INFO] editor_state: exited animation mode
+2026-05-02 19:06:49 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 19:06:49 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 19:06:49 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 19:06:49 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-02 19:06:51 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 19:06:53 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-02 19:06:53 [INFO] ui_panels: 已加载动画: running
+2026-05-02 19:06:57 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-02 19:07:00 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-02 19:07:00 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-02 19:08:54 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-02 19:08:54 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-02 19:08:54 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-02 19:08:54 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-02 19:08:54 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 19:08:59 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 19:08:59 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 19:08:59 [INFO] editor_state: exited animation mode
+2026-05-02 19:08:59 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-02 19:08:59 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-02 19:08:59 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-02 19:08:59 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-04 10:33:36 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 10:33:36 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 10:33:38 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 10:33:38 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-04 10:33:38 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-04 10:33:51 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-04 10:33:51 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-04 10:33:51 [INFO] editor_state: exited animation mode
+2026-05-04 10:33:51 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-04 10:33:51 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-04 10:33:51 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-04 10:33:51 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-04 10:33:55 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-04 10:33:58 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-04 10:33:58 [INFO] ui_panels: 已加载动画: running
+2026-05-04 10:34:10 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-04 10:34:15 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-04 10:34:15 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-04 10:34:24 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-04 10:34:29 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-04 10:34:29 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-04 10:34:57 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 10:34:57 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 10:34:58 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 10:34:58 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-04 10:34:58 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-04 10:35:02 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-04 10:35:02 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-04 10:35:02 [INFO] editor_state: exited animation mode
+2026-05-04 10:35:02 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-04 10:35:02 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-04 10:35:02 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-04 10:35:02 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-04 10:35:41 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-04 10:35:43 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-04 10:35:43 [INFO] ui_panels: 已加载动画: running
+2026-05-04 10:35:59 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-04 10:36:07 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-04 10:36:07 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-04 10:36:23 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-04 10:36:29 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-04 10:36:29 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-04 10:42:18 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 10:42:18 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 10:42:19 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 10:42:19 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-04 10:42:19 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-04 10:42:27 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-04 10:42:27 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-04 10:42:27 [INFO] editor_state: exited animation mode
+2026-05-04 10:42:27 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-04 10:42:27 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-04 10:42:27 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-04 10:42:27 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-04 10:42:30 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-04 10:42:31 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-04 10:42:31 [INFO] ui_panels: 已加载动画: running
+2026-05-04 10:42:44 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-04 10:42:57 [INFO] editor_state: entered animation mode: RT20_reload_prone (10 frames)
+2026-05-04 10:42:57 [INFO] ui_panels: 已加载动画: RT20_reload_prone
+2026-05-04 10:43:15 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-04 10:43:20 [INFO] editor_state: entered animation mode: dance, moonwalk (31 frames)
+2026-05-04 10:43:20 [INFO] ui_panels: 已加载动画: dance, moonwalk
+2026-05-04 14:26:49 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 14:26:49 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 14:26:50 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 14:26:50 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-04 14:26:50 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-04 14:26:50 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-04 14:27:05 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-04 14:27:05 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-04 14:27:05 [INFO] editor_state: exited animation mode
+2026-05-04 14:27:05 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-04 14:27:05 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-04 14:27:05 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-04 14:27:05 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-04 14:27:05 [INFO] ui_panels: 已加载骨架 (15 粒子)
+2026-05-04 14:27:15 [INFO] animation_io: indexed 1069 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\soldier_animations.xml
+2026-05-04 14:27:17 [INFO] editor_state: entered animation mode: running (7 frames)
+2026-05-04 14:27:17 [INFO] ui_panels: 已加载动画: running
+2026-05-04 14:27:47 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 14:27:47 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 14:27:48 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 14:27:56 [INFO] xml_io: 已清理 XML 尾部垃圾字符: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml
+2026-05-04 14:27:56 [INFO] editor_state: loaded XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_smg_type82.xml (2589 voxels, 15 particles, 17 sticks)
+2026-05-04 14:27:56 [INFO] ui_panels: 已加载: gkd_smg_type82.xml
+2026-05-04 14:31:41 [INFO] xml_io: 已写出: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml  (2589 体素, 2589 已绑定)
+2026-05-04 14:31:41 [INFO] ui_panels: Saved: gkd_1.xml
+2026-05-04 14:31:53 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 14:31:53 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 14:31:54 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 14:31:54 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-04 14:31:54 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-04 14:31:54 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-04 14:32:00 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml
+2026-05-04 14:32:00 [INFO] editor_state: exited animation mode
+2026-05-04 14:32:00 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml (2589 voxels, 16 particles, 17 sticks)
+2026-05-04 14:32:00 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-04 14:32:00 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-04 14:32:00 [INFO] ui_panels: 已加载骨架 (16 粒子)
+2026-05-04 14:32:14 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 14:32:15 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 14:32:15 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 14:32:21 [INFO] editor_state: loaded XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml (2589 voxels, 16 particles, 17 sticks)
+2026-05-04 14:32:21 [INFO] ui_panels: 已加载: gkd_1.xml
+2026-05-04 14:32:30 [ERROR] ui_panels: 添加骨段失败: Stick endpoints must be different particles
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\ui_panels.py", line 1306, in _draw_add_stick
+    editor_state.add_stick(
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\editor_state.py", line 952, in add_stick
+    raise ValueError("Stick endpoints must be different particles")
+ValueError: Stick endpoints must be different particles
+2026-05-04 14:35:15 [INFO] xml_io: 已写出: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml  (2589 体素, 2589 已绑定)
+2026-05-04 14:35:15 [INFO] ui_panels: Saved: gkd_1.xml
+2026-05-04 14:35:22 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 14:35:22 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 14:35:23 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 14:35:28 [INFO] editor_state: loaded XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml (2589 voxels, 17 particles, 17 sticks)
+2026-05-04 14:35:28 [INFO] ui_panels: 已加载: gkd_1.xml
+2026-05-04 14:44:17 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 14:44:18 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 14:44:18 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 14:44:27 [INFO] editor_state: loaded XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml (2589 voxels, 17 particles, 17 sticks)
+2026-05-04 14:44:27 [INFO] ui_panels: 已加载: gkd_1.xml
+2026-05-04 14:44:35 [ERROR] ui_panels: 添加骨段失败: Stick endpoints must be different particles
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\ui_panels.py", line 1306, in _draw_add_stick
+    editor_state.add_stick(
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\editor_state.py", line 952, in add_stick
+    raise ValueError("Stick endpoints must be different particles")
+ValueError: Stick endpoints must be different particles
+2026-05-04 14:46:37 [INFO] ui_panels: 进入镜像模式: X 轴
+2026-05-04 14:47:00 [INFO] ui_panels: 已退出镜像模式
+2026-05-04 14:47:01 [INFO] ui_panels: 进入镜像模式: CUSTOM 轴
+2026-05-04 14:47:08 [INFO] ui_panels: 已退出镜像模式
+2026-05-04 14:47:09 [INFO] ui_panels: 进入镜像模式: CUSTOM 轴
+2026-05-04 14:48:21 [INFO] ui_panels: 已退出镜像模式
+2026-05-04 14:48:26 [INFO] ui_panels: 进入镜像模式: X 轴
+2026-05-04 14:48:53 [INFO] ui_panels: 已退出镜像模式
+2026-05-04 14:52:16 [INFO] xml_io: 已写出: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml  (2589 体素, 2589 已绑定)
+2026-05-04 14:52:16 [INFO] ui_panels: Saved: gkd_1.xml
+2026-05-04 14:52:21 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 14:52:21 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 14:52:23 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 14:52:26 [INFO] editor_state: loaded XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml (2589 voxels, 17 particles, 17 sticks)
+2026-05-04 14:52:26 [INFO] ui_panels: 已加载: gkd_1.xml
+2026-05-04 14:52:33 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 14:52:33 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 14:52:34 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 14:52:34 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-04 14:52:34 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-04 14:52:34 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-04 14:52:38 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml
+2026-05-04 14:52:38 [INFO] editor_state: exited animation mode
+2026-05-04 14:52:38 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml (2589 voxels, 17 particles, 17 sticks)
+2026-05-04 14:52:38 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-04 14:52:38 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-04 14:52:38 [INFO] ui_panels: 已加载骨架 (17 粒子)
+2026-05-04 14:55:42 [INFO] animation_io: wrote animation 'new_animation' to D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1_anim_test.xml (2 frames)
+2026-05-04 14:55:42 [INFO] ui_panels: 已保存: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1_anim_test.xml
+2026-05-04 14:55:49 [INFO] __main__: not an animation file, try as skeleton: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml
+2026-05-04 14:55:49 [INFO] editor_state: exited animation mode
+2026-05-04 14:55:49 [INFO] editor_state: loaded skeleton XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml (2589 voxels, 17 particles, 17 sticks)
+2026-05-04 14:55:49 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-04 14:55:49 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-04 14:55:49 [INFO] ui_panels: 已加载骨架 (17 粒子)
+2026-05-04 14:55:52 [INFO] animation_io: indexed 1 animations from D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1_anim_test.xml
+2026-05-04 14:55:52 [INFO] editor_state: entered animation mode: new_animation (2 frames)
+2026-05-04 14:55:52 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-04 15:15:43 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 15:15:43 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 15:15:44 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 15:15:50 [INFO] editor_state: loaded XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1_anim_test.xml (0 voxels, 0 particles, 0 sticks)
+2026-05-04 15:15:50 [INFO] ui_panels: 已加载: gkd_1_anim_test.xml
+2026-05-04 15:15:55 [INFO] editor_state: loaded XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml (2589 voxels, 17 particles, 17 sticks)
+2026-05-04 15:15:55 [INFO] ui_panels: 已加载: gkd_1.xml
+2026-05-04 15:16:23 [ERROR] __main__: main loop error
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 1371, in main
+    pivot = _gizmo_pivot_world()
+            ^^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 378, in _gizmo_pivot_world
+    return _compute_rotate_pivot()
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 731, in _compute_rotate_pivot
+    [[g_editor.particles[i]["x"], g_editor.particles[i]["y"], g_editor.particles[i]["z"]]
+      ~~~~~~~~~~~~~~~~~~^^^
+IndexError: list index out of range
+2026-05-04 15:16:23 [ERROR] __main__: main loop error
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 1321, in main
+    imgui.new_frame()
+  File "imgui\core.pyx", line 3901, in imgui.core.new_frame
+imgui.core.ImGuiError: ImGui assertion error ((g.FrameCount == 0 || g.FrameCountEnded == g.FrameCount) && "Forgot to call Render() or EndFrame() at the end of the previous frame?") at imgui-cpp/imgui.cpp:7090
+2026-05-04 15:16:24 [ERROR] __main__: GLFW callback on_mouse_button failed
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 947, in wrapper
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 977, in on_mouse_button
+    if _gizmo_pivot_world() is not None:
+       ^^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 378, in _gizmo_pivot_world
+    return _compute_rotate_pivot()
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 731, in _compute_rotate_pivot
+    [[g_editor.particles[i]["x"], g_editor.particles[i]["y"], g_editor.particles[i]["z"]]
+      ~~~~~~~~~~~~~~~~~~^^^
+IndexError: list index out of range
+2026-05-04 15:16:27 [ERROR] __main__: GLFW callback on_mouse_button failed
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 947, in wrapper
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 977, in on_mouse_button
+    if _gizmo_pivot_world() is not None:
+       ^^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 378, in _gizmo_pivot_world
+    return _compute_rotate_pivot()
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 731, in _compute_rotate_pivot
+    [[g_editor.particles[i]["x"], g_editor.particles[i]["y"], g_editor.particles[i]["z"]]
+      ~~~~~~~~~~~~~~~~~~^^^
+IndexError: list index out of range
+2026-05-04 15:16:28 [ERROR] __main__: GLFW callback on_mouse_button failed
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 947, in wrapper
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 977, in on_mouse_button
+    if _gizmo_pivot_world() is not None:
+       ^^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 378, in _gizmo_pivot_world
+    return _compute_rotate_pivot()
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\main.py", line 731, in _compute_rotate_pivot
+    [[g_editor.particles[i]["x"], g_editor.particles[i]["y"], g_editor.particles[i]["z"]]
+      ~~~~~~~~~~~~~~~~~~^^^
+IndexError: list index out of range
+2026-05-04 15:22:59 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 15:22:59 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 15:23:00 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 15:23:08 [INFO] editor_state: loaded XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml (2589 voxels, 17 particles, 17 sticks)
+2026-05-04 15:23:08 [INFO] ui_panels: 已加载: gkd_1.xml
+2026-05-04 15:23:27 [ERROR] ui_panels: 添加骨段失败: Stick endpoints must be different particles
+Traceback (most recent call last):
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\ui_panels.py", line 1383, in _draw_add_stick
+    editor_state.add_stick(
+  File "D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\editor_state.py", line 1009, in add_stick
+    raise ValueError("Stick endpoints must be different particles")
+ValueError: Stick endpoints must be different particles
+2026-05-04 15:40:18 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 15:40:18 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 15:40:19 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 15:40:26 [INFO] editor_state: loaded XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml (2589 voxels, 17 particles, 17 sticks)
+2026-05-04 15:40:26 [INFO] ui_panels: 已加载: gkd_1.xml
+2026-05-04 16:00:30 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 16:00:30 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 16:00:31 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 16:00:36 [INFO] editor_state: loaded XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml (2589 voxels, 17 particles, 17 sticks)
+2026-05-04 16:00:36 [INFO] ui_panels: 已加载: gkd_1.xml
+2026-05-04 21:47:09 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 21:47:09 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 21:47:10 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 21:47:10 [INFO] __main__: loaded default human skeleton (15 particles)
+2026-05-04 21:47:10 [INFO] editor_state: entered animation mode: new_animation (1 frames)
+2026-05-04 21:47:10 [INFO] ui_panels: 已加载动画: new_animation
+2026-05-04 21:47:15 [INFO] rwrsb: rwrsb_gui started, log dir: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\logs
+2026-05-04 21:47:15 [INFO] OpenGL.acceleratesupport: No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2026-05-04 21:47:16 [INFO] __main__: loaded font: C:\Windows\Fonts\msyh.ttc
+2026-05-04 21:47:23 [INFO] editor_state: loaded XML: D:\IMP\RWR\模型相关\【rwrsb_gui_v2】\rwrsb_gui_v2.2\rwrsb_gui\gkd_1.xml (2589 voxels, 17 particles, 17 sticks)
+2026-05-04 21:47:23 [INFO] ui_panels: 已加载: gkd_1.xml
