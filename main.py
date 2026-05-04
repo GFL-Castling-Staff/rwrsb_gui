@@ -1061,7 +1061,7 @@ def on_mouse_button(window, button, action, mods):
                         else:
                             g_editor.set_active_particle(hit_particle)
                 else:
-                    # 未命中粒子 → 尝试拾取 stick；命中则设为 active stick + 选中两端
+                    # 未命中粒子 → 尝试拾取 stick
                     hit_stick = _pick_stick(g_mouse_x, g_mouse_y)
                     if hit_stick >= 0:
                         stick = g_editor.sticks[hit_stick]
@@ -1069,14 +1069,21 @@ def on_mouse_button(window, button, action, mods):
                         a_idx = id_to_idx.get(int(stick.particle_a_id), -1)
                         b_idx = id_to_idx.get(int(stick.particle_b_id), -1)
                         endpoints = {i for i in (a_idx, b_idx) if i >= 0}
-                        if shift:
+                        # Shift / Ctrl：显式把端点加入 / toggle 粒子选择
+                        # 普通点 stick：仅切 active_stick + 清空粒子选择
+                        # （等同于"点空白"语义，避免点 stick 时累积选错的粒子，
+                        #  也避免后续 chain 从错误粒子起步）
+                        if shift and endpoints:
                             g_editor.selected_particles |= endpoints
-                        elif ctrl:
-                            g_editor.selected_particles ^= endpoints
-                        else:
-                            g_editor.replace_selected_particles(endpoints)
-                        if endpoints:
                             g_editor.set_active_particle(next(iter(endpoints)))
+                        elif ctrl and endpoints:
+                            g_editor.selected_particles ^= endpoints
+                            remaining = endpoints & g_editor.selected_particles
+                            if remaining:
+                                g_editor.set_active_particle(next(iter(remaining)))
+                        else:
+                            g_editor.clear_selected_particles()
+                            g_editor.active_particle_idx = -1
                         g_editor.active_stick_idx = hit_stick
                         if g_renderer is not None:
                             g_renderer.highlight_stick_idx = hit_stick

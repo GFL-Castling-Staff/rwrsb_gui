@@ -968,12 +968,13 @@ def pick_stick_screen(
     sticks: list,
     screen_x: float, screen_y: float,
     screen_w: int, screen_h: int,
-    threshold_px: float = 8.0,
+    threshold_px: float = 5.0,
 ) -> int:
     """点击拾取 stick：把每根 stick 的两端粒子投影到屏幕，求点-线段最短距离。
 
     返回距离最近且 < threshold_px 的 stick 数组下标；都不命中返回 -1。
     任一端点投影越界（NDC z 出界 / w<=0）的 stick 视为不可拾取。
+    阈值偏小是有意：避免误中刚生成的 chain stick，让"点空白清选择"语义稳定。
     """
     if not sticks or not particles:
         return -1
