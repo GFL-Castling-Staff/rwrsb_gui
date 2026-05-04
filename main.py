@@ -23,7 +23,8 @@ from imgui.integrations.glfw import GlfwRenderer
 from camera       import OrbitCamera
 from editor_state import EditorState
 from renderer     import (VoxelRenderer, pick_voxel, box_select_voxels,
-                          pick_particle_screen, box_select_particles)
+                          pick_particle_screen, pick_stick_screen,
+                          box_select_particles)
 from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_status_bar, draw_load_dialog, draw_save_dialog,
                           draw_preset_dialog,
@@ -338,6 +339,19 @@ def _pick_particle(sx, sy):
     vp_h = WIN_H - toolbar_h - status_h
     mvp = g_camera.get_mvp()
     return pick_particle_screen(mvp, positions, sx, sy - toolbar_h, vp_w, vp_h)
+
+
+def _pick_stick(sx, sy):
+    if not g_editor.particles or not g_editor.sticks:
+        return -1
+    panel_w, toolbar_h, status_h = _ui_layout_metrics()
+    vp_w = WIN_W - panel_w
+    vp_h = WIN_H - toolbar_h - status_h
+    mvp = g_camera.get_mvp()
+    return pick_stick_screen(
+        mvp, g_editor.particles, g_editor.sticks,
+        sx, sy - toolbar_h, vp_w, vp_h,
+    )
 
 
 def _gizmo_pivot_world():
@@ -1041,8 +1055,26 @@ def on_mouse_button(window, button, action, mods):
                         else:
                             g_editor.set_active_particle(hit_particle)
                 else:
-                    # 未命中粒子
-                    if shift or ctrl:
+                    # 未命中粒子 → 尝试拾取 stick；命中则设为 active stick + 选中两端
+                    hit_stick = _pick_stick(g_mouse_x, g_mouse_y)
+                    if hit_stick >= 0:
+                        stick = g_editor.sticks[hit_stick]
+                        id_to_idx = {int(p["id"]): i for i, p in enumerate(g_editor.particles)}
+                        a_idx = id_to_idx.get(int(stick.particle_a_id), -1)
+                        b_idx = id_to_idx.get(int(stick.particle_b_id), -1)
+                        endpoints = {i for i in (a_idx, b_idx) if i >= 0}
+                        if shift:
+                            g_editor.selected_particles |= endpoints
+                        elif ctrl:
+                            g_editor.selected_particles ^= endpoints
+                        else:
+                            g_editor.replace_selected_particles(endpoints)
+                        if endpoints:
+                            g_editor.set_active_particle(next(iter(endpoints)))
+                        g_editor.active_stick_idx = hit_stick
+                        if g_renderer is not None:
+                            g_renderer.highlight_stick_idx = hit_stick
+                    elif shift or ctrl:
                         # 起始框选（Shift/Ctrl 语义延续到 _finish_box_select）
                         g_ui.box_selecting = True
                         g_ui.box_x0 = g_ui.box_x1 = g_mouse_x
@@ -1109,6 +1141,8 @@ def on_cursor_pos(window, xpos, ypos):
         else:
             g_renderer.highlight_particle_idx = hover_particle if hover_particle >= 0 else g_editor.active_particle_idx
             g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
+        # active stick 高亮：让面板切换 / 视口选 stick 都能可视化
+        g_renderer.highlight_stick_idx = g_editor.active_stick_idx
     # gizmo hover：拖动期间冻结，避免误导
     if not (g_particle_drag_active or g_rotate_drag_active):
         g_ui.gizmo_hover_handle = _pick_gizmo_handle(xpos, ypos)

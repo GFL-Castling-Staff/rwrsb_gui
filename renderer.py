@@ -962,6 +962,67 @@ def pick_particle_screen(
         return -1
     return best
 
+def pick_stick_screen(
+    vp_matrix: np.ndarray,
+    particles: list,
+    sticks: list,
+    screen_x: float, screen_y: float,
+    screen_w: int, screen_h: int,
+    threshold_px: float = 8.0,
+) -> int:
+    """点击拾取 stick：把每根 stick 的两端粒子投影到屏幕，求点-线段最短距离。
+
+    返回距离最近且 < threshold_px 的 stick 数组下标；都不命中返回 -1。
+    任一端点投影越界（NDC z 出界 / w<=0）的 stick 视为不可拾取。
+    """
+    if not sticks or not particles:
+        return -1
+
+    id_to_idx = {int(p["id"]): i for i, p in enumerate(particles)}
+    pos = np.array([(p["x"], p["y"], p["z"]) for p in particles], dtype=np.float32)
+    n = len(pos)
+    if n == 0:
+        return -1
+
+    ones = np.ones((n, 1), dtype=np.float32)
+    pos_h = np.hstack([pos, ones])
+    clip = (vp_matrix @ pos_h.T).T
+    w = clip[:, 3]
+    w_safe = np.where(np.abs(w) < 1e-6, 1e-6, w)
+    ndc = clip[:, :3] / w_safe[:, None]
+    sx = (ndc[:, 0] + 1.0) * 0.5 * screen_w
+    sy = (1.0 - ndc[:, 1]) * 0.5 * screen_h
+    valid = (w > 0) & (ndc[:, 2] > -1.0) & (ndc[:, 2] < 1.0)
+
+    best_idx = -1
+    best_dist2 = float(threshold_px * threshold_px)
+    px = float(screen_x)
+    py = float(screen_y)
+    for ci, stick in enumerate(sticks):
+        a_idx = id_to_idx.get(int(stick.particle_a_id), -1)
+        b_idx = id_to_idx.get(int(stick.particle_b_id), -1)
+        if a_idx < 0 or b_idx < 0:
+            continue
+        if not (valid[a_idx] and valid[b_idx]):
+            continue
+        ax, ay = float(sx[a_idx]), float(sy[a_idx])
+        bx, by = float(sx[b_idx]), float(sy[b_idx])
+        dx, dy = bx - ax, by - ay
+        seg_len2 = dx * dx + dy * dy
+        if seg_len2 < 1e-6:
+            d2 = (px - ax) ** 2 + (py - ay) ** 2
+        else:
+            t = ((px - ax) * dx + (py - ay) * dy) / seg_len2
+            t = max(0.0, min(1.0, t))
+            cx = ax + dx * t
+            cy = ay + dy * t
+            d2 = (px - cx) ** 2 + (py - cy) ** 2
+        if d2 < best_dist2:
+            best_dist2 = d2
+            best_idx = ci
+    return best_idx
+
+
 def box_select_particles(
     vp_matrix: np.ndarray, positions: np.ndarray,
     box_x0: float, box_y0: float, box_x1: float, box_y1: float,
