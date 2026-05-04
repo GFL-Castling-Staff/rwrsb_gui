@@ -31,8 +31,7 @@ from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_animation_panel, draw_anim_source_picker,
                           draw_anim_exit_confirm, draw_invalid_binding_dialog, tr)
 from animation_io import (parse_animation_index, parse_single_animation,
-                          parse_first_animation, Animation, AnimationFrame,
-                          EXPECTED_PARTICLE_COUNT)
+                          parse_first_animation, Animation, AnimationFrame)
 from resource_utils import resource_path
 
 logger = logging.getLogger(__name__)

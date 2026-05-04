@@ -26,8 +26,10 @@ from typing import List, Tuple, Optional
 
 logger = logging.getLogger(__name__)
 
-# RWR 引擎硬编码：每帧必须正好 15 个 position，对应 vanilla 标准 skeleton 的 15 个 particle
-EXPECTED_PARTICLE_COUNT = 15
+# RWR 引擎对骨架的硬约束只在骨段数：必须正好 17 根 stick（与 vanilla soldier 一致）。
+# 粒子数和拓扑都不受引擎限制 —— 异形骨可自由增减粒子，但 stick 总数必须 = 17。
+# 动画 XML 每帧 <position> 数 = 当前 skeleton 粒子数（按 skeleton 动态读取，非固定 15）。
+EXPECTED_STICK_COUNT = 17
 
 
 @dataclass
@@ -139,10 +141,11 @@ def _parse_animation_element(anim_elem) -> Animation:
             y = float(pos_elem.get('y', '0'))
             z = float(pos_elem.get('z', '0'))
             positions.append((x, y, z))
-        if len(positions) != EXPECTED_PARTICLE_COUNT:
+        # 引擎不限粒子数；同一 animation 内各帧粒子数必须一致才能插值
+        if anim.frames and len(positions) != len(anim.frames[0].positions):
             logger.warning(
-                "animation '%s' frame %.3f has %d positions (expected %d)",
-                name, time, len(positions), EXPECTED_PARTICLE_COUNT,
+                "animation '%s' frame %.3f has %d positions (first frame has %d)",
+                name, time, len(positions), len(anim.frames[0].positions),
             )
 
         controls: List[Tuple[str, int]] = []
@@ -213,7 +216,7 @@ def write_single_animation(path, animation: Animation):
 # ──────────────────────────────────────────────
 
 def interpolate_positions(animation: Animation, t: float,
-                          n_particles: int = EXPECTED_PARTICLE_COUNT):
+                          n_particles: int = 0):
     """给定时间 t 秒，返回 n_particles 个 (x, y, z) 的插值位置。
 
     边界处理：
