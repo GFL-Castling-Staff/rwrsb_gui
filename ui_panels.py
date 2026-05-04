@@ -94,6 +94,7 @@ _TEXT = {
         "extend_chain_x": "Chain +X",
         "extend_chain_y": "Chain +Y",
         "extend_chain_z": "Chain +Z",
+        "particle_filter": "Filter (name / id)",
         "delete_selected_btn": "Delete selected",
         "deleted_particles": "Deleted {n} particle(s)",
         "deleted_active_stick": "Deleted active stick",
@@ -435,6 +436,7 @@ _TEXT = {
         "extend_chain_x": "拉链 +X",
         "extend_chain_y": "拉链 +Y",
         "extend_chain_z": "拉链 +Z",
+        "particle_filter": "过滤（名字/ID）",
         "delete_selected_btn": "删除选中",
         "deleted_particles": "已删除 {n} 个粒子",
         "deleted_active_stick": "已删除当前骨段",
@@ -834,6 +836,9 @@ class UIState:
         # 选区 gizmo（动画工具，bone_edit 模式下选中粒子时显示）
         self.gizmo_arrow_pixels = 80          # 屏幕像素总长，可调
         self.gizmo_hover_handle = None        # str | None：当前 hover 的把手名
+
+        # 粒子列表过滤（按 name / id 子串匹配）
+        self.particle_filter = ""
 
         # Commit 2：动画模式进入前骨段数检查对话框
         self._show_anim_stick_count_dialog = False
@@ -1276,8 +1281,24 @@ def _draw_particle_editor(ui_state, editor_state):
     else:
         imgui.text_disabled(tr(ui_state, "spawn_near_no_active"))
 
+    # 名字 / ID 过滤；空字符串显示全部
+    imgui.set_next_item_width(-1)
+    _, ui_state.particle_filter = imgui.input_text(
+        tr(ui_state, "particle_filter") + "##particle_filter",
+        ui_state.particle_filter,
+        64,
+    )
+    filt = ui_state.particle_filter.strip().lower()
+
     for idx, particle in enumerate(editor_state.particles):
+        if filt:
+            label = f"{particle['name']} {particle['id']}".lower()
+            if filt not in label:
+                continue
         imgui.push_id(f"particle-{idx}")
+        # active 粒子的 tree 节点自动展开，便于跟随选择切换
+        if idx == editor_state.active_particle_idx:
+            imgui.set_next_item_open(True, condition=imgui.ONCE)
         if imgui.tree_node(f"{particle['name']} ({particle['id']})##node"):
             editor_state.set_active_particle(idx)
             changed_name, new_name = imgui.input_text(tr(ui_state, "name"), particle["name"], 128)
