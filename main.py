@@ -248,14 +248,16 @@ def _do_brush_paint(sx, sy):
         g_editor.bind_voxels([hit], g_editor.active_stick_idx)
 
 
-def _finish_box_select():
+def _finish_box_select(mods=0):
     panel_w, toolbar_h, status_h = _ui_layout_metrics()
     vp_w = WIN_W - panel_w
     vp_h = WIN_H - toolbar_h - status_h
     mvp = g_camera.get_mvp()
-    io = imgui.get_io()
-    shift = io.key_shift
-    ctrl = io.key_ctrl
+    # 直接用 GLFW mods（鼠标释放当帧的实时状态），不读 ImGui 的 io.key_*
+    # —— 后者更新发生在 process_inputs，可能落后一帧
+    shift = bool(mods & glfw.MOD_SHIFT)
+    ctrl = bool(mods & glfw.MOD_CONTROL)
+    alt_global = bool(mods & glfw.MOD_ALT)
 
     if g_editor.tool_mode == 'bone_edit':
         if g_editor.mirror_mode:
@@ -269,7 +271,7 @@ def _finish_box_select():
             g_ui.box_x0, g_ui.box_y0 - toolbar_h,
             g_ui.box_x1, g_ui.box_y1 - toolbar_h,
             vp_w, vp_h)
-        alt = io.key_alt
+        alt = alt_global
         if shift and alt:
             # Shift+Alt: 减选
             for i in indices:
@@ -299,7 +301,7 @@ def _finish_box_select():
             g_ui.box_x0, g_ui.box_y0 - toolbar_h,
             g_ui.box_x1, g_ui.box_y1 - toolbar_h,
             vp_w, vp_h)
-        alt = io.key_alt
+        alt = alt_global
         if shift and alt:
             # Shift+Alt: 减选
             for i in indices:
@@ -1038,26 +1040,32 @@ def on_mouse_button(window, button, action, mods):
                 return
             if g_editor.mirror_mode and g_editor.mirror_edit_mode:
                 return
-            # gizmo 命中优先：箭头/中心 → 平移；圆环 → 旋转。命中即消费点击。
-            gizmo_handle = None
-            if _gizmo_pivot_world() is not None:
-                gizmo_handle = _pick_gizmo_handle(g_mouse_x, g_mouse_y)
-            if gizmo_handle is not None:
-                active = g_editor.active_particle_idx
-                if 0 <= active < len(g_editor.particles):
-                    if gizmo_handle.endswith("_arrow"):
-                        _begin_particle_drag(g_mouse_x, g_mouse_y, active,
-                                             axis_preset=gizmo_handle[0])
-                    elif gizmo_handle == "center":
-                        _begin_particle_drag(g_mouse_x, g_mouse_y, active,
-                                             axis_preset=None)
-                    elif gizmo_handle.endswith("_ring"):
-                        _start_rotate_drag(axis_preset=gizmo_handle[0])
-                return
 
+            # 优先级：粒子 > gizmo > stick > 空白
+            # 之前 gizmo 在前，导致 chain 后 active 粒子的 gizmo 箭头（80px）
+            # 覆盖区域吞掉点击 → 用户点别的粒子被解读为拖 active，选择不变
             hit_particle = _pick_particle_with_cycling(g_mouse_x, g_mouse_y)
             shift = bool(mods & glfw.MOD_SHIFT)
             ctrl = bool(mods & glfw.MOD_CONTROL)
+
+            # gizmo 仅在没命中粒子时尝试（中心 handle 等于点 active 粒子，行为
+            # 一致；箭头/圆环离粒子远，本就该这时响应）
+            if hit_particle < 0:
+                gizmo_handle = None
+                if _gizmo_pivot_world() is not None:
+                    gizmo_handle = _pick_gizmo_handle(g_mouse_x, g_mouse_y)
+                if gizmo_handle is not None:
+                    active = g_editor.active_particle_idx
+                    if 0 <= active < len(g_editor.particles):
+                        if gizmo_handle.endswith("_arrow"):
+                            _begin_particle_drag(g_mouse_x, g_mouse_y, active,
+                                                 axis_preset=gizmo_handle[0])
+                        elif gizmo_handle == "center":
+                            _begin_particle_drag(g_mouse_x, g_mouse_y, active,
+                                                 axis_preset=None)
+                        elif gizmo_handle.endswith("_ring"):
+                            _start_rotate_drag(axis_preset=gizmo_handle[0])
+                    return
 
             # ── bone_edit 模式：点击粒子 → 选择 or 拖动 ──
             if g_editor.tool_mode == 'bone_edit' and g_ui.allow_skeleton_edit:
@@ -1184,7 +1192,7 @@ def on_mouse_button(window, button, action, mods):
                 g_brush_active = False
             if g_ui.box_selecting:
                 g_ui.box_selecting = False
-                _finish_box_select()
+                _finish_box_select(mods)
 
     g_camera.on_mouse_button(button, action, mods, g_mouse_x, g_mouse_y)
 

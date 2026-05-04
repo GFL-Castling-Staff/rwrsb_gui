@@ -858,8 +858,20 @@ class EditorState:
             self.selected_particles.add(idx)
 
     def replace_selected_particles(self, indices):
-        """普通点击/普通框选语义：替换整个集合。"""
-        self.selected_particles = {i for i in indices if 0 <= i < len(self.particles)}        
+        """普通点击/普通框选语义：替换整个集合，并同步 active。
+
+        active_particle_idx 的更新规则：
+        - 新选择为空 → active = -1
+        - 当前 active 仍在新选择中 → 保留
+        - 否则 → 任选新选择中的一个作为 active
+        让调用方不需要再单独设 active，避免遗漏导致下游（拉链按钮等）失效。
+        """
+        n = len(self.particles)
+        self.selected_particles = {i for i in indices if 0 <= i < n}
+        if not self.selected_particles:
+            self.active_particle_idx = -1
+        elif self.active_particle_idx not in self.selected_particles:
+            self.active_particle_idx = next(iter(self.selected_particles))
 
     def set_particle_position(self, particle_index, x, y, z, push_undo=False):
         if particle_index < 0 or particle_index >= len(self.particles):
