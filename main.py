@@ -1133,6 +1133,7 @@ def on_cursor_pos(window, xpos, ypos):
         if g_renderer is not None:
             g_renderer.highlight_particle_idx = g_editor.active_particle_idx
             g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
+            g_renderer.highlight_active_particle_idx = g_editor.active_particle_idx
         g_ui.gizmo_hover_handle = None
         return
     hover_particle = _pick_particle(xpos, ypos)
@@ -1144,6 +1145,8 @@ def on_cursor_pos(window, xpos, ypos):
         else:
             g_renderer.highlight_particle_idx = hover_particle if hover_particle >= 0 else g_editor.active_particle_idx
             g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
+        # active particle 单独高亮（青色）：与多选淡黄区分，视觉上指示"chain 起点"
+        g_renderer.highlight_active_particle_idx = g_editor.active_particle_idx
         # active stick 高亮：让面板切换 / 视口选 stick 都能可视化
         g_renderer.highlight_stick_idx = g_editor.active_stick_idx
     # gizmo hover：拖动期间冻结，避免误导
