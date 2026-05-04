@@ -1171,12 +1171,12 @@ class EditorState:
         self._restore_snapshot(self._redo_stack.pop())
 
     def save_xml(self, path, skeleton_sticks=None):
+        # skeleton_sticks 参数已 deprecated：旧版本传入"加载时 stick 快照"作 pass-through，
+        # 但会话期间对 sticks 的增删不会同步到该快照，导致编辑结果不被保存。
+        # 现在统一用 self.sticks（活引用，与粒子路径一致）。参数保留仅为兼容旧 caller。
         from xml_io import write_xml
 
-        if skeleton_sticks:
-            out_sticks = list(skeleton_sticks)
-        else:
-            out_sticks = [{"a": s.particle_a_id, "b": s.particle_b_id} for s in self.sticks]
+        out_sticks = [{"a": s.particle_a_id, "b": s.particle_b_id} for s in self.sticks]
         skeleton = {
             "particles": list(self.particles),
             "sticks": out_sticks,
