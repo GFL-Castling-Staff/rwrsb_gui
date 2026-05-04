@@ -177,6 +177,12 @@ class EditorState:
         # 5b：各 stick 的参考长度（进入动画模式时记录）
         self._anim_reference_lengths = {}
 
+        # 全局蒙皮规则开关：True 时 _compute_body_bridge_frame 跳过 vanilla 硬编码表，
+        # 改用拓扑邻居中"最垂直于本骨段方向"的 stick 主轴作为 lateral 参考。
+        # 孤立骨段（无邻居）自然落回 _compute_stick_frame 默认世界轴。
+        # 切换值时调用方需重录 bind pose（set_use_global_lateral_ref 已封装）。
+        self.use_global_lateral_ref = False
+
         # 半身基准 pose（P2）
         self._baseline_positions = None  # list[tuple[float,float,float]] | None
         self._baseline_name = ""
@@ -1068,14 +1074,15 @@ class EditorState:
     def enter_animation_mode(self, animation):
         """进入动画模式，载入 animation 作为编辑目标。
 
-        要求 particle 数 = EXPECTED_PARTICLE_COUNT (15)，否则抛 ValueError。
+        要求 stick 数 = EXPECTED_STICK_COUNT (17)，否则抛 ValueError。
+        引擎只限骨段数，不限粒子数和拓扑（异形骨可有任意粒子数 / 孤立骨段）。
         如果 animation.frames 为空，自动加一帧 = 当前 particle 姿态。
         """
-        from animation_io import EXPECTED_PARTICLE_COUNT, AnimationFrame
-        if len(self.particles) != EXPECTED_PARTICLE_COUNT:
+        from animation_io import EXPECTED_STICK_COUNT, AnimationFrame
+        if len(self.sticks) != EXPECTED_STICK_COUNT:
             raise ValueError(
-                f"Animation editing requires {EXPECTED_PARTICLE_COUNT} particles, "
-                f"current skeleton has {len(self.particles)}"
+                f"Animation editing requires {EXPECTED_STICK_COUNT} sticks, "
+                f"current skeleton has {len(self.sticks)}"
             )
 
         if not animation.frames:
@@ -1688,7 +1695,11 @@ class EditorState:
 
         bind 时和 now 时用同一种构基方案，local↔world 映射自洽。
         任一步缺信息（粒子缺失 / 长度退化）返回 None，调用方落回最短旋转路径。
+
+        当 use_global_lateral_ref=True 时跳过硬编码表，改走拓扑全局规则。
         """
+        if self.use_global_lateral_ref:
+            return self._compute_global_lateral_frame(stick, id_to_p)
         ref_type = self._lookup_lateral_ref_type(stick, id_to_p)
         if ref_type is None:
             return None
@@ -1710,6 +1721,95 @@ class EditorState:
         if ref is None:
             return None
         R = self._basis_from_axis_and_reference(u, ref)
+        return origin, R, u
+
+    def set_use_global_lateral_ref(self, value: bool):
+        """切换全局蒙皮规则开关，并重录 bind pose 与刷新 voxel 位置。
+
+        切换规则后，bind 时使用的 lateral 参考变了，旧的 _voxel_local_offsets
+        是按旧规则记录的，必须重录；否则下一帧会"用旧 bind 配新 now"导致体素跳变。
+        """
+        new_v = bool(value)
+        if new_v == self.use_global_lateral_ref:
+            return
+        self.use_global_lateral_ref = new_v
+        if not (self.animation_mode and self.voxels and self.bindings):
+            return
+        # 用 canonical pose 重录 bind（与 enter_animation_mode 同源）
+        bind_source = (self._canonical_skeleton_pose
+                       if self._canonical_skeleton_pose is not None
+                       else self._particle_positions_before_anim)
+        if bind_source:
+            still_particles = []
+            for i, (x, y, z) in enumerate(bind_source):
+                if i < len(self.particles):
+                    p = dict(self.particles[i])
+                    p["x"], p["y"], p["z"] = x, y, z
+                    still_particles.append(p)
+            if (self._canonical_voxel_positions is not None
+                    and len(self._canonical_voxel_positions) == len(self.voxels)):
+                self.voxels = list(self._canonical_voxel_positions)
+            self.record_voxel_bind_pose(particle_positions=still_particles)
+        else:
+            self.record_voxel_bind_pose()
+        # 把当前帧的蒙皮按新规则刷一遍
+        self.update_voxel_positions_from_skeleton()
+        self.gpu_dirty = True
+
+    def _compute_global_lateral_frame(self, stick, id_to_p):
+        """拓扑全局规则：用共享端点的邻居 stick 中"最垂直于本骨段"的方向作为 lateral 参考。
+
+        - 邻居：和本 stick 共享至少一个粒子端点的其他 stick
+        - 选择标准：1 - |dot(u_self, u_other)| 最大者（越接近 90° 越好）
+        - 退化：邻居全平行（perp < 0.05，约 18°）或无邻居 → 返回 None，
+          调用方落回 _compute_stick_frame 世界轴。
+        - 孤立骨：天然无邻居 → None → 世界轴 fallback，符合"孤立骨 roll 无语义"的事实。
+
+        bind 时和 now 时都查表当前 self.sticks 与 id_to_p，每帧动态重算 lateral 参考，
+        因此 cube 朝向会跟着拓扑邻居一起旋转，与 vanilla 表驱动方案的语义一致。
+        """
+        pa = id_to_p.get(int(stick.particle_a_id))
+        pb = id_to_p.get(int(stick.particle_b_id))
+        if pa is None or pb is None:
+            return None
+        a = np.array([pa["x"], pa["y"], pa["z"]], dtype=np.float32)
+        b = np.array([pb["x"], pb["y"], pb["z"]], dtype=np.float32)
+        diff = b - a
+        L = float(np.linalg.norm(diff))
+        if L < 1e-6:
+            return None
+        u = diff / L
+
+        self_endpoints = {int(stick.particle_a_id), int(stick.particle_b_id)}
+        best_ref = None
+        best_perp = 0.05  # 平行邻居（< ~18°）视作无效，等同于无邻居
+        for other in self.sticks:
+            if other is stick:
+                continue
+            other_endpoints = {int(other.particle_a_id), int(other.particle_b_id)}
+            if not (self_endpoints & other_endpoints):
+                continue
+            opa = id_to_p.get(int(other.particle_a_id))
+            opb = id_to_p.get(int(other.particle_b_id))
+            if opa is None or opb is None:
+                continue
+            oa = np.array([opa["x"], opa["y"], opa["z"]], dtype=np.float32)
+            ob = np.array([opb["x"], opb["y"], opb["z"]], dtype=np.float32)
+            odiff = ob - oa
+            oL = float(np.linalg.norm(odiff))
+            if oL < 1e-6:
+                continue
+            ou = odiff / oL
+            perp = 1.0 - abs(float(np.dot(u, ou)))
+            if perp > best_perp:
+                best_perp = perp
+                best_ref = ou
+
+        if best_ref is None:
+            return None
+
+        origin = (a + b) * 0.5
+        R = self._basis_from_axis_and_reference(u, best_ref)
         return origin, R, u
 
     def _rotate_basis(self, R_bind, u_bind, u_now):

@@ -200,6 +200,8 @@ _TEXT = {
         "anim_length_threshold": "Threshold (%)",
         "anim_length_dev_header": "Length deviations",
         "anim_length_dev_none": "All sticks within threshold",
+        "anim_global_lateral_ref": "Global skinning rule (topology-based)",
+        "anim_global_lateral_ref_tip": "Replace hardcoded vanilla rules with neighbor-stick lateral reference. Isolated bones fall back to world axis.",
         "grid_btn": "Grid...",
         "grid_popup_title": "Grid options",
         "settings_btn": "View...",
@@ -510,6 +512,8 @@ _TEXT = {
         "anim_length_threshold": "阈值 (%)",
         "anim_length_dev_header": "长度偏差",
         "anim_length_dev_none": "所有骨段均在阈值内",
+        "anim_global_lateral_ref": "全局蒙皮规则（拓扑驱动）",
+        "anim_global_lateral_ref_tip": "替换 vanilla 硬编码规则，用邻居骨段方向作为 lateral 参考；孤立骨段落回世界轴。",
         "grid_btn": "网格...",
         "grid_popup_title": "网格选项",
         "settings_btn": "视图...",
@@ -2914,6 +2918,14 @@ def _draw_anim_panel_inner(ui_state, editor_state, WIN_W, WIN_H):
         imgui.text_disabled(tr(ui_state, "anim_no_frame_selected"))
 
     imgui.separator()
+    chg_glr, v_glr = imgui.checkbox(
+        tr(ui_state, "anim_global_lateral_ref") + "##global_lateral",
+        editor_state.use_global_lateral_ref)
+    if chg_glr:
+        editor_state.set_use_global_lateral_ref(v_glr)
+    if imgui.is_item_hovered():
+        imgui.set_tooltip(tr(ui_state, "anim_global_lateral_ref_tip"))
+
     chg_chk, v = imgui.checkbox(
         tr(ui_state, "anim_check_lengths") + "##check_len",
         ui_state._anim_check_lengths)
