@@ -183,6 +183,12 @@ class EditorState:
         # 切换值时调用方需重录 bind pose（set_use_global_lateral_ref 已封装）。
         self.use_global_lateral_ref = False
 
+        # 全局规则缓存：ci → frozenset({neighbor_a_id, neighbor_b_id})。
+        # bind 时一次性挑出每根 stick 的邻居并固化，运行时只复用此邻居的方向。
+        # 不缓存的话对称 junction（如 hip-bridge）多个邻居 perp 值接近，
+        # 动画过程中排名翻转会让 lateral ref 跳变 → 蒙皮抖动。
+        self._global_lateral_neighbors = {}
+
         # 半身基准 pose（P2）
         self._baseline_positions = None  # list[tuple[float,float,float]] | None
         self._baseline_name = ""
@@ -1690,16 +1696,17 @@ class EditorState:
             )
         return None
 
-    def _compute_body_bridge_frame(self, stick, id_to_p):
+    def _compute_body_bridge_frame(self, stick, id_to_p, ci=None):
         """统一入口：表驱动选择 lateral 参考类型，构造正交基。
 
         bind 时和 now 时用同一种构基方案，local↔world 映射自洽。
         任一步缺信息（粒子缺失 / 长度退化）返回 None，调用方落回最短旋转路径。
 
         当 use_global_lateral_ref=True 时跳过硬编码表，改走拓扑全局规则。
+        ci 参数仅全局规则用于缓存所选邻居（None 时退化为每次重新挑选）。
         """
         if self.use_global_lateral_ref:
-            return self._compute_global_lateral_frame(stick, id_to_p)
+            return self._compute_global_lateral_frame(stick, id_to_p, ci)
         ref_type = self._lookup_lateral_ref_type(stick, id_to_p)
         if ref_type is None:
             return None
@@ -1756,7 +1763,7 @@ class EditorState:
         self.update_voxel_positions_from_skeleton()
         self.gpu_dirty = True
 
-    def _compute_global_lateral_frame(self, stick, id_to_p):
+    def _compute_global_lateral_frame(self, stick, id_to_p, ci=None):
         """拓扑全局规则：用共享端点的邻居 stick 中"最垂直于本骨段"的方向作为 lateral 参考。
 
         - 邻居：和本 stick 共享至少一个粒子端点的其他 stick
@@ -1765,8 +1772,9 @@ class EditorState:
           调用方落回 _compute_stick_frame 世界轴。
         - 孤立骨：天然无邻居 → None → 世界轴 fallback，符合"孤立骨 roll 无语义"的事实。
 
-        bind 时和 now 时都查表当前 self.sticks 与 id_to_p，每帧动态重算 lateral 参考，
-        因此 cube 朝向会跟着拓扑邻居一起旋转，与 vanilla 表驱动方案的语义一致。
+        关键约束：邻居身份缓存（_global_lateral_neighbors[ci]）。
+        bind 时挑出邻居后固化，运行时只复用此邻居的方向 —— 否则对称 junction
+        （hip-bridge / shoulder-bridge 多个 perp 接近的邻居）会因排名翻转抖动。
         """
         pa = id_to_p.get(int(stick.particle_a_id))
         pb = id_to_p.get(int(stick.particle_b_id))
@@ -1781,29 +1789,59 @@ class EditorState:
         u = diff / L
 
         self_endpoints = {int(stick.particle_a_id), int(stick.particle_b_id)}
+        cached_pair = self._global_lateral_neighbors.get(ci) if ci is not None else None
+
         best_ref = None
-        best_perp = 0.05  # 平行邻居（< ~18°）视作无效，等同于无邻居
-        for other in self.sticks:
-            if other is stick:
-                continue
-            other_endpoints = {int(other.particle_a_id), int(other.particle_b_id)}
-            if not (self_endpoints & other_endpoints):
-                continue
-            opa = id_to_p.get(int(other.particle_a_id))
-            opb = id_to_p.get(int(other.particle_b_id))
-            if opa is None or opb is None:
-                continue
-            oa = np.array([opa["x"], opa["y"], opa["z"]], dtype=np.float32)
-            ob = np.array([opb["x"], opb["y"], opb["z"]], dtype=np.float32)
-            odiff = ob - oa
-            oL = float(np.linalg.norm(odiff))
-            if oL < 1e-6:
-                continue
-            ou = odiff / oL
-            perp = 1.0 - abs(float(np.dot(u, ou)))
-            if perp > best_perp:
-                best_perp = perp
-                best_ref = ou
+        cache_pair = None
+        if cached_pair is not None:
+            # 复用 bind 时挑选的邻居：按 id 对查回当前方向
+            for other in self.sticks:
+                other_pair = frozenset({int(other.particle_a_id), int(other.particle_b_id)})
+                if other_pair != cached_pair:
+                    continue
+                opa = id_to_p.get(int(other.particle_a_id))
+                opb = id_to_p.get(int(other.particle_b_id))
+                if opa is None or opb is None:
+                    break
+                oa = np.array([opa["x"], opa["y"], opa["z"]], dtype=np.float32)
+                ob = np.array([opb["x"], opb["y"], opb["z"]], dtype=np.float32)
+                odiff = ob - oa
+                oL = float(np.linalg.norm(odiff))
+                if oL < 1e-6:
+                    break
+                best_ref = odiff / oL
+                break
+            # 缓存的邻居已不存在/退化，落回 None（运行时不会再 fallback 到挑新邻居 ——
+            # 维持身份恒定优先于重新搜索）
+
+        if best_ref is None and cached_pair is None:
+            best_perp = 0.05  # 平行邻居（< ~18°）视作无效，等同于无邻居
+            for other in self.sticks:
+                if other is stick:
+                    continue
+                other_endpoints = {int(other.particle_a_id), int(other.particle_b_id)}
+                if not (self_endpoints & other_endpoints):
+                    continue
+                opa = id_to_p.get(int(other.particle_a_id))
+                opb = id_to_p.get(int(other.particle_b_id))
+                if opa is None or opb is None:
+                    continue
+                oa = np.array([opa["x"], opa["y"], opa["z"]], dtype=np.float32)
+                ob = np.array([opb["x"], opb["y"], opb["z"]], dtype=np.float32)
+                odiff = ob - oa
+                oL = float(np.linalg.norm(odiff))
+                if oL < 1e-6:
+                    continue
+                ou = odiff / oL
+                perp = 1.0 - abs(float(np.dot(u, ou)))
+                if perp > best_perp:
+                    best_perp = perp
+                    best_ref = ou
+                    cache_pair = frozenset(other_endpoints)
+
+            # bind 时（无缓存）首次挑选完写回缓存
+            if ci is not None and cache_pair is not None:
+                self._global_lateral_neighbors[ci] = cache_pair
 
         if best_ref is None:
             return None
@@ -1858,6 +1896,8 @@ class EditorState:
         """
         self._voxel_local_offsets = {}
         self._voxel_groups = {}
+        # 清空全局规则的邻居缓存：bind 时重新挑选邻居身份
+        self._global_lateral_neighbors = {}
         if not self.voxels or not self.bindings:
             return
 
@@ -1877,7 +1917,7 @@ class EditorState:
                 pa = id_to_p.get(int(stick.particle_a_id))
                 pb = id_to_p.get(int(stick.particle_b_id))
                 if pa is not None and pb is not None:
-                    body_frame = self._compute_body_bridge_frame(stick, id_to_p)
+                    body_frame = self._compute_body_bridge_frame(stick, id_to_p, ci)
                     if body_frame is not None:
                         origin, R, u_bind = body_frame
                     else:
@@ -1939,7 +1979,7 @@ class EditorState:
             b = np.array([pb['x'], pb['y'], pb['z']], dtype=np.float32)
             diff = b - a
             L = float(np.linalg.norm(diff))
-            body_frame = self._compute_body_bridge_frame(stick, id_to_p)
+            body_frame = self._compute_body_bridge_frame(stick, id_to_p, ci)
             if body_frame is not None:
                 origin, R, _u_now = body_frame
             elif L < 1e-6:
