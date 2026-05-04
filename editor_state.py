@@ -921,6 +921,27 @@ class EditorState:
         self.set_active_particle(new_idx)
         return new_idx
 
+    def nudge_selected_particles(self, dx, dy, dz) -> int:
+        """整批平移 selected_particles 里的所有粒子，整次操作只推一次 undo。
+
+        返回实际平移的粒子数；selected 为空 / 平移量为 0 时直接返回 0 不推 undo。
+        """
+        if not self.selected_particles:
+            return 0
+        if dx == 0 and dy == 0 and dz == 0:
+            return 0
+        valid = [i for i in self.selected_particles if 0 <= i < len(self.particles)]
+        if not valid:
+            return 0
+        self._push_undo()
+        for i in valid:
+            p = self.particles[i]
+            p["x"] = float(p["x"]) + float(dx)
+            p["y"] = float(p["y"]) + float(dy)
+            p["z"] = float(p["z"]) + float(dz)
+        self._mark_skeleton_changed()
+        return len(valid)
+
     def extend_chain_from(self, reference_index, axis="x", distance=2.0) -> int:
         """从 reference 粒子沿轴生成新粒子并自动用 stick 接到 reference。
 

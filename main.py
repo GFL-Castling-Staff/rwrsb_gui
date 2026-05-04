@@ -1208,6 +1208,30 @@ def on_key(window, key, scancode, action, mods):
         elif key == glfw.KEY_E:
             if g_ui.allow_skeleton_edit:
                 g_editor.set_tool_mode('bone_edit')
+        elif key in (glfw.KEY_LEFT, glfw.KEY_RIGHT, glfw.KEY_UP, glfw.KEY_DOWN,
+                     glfw.KEY_PAGE_UP, glfw.KEY_PAGE_DOWN):
+            # 方向键微调：仅 bone_edit + 非动画模式（动画有 gizmo 拖拽）
+            if (g_editor.tool_mode == 'bone_edit'
+                    and g_ui.allow_skeleton_edit
+                    and g_ui.allow_particle_edit
+                    and not g_editor.animation_mode
+                    and g_editor.selected_particles):
+                shift = bool(mods & glfw.MOD_SHIFT)
+                step = 0.1 if shift else (5.0 if ctrl else 1.0)
+                dx = dy = dz = 0.0
+                if key == glfw.KEY_LEFT:
+                    dx = -step
+                elif key == glfw.KEY_RIGHT:
+                    dx = step
+                elif key == glfw.KEY_UP:
+                    dy = step
+                elif key == glfw.KEY_DOWN:
+                    dy = -step
+                elif key == glfw.KEY_PAGE_UP:
+                    dz = step
+                elif key == glfw.KEY_PAGE_DOWN:
+                    dz = -step
+                g_editor.nudge_selected_particles(dx, dy, dz)
         elif key in (glfw.KEY_DELETE, glfw.KEY_BACKSPACE):
             # Delete / Backspace：bone_edit 模式下删选中粒子或 active stick
             if (g_editor.tool_mode == 'bone_edit' and g_ui.allow_skeleton_edit):
