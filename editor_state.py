@@ -304,6 +304,136 @@ class EditorState:
             candidate += 1
         return candidate
 
+    def classify_sticks(self) -> dict[int, str]:
+        """每根 stick 标 'skinned' | 'connected_unskinned' | 'dummy'。
+
+        dummy = 无 voxel binding 且 两端粒子不与其他 stick 共享（拓扑孤立）。
+        connected_unskinned = 有拓扑连接但无 voxel binding。
+        skinned = 有 voxel binding。
+        """
+        result: dict[int, str] = {}
+
+        # 1) 统计每个粒子的度（出现在几根 stick 中）
+        particle_degree: dict[int, int] = {}
+        for s in self.sticks:
+            particle_degree[s.particle_a_id] = particle_degree.get(s.particle_a_id, 0) + 1
+            particle_degree[s.particle_b_id] = particle_degree.get(s.particle_b_id, 0) + 1
+
+        # 2) 判断每根 stick
+        for s in self.sticks:
+            has_binding = s.constraint_index in self.bindings and bool(self.bindings[s.constraint_index])
+            deg_a = particle_degree.get(s.particle_a_id, 0)
+            deg_b = particle_degree.get(s.particle_b_id, 0)
+
+            if has_binding:
+                result[s.constraint_index] = "skinned"
+            elif deg_a == 1 and deg_b == 1:
+                # 两端都不与其他 stick 共享 → 拓扑孤立
+                result[s.constraint_index] = "dummy"
+            else:
+                result[s.constraint_index] = "connected_unskinned"
+
+        return result
+
+    def dummy_stick_indices(self) -> list[int]:
+        """返回所有 dummy stick 的 constraint_index 列表。"""
+        classified = self.classify_sticks()
+        return [ci for ci, label in classified.items() if label == "dummy"]
+
+    def pad_dummy_sticks_to_target(self, target=17):
+        """一键补足 dummy stick 到 target 根。
+
+        - need <= 0 → 直接返回
+        - 在远离 voxel 的位置创建 need 对孤立粒子 + need 根 dummy stick
+        - 粒子名：_dummy_N_a / _dummy_N_b
+        - 带 undo 快照
+        """
+        from animation_io import EXPECTED_STICK_COUNT
+        need = EXPECTED_STICK_COUNT - len(self.sticks)
+        if need <= 0:
+            return
+
+        # 计算安全位置：远离 voxel 模型
+        if len(self.particles) > 0:
+            xs = [p["pos"][0] for p in self.particles]
+            ys = [p["pos"][1] for p in self.particles]
+            zs = [p["pos"][2] for p in self.particles]
+            span = max(max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs), 1.0)
+            base_x = min(xs) - span * 1.5
+            base_y = sum(ys) / len(ys)
+            base_z = sum(zs) / len(zs)
+        else:
+            base_x, base_y, base_z = -50.0, 0.0, 0.0
+
+        # 收集已有名称防止冲突
+        existing_names = {p["name"] for p in self.particles}
+
+        self._push_undo()
+
+        for i in range(need):
+            # 生成唯一名称
+            name_a = f"_dummy_{i}_a"
+            name_b = f"_dummy_{i}_b"
+            suffix = 0
+            while name_a in existing_names or name_b in existing_names:
+                suffix += 1
+                name_a = f"_dummy_{i}_{suffix}_a"
+                name_b = f"_dummy_{i}_{suffix}_b"
+
+            pid_a = self._next_particle_id()
+            self.particles.append({
+                "id": pid_a, "name": name_a,
+                "pos": [base_x, base_y, base_z + i * 2.0],
+            })
+            existing_names.add(name_a)
+
+            pid_b = self._next_particle_id()
+            self.particles.append({
+                "id": pid_b, "name": name_b,
+                "pos": [base_x + 2.0, base_y, base_z + i * 2.0],
+            })
+            existing_names.add(name_b)
+
+            ci = self._next_constraint_index()
+            self.sticks.append(StickEntry(ci, pid_a, pid_b,
+                                          f"_dummy_{i}_seg"))
+
+        self.skeleton_dirty = True
+        self._tree_dirty = True
+
+    def _prune_dummy_sticks(self):
+        """删除所有 dummy stick 及其孤立粒子（预设加载时清理用）。"""
+        dummy_indices = set(self.dummy_stick_indices())
+        if not dummy_indices:
+            return
+
+        # 收集 dummy 粒子（仅出现在 dummy sticks 中的孤立粒子）
+        dummy_particle_ids: set[int] = set()
+        for s in self.sticks:
+            if s.constraint_index in dummy_indices:
+                dummy_particle_ids.add(s.particle_a_id)
+                dummy_particle_ids.add(s.particle_b_id)
+
+        # 排除同时出现在非 dummy stick 中的粒子
+        for s in self.sticks:
+            if s.constraint_index not in dummy_indices:
+                dummy_particle_ids.discard(s.particle_a_id)
+                dummy_particle_ids.discard(s.particle_b_id)
+
+        self._push_undo()
+        self.sticks = [s for s in self.sticks if s.constraint_index not in dummy_indices]
+        self.particles = [p for p in self.particles if p["id"] not in dummy_particle_ids]
+        self._normalize_stick_indices()
+        self.skeleton_dirty = True
+        self._tree_dirty = True
+
+    def _next_constraint_index(self):
+        used = {s.constraint_index for s in self.sticks}
+        candidate = 0
+        while candidate in used:
+            candidate += 1
+        return candidate
+
     def _rebuild_sticks_from_raw(self, raw_sticks):
         particles_by_id = {p["id"]: p for p in self.particles}
         self.sticks = []

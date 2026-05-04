@@ -171,7 +171,7 @@ Axis constraints (during drag) and multi-select (during click/box-select) read m
 
 ### Entering animation mode: `enter_animation_mode(animation)`
 
-Precondition: `len(particles) == EXPECTED_PARTICLE_COUNT (15)`, otherwise raises `ValueError`.
+Precondition: `len(sticks) == EXPECTED_STICK_COUNT (17)`, otherwise raises `ValueError`.
 
 Execution order:
 1. If `animation.frames` is empty, automatically append one frame (= current particle pose)
@@ -199,9 +199,11 @@ Reason: In binding mode, voxels are the actual geometry — dragging a particle 
 
 ## 7. Key Conventions and Implicit Knowledge
 
-### EXPECTED_PARTICLE_COUNT = 15
+### EXPECTED_STICK_COUNT = 17
 
-Defined in `animation_io.py`. The RWR engine hard-codes this: a soldier animation XML must have exactly 15 particle positions per frame — one more or one less will cause a parse failure. Skeleton loading, frame editing, and XML export in the animation tool all depend on this constraint.
+Defined in `animation_io.py`. The RWR engine constraint for soldier animation is **exactly 17 sticks per frame**, NOT particle count. The engine does not enforce any particle count limit (15 particles is a vanilla humanoid skeleton convention, not a hard engine restriction). It also does not enforce connectivity or topology — isolated, unbound sticks load fine.
+
+Skeleton loading, frame editing, and XML export in the animation tool all depend on this constraint. A pre-flight dialog checks stick count before entering animation mode and guides the user to pad or prune as needed.
 
 ### constraintIndex == sticks list index
 
@@ -219,6 +221,16 @@ Changing `trans_bias` shifts all voxel and skeleton coordinates together, so the
 ### Presets store only the skeleton, not bindings
 
 Skeleton presets (`presets/*.json`) store only `particles` + `sticks`, not `bindings`. Bindings are project-specific data tied to a particular voxel model and have no cross-model reuse value. Loading a preset clears the bindings.
+
+### Heterogeneous skeletons and dummy sticks
+
+The RWR engine only enforces stick count = 17; topology is unrestricted. This enables **heterogeneous skeletons** (non-humanoid, e.g. quadrupeds, mechanical rigs). Key mechanisms:
+
+- **dummy stick**: A stick with no voxel binding and topologically isolated (neither endpoint shared with another stick). Used to pad the count to 17, satisfying the engine constraint.
+- **`classify_sticks()`** (`editor_state.py`): Classifies each stick as `skinned` (has binding), `connected_unskinned` (has topology but no binding), or `dummy` (isolated, no binding).
+- **One-click pad** (`pad_dummy_sticks_to_target()`): Auto-creates `_dummy_N_a/b` particles and matching dummy sticks far from the model to reach 17. Undo-supported.
+- **Pre-flight check**: A dialog appears before entering animation mode if stick count != 17, showing the delta and guiding the user (< 17: one-click pad, > 17: manual prune).
+- **Visual distinction**: Dummy sticks render in gray with reduced alpha in the 3D viewport; the bone panel has an independent dummy visibility toggle; the panel list marks dummies with `[D]` prefix and connected_unskinned sticks with `(unbound)`.
 
 ### Table-driven lateral-reference skinning
 

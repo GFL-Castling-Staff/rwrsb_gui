@@ -894,7 +894,7 @@ def _load_file(path):
             sk = g_editor.load_xml(path, g_ui.trans_bias)
             g_skeleton_sticks[0] = sk.get('sticks', [])
             g_renderer.upload_skeleton_lines(
-                g_editor.particles, g_editor.sticks)
+                g_editor.particles, g_editor.sticks, set(g_editor.dummy_stick_indices()))
             rebuild_positions_cache()
             g_camera.reset_to_model(g_editor.voxels)
 
@@ -1275,7 +1275,7 @@ def main():
             _update_grid()
             _update_mirror_indicator()
             if g_editor.skeleton_dirty and g_renderer is not None:
-                g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks)
+                g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks, set(g_editor.dummy_stick_indices()), skip_dummy=not g_ui.show_dummy_sticks)
                 g_editor.skeleton_dirty = False
 
             # update GPU buffers when dirty

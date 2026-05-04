@@ -224,7 +224,7 @@ class VoxelRenderer:
             bone_orientations.astype(np.float32).tobytes()
         )
 
-    def upload_skeleton_lines(self, particles, sticks):
+    def upload_skeleton_lines(self, particles, sticks, dummy_indices=None, skip_dummy=False):
         self.stick_segments = []
 
         if not particles:
@@ -234,6 +234,7 @@ class VoxelRenderer:
 
         id_to_particle = {p["id"]: p for p in particles}
 
+        _dummy = dummy_indices if dummy_indices is not None else set()
         line_verts = []
         vtx_offset = 0
         for stick in sticks:
@@ -242,8 +243,16 @@ class VoxelRenderer:
             if pa is None or pb is None:
                 self.stick_segments.append((vtx_offset, 0))
                 continue
-            line_verts += [pa["x"], pa["y"], pa["z"], 1.0, 1.0, 1.0, 1.0]
-            line_verts += [pb["x"], pb["y"], pb["z"], 1.0, 1.0, 1.0, 1.0]
+            is_dummy = stick.constraint_index in _dummy
+            if skip_dummy and is_dummy:
+                self.stick_segments.append((vtx_offset, 0))
+                continue
+            if is_dummy:
+                r, g, b, a = 0.4, 0.4, 0.4, 0.35
+            else:
+                r, g, b, a = 1.0, 1.0, 1.0, 1.0
+            line_verts += [pa["x"], pa["y"], pa["z"], r, g, b, a]
+            line_verts += [pb["x"], pb["y"], pb["z"], r, g, b, a]
             self.stick_segments.append((vtx_offset, 2))
             vtx_offset += 2
 

@@ -9,6 +9,8 @@ from pathlib import Path
 
 import imgui
 
+from animation_io import EXPECTED_STICK_COUNT
+
 logger = logging.getLogger(__name__)
 
 # ── Toast 通知 ────────────────────────────────
@@ -54,7 +56,8 @@ _TEXT = {
         "presets": "Presets",
         "voxels_bound": "Voxels: {bound}/{total} bound",
         "particles_count": "Particles: {count}",
-        "sticks_count": "Sticks: {count}",
+        "sticks_count": "Sticks: {count} / {target}",
+        "dummy_count_hint": "  ({real} real + {dummy} dummy)",
         "active_particle": "Active particle: {name} ({pid})",
         "active_particle_none": "Active particle: none",
         "stick_list": "Stick List",
@@ -346,6 +349,19 @@ _TEXT = {
         "skeleton_loaded_voxels_discarded": "Loaded skeleton (voxels discarded)",
         "anim_mode_enter_failed": "Failed to enter animation mode: {error}",
         "anim_default_skeleton_failed": "Failed to load default skeleton: {error}",
+        # Commit 2: 动画模式进入前骨段数检查
+        "stick_count_dialog_title": "Stick Count Mismatch",
+        "stick_count_dialog_body": "Animation mode requires exactly 17 sticks.\nCurrent skeleton has {count} stick(s) — {diff_msg}.",
+        "stick_count_dialog_below": "missing {n}",
+        "stick_count_dialog_over": "extra {n}",
+        "stick_count_dialog_over_hint": "Please manually merge or delete excess sticks before retrying.",
+        "stick_count_dialog_pad_button": "Pad to 17 (+{n} dummy)",
+        "stick_count_dialog_cancel": "Cancel",
+        # Commit 5: dummy stick UI
+        "show_dummy_sticks": "Show dummy sticks",
+        "stick_label_unbound": "(unbound)",
+        # Commit 6: 17根时删除骨段警告
+        "stick_delete_at_target": "Stick count is at target (17). Animation entry will be blocked unless re-padded.",
     },
     "zh": {
         "open_vox": "打开 VOX",
@@ -366,7 +382,8 @@ _TEXT = {
         "presets": "预设",
         "voxels_bound": "体素: {bound}/{total} 已绑定",
         "particles_count": "粒子: {count}",
-        "sticks_count": "骨段: {count}",
+        "sticks_count": "骨段: {count} / {target}",
+        "dummy_count_hint": "  ({real} 真实 + {dummy} 哑铃)",
         "active_particle": "当前粒子: {name} ({pid})",
         "active_particle_none": "当前粒子: 无",
         "stick_list": "骨段列表",
@@ -635,6 +652,19 @@ _TEXT = {
         "mirror_enter_failed": "进入镜像模式失败: {error}",
         "anim_mode_enter_failed": "进入动画模式失败: {error}",
         "anim_default_skeleton_failed": "加载默认骨架失败: {error}",
+        # Commit 2: 动画模式进入前骨段数检查
+        "stick_count_dialog_title": "骨段数不匹配",
+        "stick_count_dialog_body": "动画模式要求恰好 17 根骨段。\n当前骨架有 {count} 根 — {diff_msg}。",
+        "stick_count_dialog_below": "还差 {n} 根",
+        "stick_count_dialog_over": "多了 {n} 根",
+        "stick_count_dialog_over_hint": "请手动合并或删除多余骨段后重试。",
+        "stick_count_dialog_pad_button": "补齐到 17（+{n} 哑铃）",
+        "stick_count_dialog_cancel": "取消",
+        # Commit 5: dummy stick UI
+        "show_dummy_sticks": "显示哑铃骨段",
+        "stick_label_unbound": "(未绑定)",
+        # Commit 6: 17根时删除骨段警告
+        "stick_delete_at_target": "骨段数已达到目标值（17）。删除后将无法进入动画模式，除非重新补足。",
     },
 }
 
@@ -774,6 +804,13 @@ class UIState:
         # 选区 gizmo（动画工具，bone_edit 模式下选中粒子时显示）
         self.gizmo_arrow_pixels = 80          # 屏幕像素总长，可调
         self.gizmo_hover_handle = None        # str | None：当前 hover 的把手名
+
+        # Commit 2：动画模式进入前骨段数检查对话框
+        self._show_anim_stick_count_dialog = False
+        self._anim_stick_count_pending = None  # callable | None：用户确认后执行的回调
+
+        # Commit 5：dummy stick 可见性开关
+        self.show_dummy_sticks = True
 
     def push_toast(self, message: str, level: str = "info",
                    also_log: bool = True, exc_info=None) -> None:
@@ -1056,6 +1093,14 @@ def _draw_stick_list(ui_state, editor_state):
             editor_state.set_all_sticks_visible(True)
     imgui.separator()
 
+    # Commit 5: dummy stick 可见性开关
+    _, ui_state.show_dummy_sticks = imgui.checkbox(
+        tr(ui_state, "show_dummy_sticks"), ui_state.show_dummy_sticks)
+    imgui.separator()
+
+    # 预计算 stick 分类
+    classified = editor_state.classify_sticks()
+
     for idx, stick in enumerate(sticks):
         imgui.push_id(f"stick-{idx}")
 
@@ -1081,9 +1126,15 @@ def _draw_stick_list(ui_state, editor_state):
         is_active = editor_state.active_stick_idx == idx
         if is_active:
             _push_green()
-        label = f"[{idx}] {stick.name}"
-        if len(label) > 18:
-            label = label[:17] + "~"
+        tag = classified.get(stick.constraint_index, "skinned")
+        if tag == "dummy":
+            label = f"[D][{idx}] {stick.name}"
+        elif tag == "connected_unskinned":
+            label = f"[{idx}] {stick.name} {tr(ui_state, 'stick_label_unbound')}"
+        else:
+            label = f"[{idx}] {stick.name}"
+        if len(label) > 22:
+            label = label[:21] + "~"
         if imgui.button(label + "##b", width=118 * ui_state.ui_scale):
             editor_state.active_stick_idx = idx
             _io = imgui.get_io()
@@ -1225,7 +1276,10 @@ def _draw_active_stick_editor(ui_state, editor_state):
 
     _push_red()
     if imgui.button(tr(ui_state, "delete_active_stick"), width=-1):
+        was_at_target = len(editor_state.sticks) == EXPECTED_STICK_COUNT
         editor_state.delete_stick(editor_state.active_stick_idx)
+        if was_at_target:
+            ui_state.push_toast(tr(ui_state, "stick_delete_at_target"), "warning")
     imgui.pop_style_color()
 
 
@@ -1281,7 +1335,25 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
     bound, total = editor_state.stats()
     imgui.text_colored(tr(ui_state, "voxels_bound", bound=bound, total=total), 0.7, 0.7, 0.7, 1.0)
     imgui.text(tr(ui_state, "particles_count", count=len(editor_state.particles)))
-    imgui.text(tr(ui_state, "sticks_count", count=len(editor_state.sticks)))
+    stick_count = len(editor_state.sticks)
+    target = EXPECTED_STICK_COUNT
+    if stick_count == target:
+        imgui.text(tr(ui_state, "sticks_count", count=stick_count, target=target))
+    else:
+        imgui.text_colored(
+            tr(ui_state, "sticks_count", count=stick_count, target=target),
+            1.0, 0.55, 0.2, 1.0,
+        )
+    # dummy hint（需要 classify_sticks，Commit 3 落地后自动生效）
+    if hasattr(editor_state, "classify_sticks"):
+        classified = editor_state.classify_sticks()
+        dummy_count = sum(1 for v in classified.values() if v == "dummy")
+        if dummy_count > 0:
+            imgui.text_colored(
+                tr(ui_state, "dummy_count_hint",
+                   real=stick_count - dummy_count, dummy=dummy_count),
+                0.5, 0.5, 0.5, 1.0,
+            )
     if 0 <= editor_state.active_particle_idx < len(editor_state.particles):
         active_particle = editor_state.particles[editor_state.active_particle_idx]
         imgui.text(tr(ui_state, "active_particle", name=active_particle["name"], pid=active_particle["id"]))
@@ -1579,7 +1651,7 @@ def _handle_browse_load(ui_state, editor_state, renderer, skeleton_sticks_ref):
         else:
             sk = editor_state.load_xml(path, ui_state.trans_bias)
             skeleton_sticks_ref[0] = sk.get("sticks", [])
-            renderer.upload_skeleton_lines(editor_state.particles, editor_state.sticks)
+            renderer.upload_skeleton_lines(editor_state.particles, editor_state.sticks, set(editor_state.dummy_stick_indices()), skip_dummy=not ui_state.show_dummy_sticks)
         editor_state.gpu_dirty = True
         ui_state._load_error = ""
         ui_state.show_load_dialog = False
@@ -1623,7 +1695,7 @@ def draw_load_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WIN_
                     else:
                         sk = editor_state.load_xml(path, ui_state.trans_bias)
                         skeleton_sticks_ref[0] = sk.get("sticks", [])
-                        renderer.upload_skeleton_lines(editor_state.particles, editor_state.sticks)
+                        renderer.upload_skeleton_lines(editor_state.particles, editor_state.sticks, set(editor_state.dummy_stick_indices()), skip_dummy=not ui_state.show_dummy_sticks)
                     editor_state.gpu_dirty = True
                     ui_state._load_error = ""
                 except Exception as exc:
@@ -1798,7 +1870,7 @@ def draw_preset_dialog(ui_state, editor_state, renderer, skeleton_sticks_ref, WI
                 try:
                     data = editor_state.load_skeleton_preset(_preset["path"])
                     skeleton_sticks_ref[0] = data.get("sticks", [])
-                    renderer.upload_skeleton_lines(editor_state.particles, editor_state.sticks)
+                    renderer.upload_skeleton_lines(editor_state.particles, editor_state.sticks, set(editor_state.dummy_stick_indices()), skip_dummy=not ui_state.show_dummy_sticks)
                     editor_state.gpu_dirty = True
                     ui_state._bone_error = ""
                     ui_state.push_toast(tr(ui_state, "preset_loaded", name=_preset['name']), "success")
@@ -2475,6 +2547,17 @@ def _anim_check_dirty_or_run(ui_state, editor_state, action):
     return True
 
 
+def _enter_anim_safe(ui_state, editor_state, anim):
+    """安全进入动画模式（带 ValueError 兜底提示）。"""
+    try:
+        editor_state.enter_animation_mode(anim)
+        if hasattr(anim, 'name'):
+            ui_state.push_toast(
+                tr(ui_state, "anim_loaded", name=anim.name), "success")
+    except ValueError as exc:
+        ui_state.push_toast(str(exc), "error")
+
+
 def _anim_action_open_skeleton(ui_state, editor_state):
     """加载用户自定义 skeleton XML（异形骨场景）。"""
     def do():
@@ -2497,15 +2580,14 @@ def _anim_action_open_skeleton(ui_state, editor_state):
         # 加载完后进入空动画的回调
         def after_load():
             try:
-                from animation_io import Animation
+                from animation_io import Animation, EXPECTED_STICK_COUNT
                 new_anim = Animation(name="new_animation", loop=False, end=1.0, speed=1.0)
-                editor_state.enter_animation_mode(new_anim)
-                ui_state.push_toast(
-                    tr(ui_state, "anim_skeleton_loaded", n=len(editor_state.particles)),
-                    "info",
-                )
-            except ValueError as exc:
-                ui_state.push_toast(str(exc), "error")
+                if len(editor_state.sticks) != EXPECTED_STICK_COUNT:
+                    ui_state._show_anim_stick_count_dialog = True
+                    ui_state._anim_stick_count_pending = (
+                        lambda: _enter_anim_safe(ui_state, editor_state, new_anim))
+                else:
+                    _enter_anim_safe(ui_state, editor_state, new_anim)
             except Exception as exc:
                 ui_state.push_toast(tr(ui_state, "anim_mode_enter_failed", error=exc), "error", exc_info=True)
 
@@ -2561,11 +2643,15 @@ def _anim_action_load_animation(ui_state, editor_state):
         if len(doc.names) == 1:
             try:
                 anim = parse_first_animation(path)
-                editor_state.enter_animation_mode(anim)
-                ui_state.push_toast(
-                    tr(ui_state, "anim_loaded", name=anim.name), "success")
             except Exception as exc:
                 ui_state.push_toast(tr(ui_state, "load_failed", error=exc), "error", exc_info=True)
+                return
+            if len(editor_state.sticks) != EXPECTED_STICK_COUNT:
+                ui_state._show_anim_stick_count_dialog = True
+                ui_state._anim_stick_count_pending = (
+                    lambda a=anim: _enter_anim_safe(ui_state, editor_state, a))
+            else:
+                _enter_anim_safe(ui_state, editor_state, anim)
             return
         # 多 animation：弹选择对话框
         ui_state._anim_picker_doc = doc
@@ -2602,6 +2688,62 @@ def _anim_action_save_animation(ui_state, editor_state):
         ui_state.push_toast(tr(ui_state, "anim_saved", path=path), "success")
     except Exception as exc:
         ui_state.push_toast(tr(ui_state, "save_failed", error=exc), "error", exc_info=True)
+
+
+# ── 骨段数检查对话框 (Commit 2) ──────────────────
+
+def draw_anim_stick_count_dialog(ui_state, editor_state):
+    """进入动画模式前，骨段数 != 17 时弹出。"""
+    if not ui_state._show_anim_stick_count_dialog:
+        return
+
+    from animation_io import EXPECTED_STICK_COUNT
+    current = len(editor_state.sticks)
+    target = EXPECTED_STICK_COUNT
+    diff = target - current
+    flags = imgui.WINDOW_ALWAYS_AUTO_RESIZE | imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_COLLAPSE
+
+    if not imgui.begin(tr(ui_state, "stick_count_dialog_title"), True, flags)[0]:
+        imgui.end()
+        return
+
+    if diff > 0:
+        diff_msg = tr(ui_state, "stick_count_dialog_below", n=diff)
+    else:
+        diff_msg = tr(ui_state, "stick_count_dialog_over", n=-diff)
+
+    imgui.text(tr(ui_state, "stick_count_dialog_body",
+                  count=current, diff_msg=diff_msg))
+
+    if diff < 0:
+        # > 17：引导用户手动操作
+        imgui.spacing()
+        imgui.text_colored(
+            tr(ui_state, "stick_count_dialog_over_hint"), 1.0, 0.55, 0.2, 1.0)
+
+    imgui.spacing()
+    imgui.separator()
+    imgui.spacing()
+
+    # Pad 按钮（< 17 时可用，commit 4 落地前为占位）
+    if diff > 0:
+        if imgui.button(tr(ui_state, "stick_count_dialog_pad_button", n=diff), -1, 0):
+            if hasattr(editor_state, "pad_dummy_sticks_to_target"):
+                editor_state.pad_dummy_sticks_to_target()
+                ui_state._show_anim_stick_count_dialog = False
+                pending = ui_state._anim_stick_count_pending
+                ui_state._anim_stick_count_pending = None
+                if pending:
+                    pending()
+            else:
+                ui_state.push_toast("Pad function not yet available", "warning")
+        imgui.spacing()
+
+    if imgui.button(tr(ui_state, "stick_count_dialog_cancel"), -1, 0):
+        ui_state._show_anim_stick_count_dialog = False
+        ui_state._anim_stick_count_pending = None
+
+    imgui.end()
 
 
 # ── 选择对话框 (多 animation 文件) ────────────────
@@ -2664,13 +2806,19 @@ def _open_picker_choice(ui_state, editor_state):
         return
     try:
         anim = parse_single_animation(doc.path, sel)
-        editor_state.enter_animation_mode(anim)
-        editor_state.animation_source_doc = doc
-        editor_state.animation_source_idx = sel
-        ui_state.push_toast(
-            tr(ui_state, "anim_loaded", name=anim.name), "success")
     except Exception as exc:
         ui_state.push_toast(tr(ui_state, "load_failed", error=exc), "error", exc_info=True)
+        ui_state._anim_picker_doc = None
+        return
+    def _do_enter():
+        editor_state.animation_source_doc = doc
+        editor_state.animation_source_idx = sel
+        _enter_anim_safe(ui_state, editor_state, anim)
+    if len(editor_state.sticks) != EXPECTED_STICK_COUNT:
+        ui_state._show_anim_stick_count_dialog = True
+        ui_state._anim_stick_count_pending = _do_enter
+    else:
+        _do_enter()
     ui_state._anim_picker_doc = None
 
 

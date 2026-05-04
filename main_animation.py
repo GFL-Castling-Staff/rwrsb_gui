@@ -29,9 +29,11 @@ from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_box_select_overlay, draw_exit_dialog,
                           draw_toasts,
                           draw_animation_panel, draw_anim_source_picker,
-                          draw_anim_exit_confirm, draw_invalid_binding_dialog, tr)
+                          draw_anim_exit_confirm, draw_anim_stick_count_dialog,
+                          draw_invalid_binding_dialog, _enter_anim_safe, tr)
 from animation_io import (parse_animation_index, parse_single_animation,
-                          parse_first_animation, Animation, AnimationFrame)
+                          parse_first_animation, Animation, AnimationFrame,
+                          EXPECTED_STICK_COUNT)
 from resource_utils import resource_path
 
 logger = logging.getLogger(__name__)
@@ -727,8 +729,12 @@ def on_drop(window, paths):
             if doc.names:
                 if len(doc.names) == 1:
                     anim = parse_first_animation(path)
-                    g_editor.enter_animation_mode(anim)
-                    g_ui.push_toast(tr(g_ui, "anim_loaded", name=anim.name), "success")
+                    if len(g_editor.sticks) != EXPECTED_STICK_COUNT:
+                        g_ui._show_anim_stick_count_dialog = True
+                        g_ui._anim_stick_count_pending = (
+                            lambda a=anim: _enter_anim_safe(g_ui, g_editor, a))
+                    else:
+                        _enter_anim_safe(g_ui, g_editor, anim)
                 else:
                     g_ui._anim_picker_doc = doc
                     g_ui._anim_picker_filter = ""
@@ -739,8 +745,13 @@ def on_drop(window, paths):
         # 不是 animation 文件 → 当作 skeleton XML（带 binding 校验）
         def after_load():
             try:
-                g_editor.enter_animation_mode(
-                    Animation(name="new_animation", end=1.0, speed=1.0))
+                new_anim = Animation(name="new_animation", end=1.0, speed=1.0)
+                if len(g_editor.sticks) != EXPECTED_STICK_COUNT:
+                    g_ui._show_anim_stick_count_dialog = True
+                    g_ui._anim_stick_count_pending = (
+                        lambda: _enter_anim_safe(g_ui, g_editor, new_anim))
+                else:
+                    _enter_anim_safe(g_ui, g_editor, new_anim)
             except Exception as exc:
                 g_ui.push_toast(tr(g_ui, "anim_mode_enter_failed", error=exc), "error", exc_info=True)
 
@@ -847,7 +858,12 @@ def main():
     # 自动进入动画模式
     try:
         new_anim = Animation(name="new_animation", loop=False, end=1.0, speed=1.0)
-        g_editor.enter_animation_mode(new_anim)
+        if len(g_editor.sticks) != EXPECTED_STICK_COUNT:
+            g_ui._show_anim_stick_count_dialog = True
+            g_ui._anim_stick_count_pending = (
+                lambda: _enter_anim_safe(g_ui, g_editor, new_anim))
+        else:
+            _enter_anim_safe(g_ui, g_editor, new_anim)
     except Exception as exc:
         logger.exception("failed to enter animation mode")
         g_ui.push_toast(tr(g_ui, "anim_mode_enter_failed", error=exc), "error", exc_info=True)
@@ -866,7 +882,7 @@ def main():
 
     rebuild_positions_cache()
     if g_renderer:
-        g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks)
+        g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks, set(g_editor.dummy_stick_indices()), skip_dummy=not g_ui.show_dummy_sticks)
         g_editor.skeleton_dirty = False
 
     _last_loop_err = (None, None, 0)
@@ -901,7 +917,7 @@ def main():
                     g_editor._apply_interpolated_to_particles(g_editor.playback_time)
 
             if g_editor.skeleton_dirty and g_renderer is not None:
-                g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks)
+                g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks, set(g_editor.dummy_stick_indices()), skip_dummy=not g_ui.show_dummy_sticks)
                 rebuild_positions_cache()
                 g_editor.skeleton_dirty = False
 
@@ -1052,6 +1068,7 @@ def main():
             draw_animation_panel(g_ui, g_editor, WIN_W, WIN_H)
             draw_anim_source_picker(g_ui, g_editor)
             draw_anim_exit_confirm(g_ui, g_editor)
+            draw_anim_stick_count_dialog(g_ui, g_editor)
             draw_invalid_binding_dialog(g_ui, g_editor)
 
             draw_status_bar(g_ui, g_editor, WIN_W, WIN_H)

@@ -173,7 +173,7 @@ particles ──── sticks ──── bindings
 
 ### 进入动画模式：`enter_animation_mode(animation)`
 
-前置条件：`len(particles) == EXPECTED_PARTICLE_COUNT (15)`，否则抛 `ValueError`。
+前置条件：`len(sticks) == EXPECTED_STICK_COUNT (17)`，否则抛 `ValueError`。
 
 执行顺序：
 1. 若 `animation.frames` 为空，自动追加一帧（= 当前 particle 姿态）
@@ -201,9 +201,11 @@ particles ──── sticks ──── bindings
 
 ## 7. 关键约定与隐式知识
 
-### EXPECTED_PARTICLE_COUNT = 15
+### EXPECTED_STICK_COUNT = 17
 
-定义在 `animation_io.py`。RWR 引擎硬编码：soldier animation XML 每帧必须正好 15 个 particle 位置，多一个少一个都会解析失败。动画工具的骨架加载、帧编辑、XML 导出全部依赖此约束。
+定义在 `animation_io.py`。RWR 引擎的 soldier animation 约束是**每帧骨段数必须正好 17**，不校验粒子数（15 粒子是 vanilla 人形骨架的惯例，并非引擎硬限制）。引擎不限骨架拓扑和连通性——孤立的、无绑定的骨段也能正常载入。
+
+动画工具的骨架加载、帧编辑、XML 导出全部依赖此约束。进入动画模式前会自动检查骨段数并弹出对话框引导补足或删减。
 
 ### constraintIndex == sticks 列表下标
 
@@ -221,6 +223,16 @@ particles ──── sticks ──── bindings
 ### 预设只保存骨架，不保存绑定
 
 骨架预设（`presets/*.json`）只保存 `particles` + `sticks`，不保存 `bindings`。binding 属于具体体素模型的项目数据，不具有跨模型复用价值。加载预设时 bindings 会被清空。
+
+### 异形骨与 dummy stick
+
+RWR 引擎只校验骨段数 = 17，不限制骨架拓扑。这一特性支持**异形骨**（非人形骨架，如四足动物、机械体等）。核心机制：
+
+- **dummy stick**：无 voxel binding 且拓扑孤立（两端粒子不与其他 stick 共享）的骨段。用于填充不足 17 根的差额，使其满足引擎约束。
+- **`classify_sticks()`**（`editor_state.py`）：将每根 stick 分类为 `skinned`（有绑定）、`connected_unskinned`（有拓扑连接但无绑定）、`dummy`（孤立无绑定）。
+- **一键补足**（`pad_dummy_sticks_to_target()`）：在远离模型的位置自动创建 `_dummy_N_a/b` 粒子和对应 dummy stick，补齐到 17 根。带 undo 支持。
+- **进入动画模式前检查**：若骨段数 != 17，弹出对话框显示差额并引导用户操作（< 17 一键补足，> 17 手动删减）。
+- **视觉区分**：dummy stick 在 3D 视口以灰色半透明渲染；骨段面板可独立控制 dummy 可见性；面板列表中以 `[D]` 前缀标记 dummy，以 `(未绑定)` 标记 connected_unskinned。
 
 ### 表驱动 lateral reference 蒙皮
 
