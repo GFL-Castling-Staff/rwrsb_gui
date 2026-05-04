@@ -236,6 +236,9 @@ class EditorState:
             "bindings": copy.deepcopy(self.bindings),
             "active_stick_idx": self.active_stick_idx,
             "active_particle_idx": self.active_particle_idx,
+            # 选择集也要进 snapshot，否则 undo/redo 后 selected_particles 与
+            # particles 不一致，会出现越界 index 访问崩溃
+            "selected_particles": set(self.selected_particles),
             # 独立保留可视状态，按 particle pair 做 key（constraint_index 在 snapshot 间不稳定）
             "visible_by_pair": {
                 (s.particle_a_id, s.particle_b_id): s.visible for s in self.sticks
@@ -253,6 +256,15 @@ class EditorState:
         self.bindings = copy.deepcopy(snapshot["bindings"])
         self.active_stick_idx = int(snapshot["active_stick_idx"])
         self.active_particle_idx = int(snapshot.get("active_particle_idx", -1))
+        # 恢复选择集；同时过滤掉越界 index（防御老 snapshot 或外部脏数据）
+        n = len(self.particles)
+        restored_sel = snapshot.get("selected_particles")
+        if restored_sel is None:
+            self.selected_particles = {i for i in self.selected_particles if 0 <= i < n}
+        else:
+            self.selected_particles = {int(i) for i in restored_sel if 0 <= int(i) < n}
+        if not (0 <= self.active_particle_idx < n):
+            self.active_particle_idx = -1
         self._normalize_stick_indices()
 
         # 恢复可视状态（按 particle pair 匹配，不按 constraint_index）
@@ -938,27 +950,25 @@ class EditorState:
     def delete_selected_particles(self) -> int:
         """批量删除 selected_particles 里的全部粒子。
 
-        倒序删除避免 index 失效；只在第一次删除前推一次 undo（_push_undo
-        里调，所以这里直接调 delete_particle 会推多次 —— 用直接操作避免）。
+        倒序删除避免 index 失效；整批操作只推一次 undo，让用户一次 Ctrl+Z 撤销。
         返回实际删除数量。
         """
         if not self.selected_particles:
             return 0
         indices = sorted(self.selected_particles, reverse=True)
-        # 复用 delete_particle 的清理逻辑：每次删一个，但 undo 只推一次
-        # 简单做法：先 push 一次 undo，然后 delete_particle 内部的 _push_undo 接受
-        # 多次推送（栈上多个相邻快照影响小，操作语义仍是"批量删除"）
-        deleted = 0
-        for idx in indices:
-            if 0 <= idx < len(self.particles):
-                self.delete_particle(idx)
-                deleted += 1
-        return deleted
+        valid = [idx for idx in indices if 0 <= idx < len(self.particles)]
+        if not valid:
+            return 0
+        self._push_undo()
+        for idx in valid:
+            self.delete_particle(idx, push_undo=False)
+        return len(valid)
 
-    def delete_particle(self, particle_index):
+    def delete_particle(self, particle_index, push_undo=True):
         if particle_index < 0 or particle_index >= len(self.particles):
             return
-        self._push_undo()
+        if push_undo:
+            self._push_undo()
         removed_id = int(self.particles[particle_index]["id"])
         del self.particles[particle_index]
 

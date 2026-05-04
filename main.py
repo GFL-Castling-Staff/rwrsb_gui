@@ -719,10 +719,12 @@ def _compute_rotate_pivot():
     active 模式下若 active 不在选择集中，fallback 到 centroid。
     """
     mode = g_ui.rotate_pivot_mode
-    sel = g_editor.selected_particles
+    n = len(g_editor.particles)
+    # 防御：过滤越界 index（外部修改或 snapshot 不一致时不至于 crash）
+    sel = [i for i in g_editor.selected_particles if 0 <= i < n]
     if mode == "active":
         act = g_editor.active_particle_idx
-        if act >= 0 and act in sel:
+        if 0 <= act < n and act in sel:
             p = g_editor.particles[act]
             return np.array([p["x"], p["y"], p["z"]], dtype=np.float32)
         # fallback: centroid
