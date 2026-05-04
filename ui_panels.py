@@ -1301,8 +1301,13 @@ def _draw_particle_editor(ui_state, editor_state):
         # active 粒子的 tree 节点自动展开，便于跟随选择切换
         if idx == editor_state.active_particle_idx:
             imgui.set_next_item_open(True, condition=imgui.ONCE)
-        if imgui.tree_node(f"{particle['name']} ({particle['id']})##node"):
+        # 注意：tree_node 在展开期间每帧都返回 True，不能无条件 set_active —
+        # 否则展开的节点会逐帧覆盖外部状态变更（视口点击清选 / extend_chain 切 active），
+        # 表现为：点空白取消不掉、右侧闪烁、gizmo 因 active 不在 selected 里而 fallback 到原点。
+        opened = imgui.tree_node(f"{particle['name']} ({particle['id']})##node")
+        if imgui.is_item_clicked():
             editor_state.set_active_particle(idx)
+        if opened:
             changed_name, new_name = imgui.input_text(tr(ui_state, "name"), particle["name"], 128)
             changed_id, new_id = imgui.input_int(tr(ui_state, "id"), int(particle["id"]))
             changed_mass, new_mass = imgui.input_float(tr(ui_state, "inv_mass"), float(particle["invMass"]), 0.0, 0.0, "%.3f")
