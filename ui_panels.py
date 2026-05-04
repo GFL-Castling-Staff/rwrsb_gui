@@ -1205,6 +1205,30 @@ def _draw_particle_editor(ui_state, editor_state):
             ui_state._bone_error = str(exc)
             ui_state.push_toast(tr(ui_state, "add_particle_failed", error=exc), "error", exc_info=True)
 
+    # 邻近添加：选中 active 粒子时显示 +X/+Y/+Z 三个按钮
+    active_idx = editor_state.active_particle_idx
+    if 0 <= active_idx < len(editor_state.particles):
+        imgui.text(tr(ui_state, "spawn_near_active"))
+        avail = imgui.get_content_region_available_width()
+        btn_w = max(40.0, (avail - 12) / 3.0)
+        for axis_key, label_key in (("x", "spawn_x"), ("y", "spawn_y"), ("z", "spawn_z")):
+            try:
+                if imgui.button(tr(ui_state, label_key) + f"##spawn_{axis_key}", width=btn_w):
+                    try:
+                        editor_state.add_particle_near(active_idx, axis=axis_key, distance=2.0)
+                        ui_state._bone_error = ""
+                    except Exception as exc:
+                        ui_state._bone_error = str(exc)
+                        ui_state.push_toast(
+                            tr(ui_state, "add_particle_failed", error=exc),
+                            "error", exc_info=True,
+                        )
+            finally:
+                if axis_key != "z":
+                    imgui.same_line()
+    else:
+        imgui.text_disabled(tr(ui_state, "spawn_near_no_active"))
+
     for idx, particle in enumerate(editor_state.particles):
         imgui.push_id(f"particle-{idx}")
         if imgui.tree_node(f"{particle['name']} ({particle['id']})##node"):

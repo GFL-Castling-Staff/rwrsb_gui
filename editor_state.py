@@ -881,6 +881,33 @@ class EditorState:
         self._mark_skeleton_changed()
         return len(self.particles) - 1
 
+    def add_particle_near(self, reference_index, axis="x", distance=2.0):
+        """在 reference 粒子附近沿指定轴偏移生成新粒子。
+
+        reference_index 越界 / 无效 → 落回原点 (0, 0, 0)。
+        新粒子自动设为 active 并加入 selected_particles，便于后续 chain 操作。
+        返回新粒子的数组下标。
+        """
+        if 0 <= reference_index < len(self.particles):
+            ref = self.particles[reference_index]
+            base_x, base_y, base_z = float(ref["x"]), float(ref["y"]), float(ref["z"])
+        else:
+            base_x = base_y = base_z = 0.0
+        d = float(distance)
+        if axis == "x":
+            x, y, z = base_x + d, base_y, base_z
+        elif axis == "y":
+            x, y, z = base_x, base_y + d, base_z
+        elif axis == "z":
+            x, y, z = base_x, base_y, base_z + d
+        else:
+            x, y, z = base_x + d, base_y, base_z
+        new_idx = self.add_particle(x=x, y=y, z=z)
+        # 自动选中新粒子，便于接力 connect_selected / extend_chain
+        self.selected_particles = {new_idx}
+        self.set_active_particle(new_idx)
+        return new_idx
+
     def update_particle(self, particle_index, **fields):
         if particle_index < 0 or particle_index >= len(self.particles):
             return
