@@ -931,6 +931,40 @@ def box_select_voxels(
     return list(np.where(in_box)[0])
 
 
+def pick_particles_at(
+    vp_matrix: np.ndarray, positions: np.ndarray,
+    screen_x: float, screen_y: float,
+    screen_w: int, screen_h: int,
+    radius_px: float = 14.0,
+) -> list:
+    """返回半径内全部粒子下标，按距离从近到远排序。
+
+    用于分辨重合粒子：同位置连续点击时，调用方按列表顺序循环切换。
+    投影越界（w<=0 / NDC z 出界）的粒子被过滤。
+    """
+    if len(positions) == 0:
+        return []
+    n = len(positions)
+    ones = np.ones((n, 1), dtype=np.float32)
+    pos_h = np.hstack([positions, ones])
+    clip = (vp_matrix @ pos_h.T).T
+    w = clip[:, 3:4]
+    w_safe = np.where(np.abs(w) < 1e-6, 1e-6, w)
+    ndc = clip[:, :3] / w_safe
+    valid = (w[:, 0] > 0) & (ndc[:, 2] > -1.0) & (ndc[:, 2] < 1.0)
+    sx = (ndc[:, 0] + 1.0) * 0.5 * screen_w
+    sy = (1.0 - ndc[:, 1]) * 0.5 * screen_h
+    dist2 = (sx - screen_x) ** 2 + (sy - screen_y) ** 2
+    r2 = float(radius_px * radius_px)
+    candidates = [
+        (float(dist2[i]), int(i))
+        for i in range(n)
+        if bool(valid[i]) and float(dist2[i]) <= r2
+    ]
+    candidates.sort()
+    return [idx for _, idx in candidates]
+
+
 def pick_particle_screen(
     vp_matrix: np.ndarray, positions: np.ndarray,
     screen_x: float, screen_y: float,

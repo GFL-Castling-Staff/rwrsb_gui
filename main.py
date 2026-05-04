@@ -23,7 +23,8 @@ from imgui.integrations.glfw import GlfwRenderer
 from camera       import OrbitCamera
 from editor_state import EditorState
 from renderer     import (VoxelRenderer, pick_voxel, box_select_voxels,
-                          pick_particle_screen, pick_stick_screen,
+                          pick_particle_screen, pick_particles_at,
+                          pick_stick_screen,
                           box_select_particles)
 from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_status_bar, draw_load_dialog, draw_save_dialog,
@@ -340,6 +341,66 @@ def _pick_particle(sx, sy):
     vp_h = WIN_H - toolbar_h - status_h
     mvp = g_camera.get_mvp()
     return pick_particle_screen(mvp, positions, sx, sy - toolbar_h, vp_w, vp_h)
+
+
+# 重合粒子循环选择：同位置连续点击切换候选
+# 状态：上次点击的屏幕坐标、命中候选列表、上次选中的下标
+g_pick_cycle_pos = None        # tuple[float, float] | None
+g_pick_cycle_candidates = []   # list[int]
+g_pick_cycle_chosen = -1       # int
+
+
+def _pick_particle_with_cycling(sx, sy):
+    """与 _pick_particle 等价，但同位置连续点击会循环候选粒子。
+
+    第一次点击：返回最近的粒子。
+    在 ~4px 内再次点击：跳到候选列表的下一个粒子，按距离顺序循环。
+    位置变了 / 候选列表变了：重置循环。
+    """
+    global g_pick_cycle_pos, g_pick_cycle_candidates, g_pick_cycle_chosen
+    positions = particle_positions_np()
+    if len(positions) == 0:
+        g_pick_cycle_pos = None
+        g_pick_cycle_candidates = []
+        g_pick_cycle_chosen = -1
+        return -1
+    panel_w, toolbar_h, status_h = _ui_layout_metrics()
+    vp_w = WIN_W - panel_w
+    vp_h = WIN_H - toolbar_h - status_h
+    mvp = g_camera.get_mvp()
+    candidates = pick_particles_at(mvp, positions, sx, sy - toolbar_h, vp_w, vp_h)
+    if not candidates:
+        g_pick_cycle_pos = None
+        g_pick_cycle_candidates = []
+        g_pick_cycle_chosen = -1
+        return -1
+    near_last = (
+        g_pick_cycle_pos is not None
+        and abs(sx - g_pick_cycle_pos[0]) < 4.0
+        and abs(sy - g_pick_cycle_pos[1]) < 4.0
+        and candidates == g_pick_cycle_candidates
+    )
+    if near_last:
+        # 循环到下一个候选
+        try:
+            cur = g_pick_cycle_candidates.index(g_pick_cycle_chosen)
+        except ValueError:
+            cur = -1
+        nxt = (cur + 1) % len(g_pick_cycle_candidates)
+        g_pick_cycle_chosen = g_pick_cycle_candidates[nxt]
+        if len(g_pick_cycle_candidates) > 1:
+            g_ui.push_toast(
+                tr(g_ui, "cycle_overlap",
+                   idx=g_pick_cycle_chosen,
+                   cur=nxt + 1,
+                   total=len(g_pick_cycle_candidates)),
+                "info",
+            )
+    else:
+        g_pick_cycle_candidates = candidates
+        g_pick_cycle_chosen = candidates[0]
+    g_pick_cycle_pos = (sx, sy)
+    return g_pick_cycle_chosen
 
 
 def _pick_stick(sx, sy):
@@ -994,7 +1055,7 @@ def on_mouse_button(window, button, action, mods):
                         _start_rotate_drag(axis_preset=gizmo_handle[0])
                 return
 
-            hit_particle = _pick_particle(g_mouse_x, g_mouse_y)
+            hit_particle = _pick_particle_with_cycling(g_mouse_x, g_mouse_y)
             shift = bool(mods & glfw.MOD_SHIFT)
             ctrl = bool(mods & glfw.MOD_CONTROL)
 
