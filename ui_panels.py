@@ -90,6 +90,10 @@ _TEXT = {
         "spawn_y": "+Y",
         "spawn_z": "+Z",
         "spawn_near_no_active": "Select 1 particle to spawn nearby",
+        "delete_selected_btn": "Delete selected",
+        "deleted_particles": "Deleted {n} particle(s)",
+        "deleted_active_stick": "Deleted active stick",
+        "delete_selected_hint": "Press Delete to remove selected particles or active stick",
         "name": "Name",
         "id": "Id",
         "inv_mass": "InvMass",
@@ -423,6 +427,10 @@ _TEXT = {
         "spawn_y": "+Y",
         "spawn_z": "+Z",
         "spawn_near_no_active": "选中 1 个粒子启用邻近添加",
+        "delete_selected_btn": "删除选中",
+        "deleted_particles": "已删除 {n} 个粒子",
+        "deleted_active_stick": "已删除当前骨段",
+        "delete_selected_hint": "按 Delete 删除选中粒子或当前骨段",
         "name": "名称",
         "id": "ID",
         "inv_mass": "逆质量",
@@ -1204,6 +1212,20 @@ def _draw_particle_editor(ui_state, editor_state):
         except Exception as exc:
             ui_state._bone_error = str(exc)
             ui_state.push_toast(tr(ui_state, "add_particle_failed", error=exc), "error", exc_info=True)
+
+    # 删除选中：与 Delete 快捷键等价（仅 selected_particles 非空时启用）
+    if editor_state.selected_particles:
+        _push_red()
+        if imgui.button(
+            tr(ui_state, "delete_selected_btn") + f" ({len(editor_state.selected_particles)})##del_sel",
+            width=-1,
+        ):
+            n = editor_state.delete_selected_particles()
+            if n > 0:
+                ui_state.push_toast(tr(ui_state, "deleted_particles", n=n), "success")
+        imgui.pop_style_color()
+    else:
+        imgui.text_disabled(tr(ui_state, "delete_selected_hint"))
 
     # 邻近添加：选中 active 粒子时显示 +X/+Y/+Z 三个按钮
     active_idx = editor_state.active_particle_idx

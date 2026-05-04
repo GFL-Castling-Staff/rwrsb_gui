@@ -30,6 +30,7 @@ from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_preset_dialog,
                           draw_box_select_overlay, draw_exit_dialog,
                           draw_toasts, tr)
+from animation_io import EXPECTED_STICK_COUNT
 
 import time
 import math
@@ -1205,6 +1206,19 @@ def on_key(window, key, scancode, action, mods):
         elif key == glfw.KEY_E:
             if g_ui.allow_skeleton_edit:
                 g_editor.set_tool_mode('bone_edit')
+        elif key in (glfw.KEY_DELETE, glfw.KEY_BACKSPACE):
+            # Delete / Backspace：bone_edit 模式下删选中粒子或 active stick
+            if (g_editor.tool_mode == 'bone_edit' and g_ui.allow_skeleton_edit):
+                if g_editor.selected_particles and g_ui.allow_particle_edit:
+                    n = g_editor.delete_selected_particles()
+                    if n > 0:
+                        g_ui.push_toast(tr(g_ui, "deleted_particles", n=n), "success")
+                elif g_editor.active_stick_idx >= 0 and g_ui.allow_stick_edit:
+                    was_at_target = (len(g_editor.sticks) == EXPECTED_STICK_COUNT)
+                    g_editor.delete_stick(g_editor.active_stick_idx)
+                    g_ui.push_toast(tr(g_ui, "deleted_active_stick"), "success")
+                    if was_at_target:
+                        g_ui.push_toast(tr(g_ui, "stick_delete_at_target"), "warning")
 
 
 @_safe_callback
