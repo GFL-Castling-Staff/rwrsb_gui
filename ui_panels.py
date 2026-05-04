@@ -80,9 +80,16 @@ _TEXT = {
         "new_a": "New A",
         "new_b": "New B",
         "add_stick": "Add Stick",
+        "connect_selected": "Connect selected: {a} ↔ {b}",
+        "connect_selected_hint": "Select 2 particles to enable quick-connect",
         "particles": "Particles",
         "particle_edit_disabled": "Particle editing is disabled",
         "add_particle": "Add Particle",
+        "spawn_near_active": "Spawn near active",
+        "spawn_x": "+X",
+        "spawn_y": "+Y",
+        "spawn_z": "+Z",
+        "spawn_near_no_active": "Select 1 particle to spawn nearby",
         "name": "Name",
         "id": "Id",
         "inv_mass": "InvMass",
@@ -406,9 +413,16 @@ _TEXT = {
         "new_a": "新 A",
         "new_b": "新 B",
         "add_stick": "添加骨段",
+        "connect_selected": "连接所选: {a} ↔ {b}",
+        "connect_selected_hint": "选中 2 个粒子启用快速连接",
         "particles": "粒子",
         "particle_edit_disabled": "粒子编辑已禁用",
         "add_particle": "添加粒子",
+        "spawn_near_active": "在 active 粒子附近添加",
+        "spawn_x": "+X",
+        "spawn_y": "+Y",
+        "spawn_z": "+Z",
+        "spawn_near_no_active": "选中 1 个粒子启用邻近添加",
         "name": "名称",
         "id": "ID",
         "inv_mass": "逆质量",
@@ -1294,6 +1308,23 @@ def _draw_add_stick(ui_state, editor_state):
     if len(editor_state.particles) < 2:
         imgui.text_disabled(tr(ui_state, "need_two_particles"))
         return
+
+    # 快速连接：选中正好 2 个粒子时一键建 stick
+    sel = list(editor_state.selected_particles)
+    if len(sel) == 2:
+        pa = editor_state.particles[sel[0]]
+        pb = editor_state.particles[sel[1]]
+        label = tr(ui_state, "connect_selected", a=pa["name"], b=pb["name"])
+        if imgui.button(label + "##quick_connect", width=-1):
+            try:
+                editor_state.add_stick(int(pa["id"]), int(pb["id"]))
+                ui_state._bone_error = ""
+            except Exception as exc:
+                ui_state._bone_error = str(exc)
+                ui_state.push_toast(tr(ui_state, "add_stick_failed", error=exc), "error", exc_info=True)
+    else:
+        imgui.text_disabled(tr(ui_state, "connect_selected_hint"))
+    imgui.separator()
 
     options = editor_state.get_particle_options()
     ui_state.new_stick_a = _clamp_index(ui_state.new_stick_a, len(options))
