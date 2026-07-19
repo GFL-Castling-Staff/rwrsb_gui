@@ -40,7 +40,7 @@ _TEXT = {
     "en": {
         "open_vox": "Open VOX",
         "open_xml": "Open XML",
-        "save_btn": "Save",
+        "save_btn": "Save/Export",
         "save_xml": "Save XML",
         "save_vox": "Export VOX",
         "save_xml_hint": "Voxels + skeleton + bindings",
@@ -390,7 +390,7 @@ _TEXT = {
     "zh": {
         "open_vox": "打开 VOX",
         "open_xml": "打开 XML",
-        "save_btn": "保存",
+        "save_btn": "保存/导出",
         "save_xml": "保存 XML",
         "save_vox": "导出 VOX",
         "save_xml_hint": "体素 + 骨架 + 绑定",
