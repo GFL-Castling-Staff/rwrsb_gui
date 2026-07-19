@@ -7,6 +7,7 @@ project_root = Path.cwd()
 datas = [
     (str(project_root / "shaders"), "shaders"),
     (str(project_root / "presets"), "presets"),
+    (str(project_root / "VERSION"), "."),
 ]
 binaries = []
 

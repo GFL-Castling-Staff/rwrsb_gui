@@ -121,7 +121,8 @@ def _apply_ui_scale():
 
 
 def _window_title():
-    base = "RWR Animation Editor (rwrsb_anim)"
+    from resource_utils import app_version
+    base = f"RWR Animation Editor (rwrsb_anim) v{app_version()}"
     if g_editor.current_animation:
         dirty = "*" if g_editor._anim_dirty else ""
         return f"{base} - {g_editor.current_animation.name}{dirty}"
