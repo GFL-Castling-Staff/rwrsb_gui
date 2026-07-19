@@ -40,7 +40,11 @@ _TEXT = {
     "en": {
         "open_vox": "Open VOX",
         "open_xml": "Open XML",
+        "save_btn": "Save",
         "save_xml": "Save XML",
+        "save_vox": "Export VOX",
+        "save_xml_hint": "Voxels + skeleton + bindings",
+        "save_vox_hint": "Voxels only, skeleton is NOT saved",
         "brush": "Brush [B]",
         "voxel_select": "Voxels [V]",
         "bone_edit": "Bones [E]",
@@ -146,7 +150,10 @@ _TEXT = {
         "error": "Error: {message}",
         "file_not_found": "File not found",
         "save_xml_title": "Save XML",
+        "save_vox_title": "Export VOX",
         "output_xml_path": "Output XML path:",
+        "output_vox_path": "Output VOX path:",
+        "vox_skeleton_warning": "VOX stores voxels only - skeleton and bindings are not saved.",
         "save": "Save",
         "save_and_exit": "Save and Exit",
         "discard_and_exit": "Discard and Exit",
@@ -383,7 +390,11 @@ _TEXT = {
     "zh": {
         "open_vox": "打开 VOX",
         "open_xml": "打开 XML",
+        "save_btn": "保存",
         "save_xml": "保存 XML",
+        "save_vox": "导出 VOX",
+        "save_xml_hint": "体素 + 骨架 + 绑定",
+        "save_vox_hint": "仅体素，不含骨架",
         "brush": "涂刷 [B]",
         "voxel_select": "选体素 [V]",
         "bone_edit": "选骨点 [E]",
@@ -489,7 +500,10 @@ _TEXT = {
         "error": "错误: {message}",
         "file_not_found": "文件不存在",
         "save_xml_title": "保存 XML",
+        "save_vox_title": "导出 VOX",
         "output_xml_path": "输出 XML 路径:",
+        "output_vox_path": "输出 VOX 路径:",
+        "vox_skeleton_warning": "VOX 只存体素，骨架与绑定关系不会被保存。",
         "save": "保存",
         "save_and_exit": "保存并退出",
         "discard_and_exit": "丢弃并退出",
@@ -713,6 +727,7 @@ class UIState:
     文件路径缓冲
         load_path_buf, save_path_buf  — 对话框输入框内容
         load_mode                      — "vox" 或 "xml"
+        save_format                    — "xml" 或 "vox"，决定保存对话框写哪种格式
 
     框选状态
         box_selecting, box_x0/y0/x1/y1 — 拖动框选的屏幕坐标
@@ -754,6 +769,7 @@ class UIState:
         self.load_path_buf = ""
         self.save_path_buf = ""
         self.load_mode = "vox"
+        self.save_format = "xml"
         self.pending_exit_after_save = False
 
         self.trans_bias = 127
@@ -972,6 +988,34 @@ def _disabled_button(label):
         imgui.button(label)
         imgui.pop_style_var()
 
+def default_save_path(editor_state, fmt):
+    """由 source_path 推导目标格式的默认输出路径。"""
+    path = editor_state.source_path or ""
+    if not path:
+        return ""
+    stem = path[:-4] if path.lower().endswith((".vox", ".xml")) else path
+    if fmt == "vox":
+        # 源本身就是 vox 时加后缀，避免默认路径直接盖掉原始文件
+        return (stem + "_edit.vox") if path.lower().endswith(".vox") else stem + ".vox"
+    return (stem + "_bound.xml") if path.lower().endswith(".vox") else stem + ".xml"
+
+
+def prepare_save_dialog(ui_state, editor_state, fmt="xml"):
+    """打开保存对话框并按格式预填路径。fmt: "xml" | "vox"。"""
+    ui_state.show_save_dialog = True
+    ui_state.save_format = fmt
+    ui_state.save_path_buf = default_save_path(editor_state, fmt)
+    ui_state._save_error = ""
+
+
+def _do_save(ui_state, editor_state, skeleton_sticks_ref, path):
+    """按当前 save_format 执行写出。异常交由调用方处理。"""
+    if ui_state.save_format == "vox":
+        editor_state.export_vox(path)
+    else:
+        editor_state.save_xml(path, skeleton_sticks_ref[0])
+
+
 def draw_toolbar(ui_state, editor_state, renderer, camera, WIN_W):
     imgui.set_next_window_position(0, 0)
     imgui.set_next_window_size(WIN_W, 38 * ui_state.ui_scale)
@@ -996,14 +1040,17 @@ def draw_toolbar(ui_state, editor_state, renderer, camera, WIN_W):
         ui_state._load_error = ""
     imgui.same_line()
 
+    # Save popup：点击展开格式选择（不用悬浮展开，避免鼠标划过工具栏误触）
     dirty = "*" if editor_state.is_dirty else ""
-    if imgui.button(f"{tr(ui_state, 'save_xml')}{dirty}##save_xml"):
-        ui_state.show_save_dialog = True
-        path = editor_state.source_path or ""
-        if path.lower().endswith(".vox"):
-            path = path[:-4] + "_bound.xml"
-        ui_state.save_path_buf = path
-        ui_state._save_error = ""
+    if imgui.button(f"{tr(ui_state, 'save_btn')}{dirty}##save_btn"):
+        imgui.open_popup("##save_format_popup")
+    if imgui.begin_popup("##save_format_popup"):
+        for fmt in ("xml", "vox"):
+            if imgui.selectable(tr(ui_state, f"save_{fmt}") + f"##save_{fmt}")[0]:
+                prepare_save_dialog(ui_state, editor_state, fmt)
+            if imgui.is_item_hovered():
+                imgui.set_tooltip(tr(ui_state, f"save_{fmt}_hint"))
+        imgui.end_popup()
     imgui.same_line()
 
     # View popup：世界原点开关 + 选区 gizmo 长度滑条
@@ -1855,13 +1902,18 @@ def _handle_browse_save(ui_state, editor_state, skeleton_sticks_ref):
     """调 Windows 原生保存对话框，选中后立即执行保存流程。"""
     from file_dialogs import save_file_dialog
 
-    initial = ui_state.save_path_buf or (editor_state.source_path or "")
-    filters = [("XML files", "*.xml"), ("All files", "*.*")]
+    is_vox = ui_state.save_format == "vox"
+    initial = ui_state.save_path_buf or default_save_path(editor_state, ui_state.save_format)
+    if is_vox:
+        filters = [("MagicaVoxel files", "*.vox"), ("All files", "*.*")]
+    else:
+        filters = [("XML files", "*.xml"), ("All files", "*.*")]
 
     t0 = time.time()
     try:
-        path = save_file_dialog(tr(ui_state, "save_xml_title"), filters,
-                                initial_path=initial, default_ext="xml")
+        path = save_file_dialog(tr(ui_state, "save_vox_title" if is_vox else "save_xml_title"),
+                                filters, initial_path=initial,
+                                default_ext="vox" if is_vox else "xml")
     except Exception as exc:
         ui_state._save_error = str(exc)
         ui_state.push_toast(tr(ui_state, "open_dialog_failed", error=exc), "error", exc_info=True)
@@ -1876,7 +1928,7 @@ def _handle_browse_save(ui_state, editor_state, skeleton_sticks_ref):
         return
 
     try:
-        editor_state.save_xml(path, skeleton_sticks_ref[0])
+        _do_save(ui_state, editor_state, skeleton_sticks_ref, path)
         ui_state._save_error = ""
         ui_state.show_save_dialog = False
         imgui.close_current_popup()
@@ -1890,10 +1942,12 @@ def draw_save_dialog(ui_state, editor_state, skeleton_sticks_ref, WIN_W, WIN_H):
     if not ui_state.show_save_dialog:
         return
     from file_dialogs import _is_supported as _file_dialog_supported
-    title = tr(ui_state, "save_xml_title")
+    is_vox = ui_state.save_format == "vox"
+    title = tr(ui_state, "save_vox_title" if is_vox else "save_xml_title")
     imgui.open_popup(title)
     imgui.set_next_window_position(WIN_W // 2 - 270, WIN_H // 2 - 80)
-    imgui.set_next_window_size(540 * ui_state.ui_scale, 160 * ui_state.ui_scale)
+    imgui.set_next_window_size(540 * ui_state.ui_scale,
+                               (190 if is_vox else 160) * ui_state.ui_scale)
     opened, _ = imgui.begin_popup_modal(title, flags=imgui.WINDOW_NO_RESIZE)
     if opened:
         # ── F9: 浏览按钮 ──
@@ -1904,15 +1958,18 @@ def draw_save_dialog(ui_state, editor_state, skeleton_sticks_ref, WIN_W, WIN_H):
         else:
             imgui.text_colored(tr(ui_state, "file_dialog_unavailable"), 1.0, 0.8, 0.3, 1.0)
 
-        imgui.text(tr(ui_state, "output_xml_path"))
+        imgui.text(tr(ui_state, "output_vox_path" if is_vox else "output_xml_path"))
         imgui.set_next_item_width(-1)
         _, ui_state.save_path_buf = imgui.input_text("##sp", ui_state.save_path_buf, 1024)
+
+        if is_vox:
+            imgui.text_colored(tr(ui_state, "vox_skeleton_warning"), 1.0, 0.8, 0.3, 1.0)
 
         if imgui.button(tr(ui_state, "save"), width=80 * ui_state.ui_scale):
             path = ui_state.save_path_buf.strip().strip('"')
             if path:
                 try:
-                    editor_state.save_xml(path, skeleton_sticks_ref[0])
+                    _do_save(ui_state, editor_state, skeleton_sticks_ref, path)
                     ui_state._save_error = ""
                     ui_state.show_save_dialog = False
                     imgui.close_current_popup()

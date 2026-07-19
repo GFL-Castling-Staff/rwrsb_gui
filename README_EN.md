@@ -24,6 +24,7 @@ It loads `.vox` files or project XML directly, lets you edit the skeleton struct
 - UI scaling
 - Camera Y-axis inversion
 - Export to XML
+- Export to MagicaVoxel `.vox` (voxels only — skeleton and bindings are not included)
 - Defaults to voxel box-select on launch (avoids accidental painting)
 
 ## Requirements

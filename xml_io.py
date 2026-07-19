@@ -108,6 +108,95 @@ def parse_vox(path: str | Path, trans_bias: int = 127) -> list[tuple[float, ...]
 
 
 # ──────────────────────────────────────────────
+# VOX 二进制写出
+# ──────────────────────────────────────────────
+
+_VOX_MAX_PALETTE = 255      # 色号 1..255，0 保留给空体素
+
+
+def _build_palette(voxels: list) -> tuple[list, list]:
+    """按首次出现顺序建调色板。
+
+    返回 (palette, indices)：
+      palette — list of (r,g,b,a) uint8，最多 255 项
+      indices — 与 voxels 等长，值为 1-based 色号
+
+    RWR 的 XML 颜色本身就是 uint8 调色板的浮点表示（值精确等于 n/255），
+    所以这里是精确反查而非近似量化。颜色数超过 255 时直接抛错：正常模型
+    远达不到这个量级（实测武器模型 73 色），触发说明数据来路异常，
+    此时静默改色比报错更危险。
+    """
+    palette = []
+    lookup = {}
+    indices = []
+    for v in voxels:
+        a = v[6] if len(v) > 6 else 1.0
+        key = tuple(max(0, min(255, int(round(float(c) * 255.0))))
+                    for c in (v[3], v[4], v[5], a))
+        idx = lookup.get(key)
+        if idx is None:
+            if len(palette) >= _VOX_MAX_PALETTE:
+                raise ValueError(
+                    f"颜色数超过 {_VOX_MAX_PALETTE}，VOX 调色板放不下，请先减色")
+            palette.append(key)
+            idx = len(palette)          # 1-based，与 parse_vox 的 rgba_raw[ci-1] 对齐
+            lookup[key] = idx
+        indices.append(idx)
+    return palette, indices
+
+
+def _vox_chunk(tag: bytes, content: bytes, children: bytes = b'') -> bytes:
+    """拼一个 VOX chunk：tag + 内容长度 + 子块长度 + 内容 + 子块。"""
+    return tag + struct.pack('<II', len(content), len(children)) + content + children
+
+
+def write_vox(path: str | Path, voxels: list, trans_bias: int = 127) -> None:
+    """把体素写成 MagicaVoxel .vox（格式版本 150）。
+
+    只输出几何与颜色 —— .vox 装不下骨架和绑定关系，调用方需自行提示用户。
+    坐标经 world_to_vox 反变换回 MagicaVoxel 空间，必须落在 0..255 内，
+    否则通常是 trans_bias 选错了（人形 127 / 武器 49）。
+    """
+    if not voxels:
+        raise ValueError("没有体素可导出")
+
+    palette, indices = _build_palette(voxels)
+
+    coords = []
+    for v in voxels:
+        vx, vy, vz = world_to_vox(round(v[0]), round(v[1]), round(v[2]), trans_bias)
+        if not (0 <= vx <= 255 and 0 <= vy <= 255 and 0 <= vz <= 255):
+            raise ValueError(
+                f"体素 ({v[0]:g}, {v[1]:g}, {v[2]:g}) 变换后超出 VOX 范围 "
+                f"({vx}, {vy}, {vz})；请检查 trans_bias（当前 {trans_bias}，"
+                f"人形应为 127，武器应为 49）")
+        coords.append((vx, vy, vz))
+
+    # SIZE 取 max+1 而非紧包围盒：坐标是含 bias 的绝对值，
+    # 缩包围盒会让读回时整体偏移，破坏 round-trip
+    size = tuple(max(c[i] for c in coords) + 1 for i in range(3))
+
+    xyzi = bytearray(struct.pack('<I', len(coords)))
+    for (vx, vy, vz), ci in zip(coords, indices):
+        xyzi += bytes((vx, vy, vz, ci))
+
+    # RGBA 恒 256 项定长；palette[i] 对应色号 i+1，尾部补零
+    pal = bytearray()
+    for entry in palette:
+        pal += bytes(entry)
+    pal += b'\x00' * (1024 - len(pal))
+
+    children = (_vox_chunk(b'SIZE', struct.pack('<III', *size))
+                + _vox_chunk(b'XYZI', bytes(xyzi))
+                + _vox_chunk(b'RGBA', bytes(pal)))
+    blob = b'VOX ' + struct.pack('<I', 150) + _vox_chunk(b'MAIN', b'', children)
+
+    Path(path).write_bytes(blob)
+    logger.info("已写出: %s  (%d 体素, %d 色, size=%s)",
+                path, len(coords), len(palette), size)
+
+
+# ──────────────────────────────────────────────
 # XML 解析
 # ──────────────────────────────────────────────
 

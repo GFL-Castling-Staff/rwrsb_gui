@@ -1301,6 +1301,18 @@ class EditorState:
         write_xml(path, self.voxels, skeleton, self.bindings)
         self._dirty = False
 
+    def export_vox(self, path):
+        """导出体素为 MagicaVoxel .vox。
+
+        只写几何和颜色，骨架与绑定不会被保存（.vox 格式没有对应容器）。
+
+        刻意不动 _dirty：编辑器只改骨架和绑定，体素内容全程只读，
+        所以导出 vox 既没保存未存的改动、也没产生新改动，与存档状态正交。
+        """
+        from xml_io import write_vox
+
+        write_vox(path, self.voxels, self.trans_bias)
+
     @property
     def is_dirty(self):
         return self._dirty

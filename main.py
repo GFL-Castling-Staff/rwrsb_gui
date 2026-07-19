@@ -182,12 +182,9 @@ def _window_title():
 
 
 def _prepare_save_dialog():
-    g_ui.show_save_dialog = True
-    path = g_editor.source_path or ""
-    if path.lower().endswith(".vox"):
-        path = path[:-4] + "_bound.xml"
-    g_ui.save_path_buf = path
-    g_ui._save_error = ""
+    # 退出前保存走 XML —— vox 存不下骨架，不能用它作为退出存档
+    from ui_panels import prepare_save_dialog
+    prepare_save_dialog(g_ui, g_editor, "xml")
 
 
 def rebuild_positions_cache():
