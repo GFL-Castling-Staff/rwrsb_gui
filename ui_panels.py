@@ -9,7 +9,7 @@ from pathlib import Path
 
 import imgui
 
-from animation_io import EXPECTED_STICK_COUNT
+from animation_io import EXPECTED_STICK_COUNT, ENGINE_CONTROL_KEYS
 from engine_skin import SEMANTIC_PARTICLES
 
 logger = logging.getLogger(__name__)
@@ -295,6 +295,14 @@ _TEXT = {
         "engine_layers_header": "Body layers (bodyAreaHint)",
         "engine_layer_upper": "Upper layer ({n}): {names}",
         "engine_layer_lower": "Lower layer ({n}): {names}",
+        # 动画数据校验
+        "anim_warn_first_frame_not_zero": "First keyframe is at {t:.3f}s, not 0: the game logs 'CHECK: error in animation' before it.",
+        "anim_warn_unknown_control_keys": "Unknown control keys {keys}: the game treats them as 'magazine'.",
+        "anim_warn_position_count_mismatch": "{n} frame(s) have a position count different from the skeleton's {expected} particles.",
+        "anim_warnings_badge": "[!] {n}",
+        "anim_warnings_header": "Animation checks (saving is not blocked):",
+        "anim_control_custom_warn": "The game only knows 14 control keys; any other key is treated as 'magazine'.",
+        "anim_save_warnings": "Saved with {n} warning(s): {first}",
         "grid_btn": "Grid...",
         "grid_popup_title": "Grid options",
         "settings_btn": "View...",
@@ -709,6 +717,14 @@ _TEXT = {
         "engine_layers_header": "上下半身分层（bodyAreaHint）",
         "engine_layer_upper": "上半身层（{n}）：{names}",
         "engine_layer_lower": "下半身层（{n}）：{names}",
+        # 动画数据校验
+        "anim_warn_first_frame_not_zero": "第一帧在 {t:.3f}s 而不是 0：游戏在它之前采样会记 'CHECK: error in animation'。",
+        "anim_warn_unknown_control_keys": "未知 control key {keys}：游戏一律当作 magazine 处理。",
+        "anim_warn_position_count_mismatch": "{n} 帧的 position 数与骨架的 {expected} 个粒子不一致。",
+        "anim_warnings_badge": "[!] {n}",
+        "anim_warnings_header": "动画检查（不影响保存）：",
+        "anim_control_custom_warn": "游戏只认 14 个 control key，其它一律当作 magazine 处理。",
+        "anim_save_warnings": "已保存，但有 {n} 条提示：{first}",
         "grid_btn": "网格...",
         "grid_popup_title": "网格选项",
         "settings_btn": "视图...",
@@ -2412,12 +2428,17 @@ def draw_toasts(ui_state, WIN_W, toolbar_h, ui_scale, draw_list):
 # 动画工具：工具栏 / 面板 / 选择对话框 / dirty 确认
 # ============================================================
 
-# 常用 control key（vanilla 见过的 14 个 + 自定义占位）
-_ANIM_CONTROL_KEYS = [
-    "action", "bounce", "cycle", "cycle_part", "effect", "hit_ground",
-    "magazine", "push", "reload", "shoot", "stop", "strong_hand",
-    "swing", "weak_hand",
-]
+# 游戏认得的 14 个 control key（+ 自定义占位）；其它 key 游戏一律当作 magazine
+_ANIM_CONTROL_KEYS = list(ENGINE_CONTROL_KEYS)
+
+
+def _anim_warning_lines(ui_state, editor_state):
+    from animation_io import validate_animation
+    anim = editor_state.current_animation
+    if anim is None:
+        return []
+    return [tr(ui_state, f"anim_warn_{code}", **params)
+            for code, params in validate_animation(anim, len(editor_state.particles))]
 
 
 def _draw_move_settings_section(ui_state, editor_state):
@@ -3070,6 +3091,10 @@ def _anim_action_save_animation(ui_state, editor_state):
         write_single_animation(path, editor_state.current_animation)
         editor_state._anim_dirty = False
         ui_state.push_toast(tr(ui_state, "anim_saved", path=path), "success")
+        warnings = _anim_warning_lines(ui_state, editor_state)
+        if warnings:
+            ui_state.push_toast(tr(ui_state, "anim_save_warnings", n=len(warnings), first=warnings[0]),
+                                "warning")
     except Exception as exc:
         ui_state.push_toast(tr(ui_state, "save_failed", error=exc), "error", exc_info=True)
 
@@ -3348,6 +3373,14 @@ def _draw_anim_panel_inner(ui_state, editor_state, WIN_W, WIN_H):
                   n=editor_state.current_frame_idx + 1 if editor_state.current_frame_idx >= 0 else 0,
                   m=len(anim.frames)))
 
+    # 动画检查：有问题时显示角标，悬停列出
+    warnings = _anim_warning_lines(ui_state, editor_state)
+    if warnings:
+        imgui.same_line()
+        imgui.text_colored(tr(ui_state, "anim_warnings_badge", n=len(warnings)), 1.0, 0.6, 0.2, 1.0)
+        if imgui.is_item_hovered():
+            imgui.set_tooltip(tr(ui_state, "anim_warnings_header") + "\n" + "\n".join(warnings))
+
     imgui.separator()
 
     # ── 时间线 ──
@@ -3429,6 +3462,12 @@ def _draw_anim_panel_inner(ui_state, editor_state, WIN_W, WIN_H):
                 chg_kt, new_kt = imgui.input_text("##key_text", key, 32)
                 if chg_kt and new_kt != key:
                     editor_state.anim_set_control(cur, ci, key=new_kt)
+                if imgui.is_item_hovered():
+                    imgui.set_tooltip(tr(ui_state, "anim_control_custom_warn"))
+                imgui.same_line()
+                imgui.text_colored("[!]", 1.0, 0.6, 0.2, 1.0)
+                if imgui.is_item_hovered():
+                    imgui.set_tooltip(tr(ui_state, "anim_control_custom_warn"))
 
             imgui.same_line()
             imgui.set_next_item_width(60)

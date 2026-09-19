@@ -32,6 +32,13 @@ logger = logging.getLogger(__name__)
 # 动画 XML 每帧 <position> 数 = 当前 skeleton 粒子数（按 skeleton 动态读取，非固定 15）。
 EXPECTED_STICK_COUNT = 17
 
+# 游戏认得的全部 control key；其它任何 key 都会被当作 "magazine" 处理
+ENGINE_CONTROL_KEYS = (
+    "action", "bounce", "cycle", "cycle_part", "effect", "hit_ground",
+    "magazine", "push", "reload", "shoot", "stop", "strong_hand",
+    "swing", "weak_hand",
+)
+
 
 @dataclass
 class AnimationFrame:
@@ -226,6 +233,34 @@ def write_single_animation(path, animation: Animation):
     Path(path).write_text(pretty, encoding='utf-8')
     logger.info("wrote animation '%s' to %s (%d frames)",
                 animation.name, path, len(animation.frames))
+
+
+# ──────────────────────────────────────────────
+# 校验
+# ──────────────────────────────────────────────
+
+def validate_animation(animation: Animation, n_particles: Optional[int] = None):
+    """按游戏的读法检查动画，返回 [(code, params)]，文案由 UI 层翻译。不阻断保存。
+
+    code:
+      first_frame_not_zero    第一帧不在 0 秒：游戏在它之前采样会记 "CHECK: error in animation"
+      unknown_control_keys    有游戏不认识的 control key，游戏一律当作 magazine
+      position_count_mismatch 有帧的 position 数与骨架粒子数不一致
+    """
+    out = []
+    if animation.frames:
+        first = min(f.time for f in animation.frames)
+        if first > 1e-6:
+            out.append(("first_frame_not_zero", {"t": first}))
+    unknown = sorted({key for f in animation.frames for key, _v in f.controls
+                      if key not in ENGINE_CONTROL_KEYS})
+    if unknown:
+        out.append(("unknown_control_keys", {"keys": ", ".join(repr(k) for k in unknown)}))
+    if n_particles is not None:
+        bad = [f.time for f in animation.frames if len(f.positions) != n_particles]
+        if bad:
+            out.append(("position_count_mismatch", {"n": len(bad), "expected": n_particles}))
+    return out
 
 
 # ──────────────────────────────────────────────
