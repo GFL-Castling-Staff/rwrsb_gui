@@ -1,160 +1,157 @@
-# 异形骨支持：骨段管理工作流
+# 引擎对齐：蒙皮 / 动画 / 外观与游戏一致
+
+> 上一版计划（异形骨 7 commits）已全部落地，原文见 git 历史 `61cf05a:docs/new.md`。
+> 依据：本地研究文档（下称"报告"，含分析细节，不入库）。
+> 状态：**已确认（2026-09-19）**——旧版蒙皮规则保留为可选；Commit 1–9 全部实施；研究文档不公开。
 
 ## 背景
 
-RWR 引擎对 skeleton 的硬约束**只在骨段数（必须 = 17 根 stick）**，粒子数和拓扑都不限。已确认（commit `fdf4cf4`、`5af9bf2`）：
-- 校验对象已从粒子数改为骨段数
-- 蒙皮已支持任意拓扑（全局规则 + 邻居缓存，孤立骨自动 world-axis fallback）
+对照游戏 1.98.1 的实际行为后确认，工具的动画蒙皮与游戏存在系统性差异：
 
-剩下要解决的是 **"用户怎么舒服地建一个 17 骨段的异形骨"**。所有真实骨段 < 17 时需要补"哑铃骨段"（dummy = 两孤立粒子 + 孤立 stick + 无 voxel binding），> 17 时手动合并删减。
+- 引擎按 **stick 下标 0–16** 查表，用固定粒子下标（1、2、3、4、5、8、9、10、11、12）构成的"身体参考系"决定每根骨段的 roll，原点取 **a 端粒子**；工具按粒子 id/name 查 lateral 规则、原点取中点、手臂走 bind 相对最短弧。
+- 全部 556 个 vanilla 动画上，工具与游戏的骨段旋转差中位数：上臂 33°–56°、前臂 71°–74°、腿 4°–10°、肩颈 8°；常用动画体素最大偏差 4–8 体素（约 14–25 cm）。
+- 游戏每帧的姿态是两层合成：`bodyAreaHint=2` 的粒子来自上半身动画并按粒子 8 对齐，且跟随瞄准朝向旋转；其余跟随移动方向。工具目前不体现这一点。
+- 现存 bug：1.98.1 的 vanilla `soldier_animations.xml` 含 `<!-- ---- -->` 注释，`animation_io` 解析直接失败。
+
+目标：动画模式下看到的就是游戏里的样子；异形骨作者能在工具里提前发现引擎规则带来的问题。
 
 ## 数据语义约定
 
-- **dummy stick**：拓扑孤立的 stick（其两端粒子不与任何其他 stick 相连）+ 无 voxel binding。
-- **dummy 粒子**：仅作为 dummy stick 端点存在的粒子。
-- 标识方式：**派生检测**，不在数据结构上加 flag。理由：拓扑就是真理，加 `is_dummy` 字段会和真实拓扑产生一致性维护负担。提供一个 `EditorState.classify_sticks() -> dict[int, "skinned"|"dummy"]` helper，按 `bindings + 拓扑邻居` 判断即可。
-- **17 是常量**：复用已加的 `animation_io.EXPECTED_STICK_COUNT`，不重复定义。
+- **stick 下标 = XML 顺序 = constraintIndex**（已有约定），新增含义：它决定引擎套用哪条朝向规则。
+- **粒子下标**（XML 顺序）1、2、3、4、5、8、9、10、11、12 是引擎语义粒子；下标 8 另作上半身层对齐锚点。
+- `bodyAreaHint`：1 = 下半身层 / 移动朝向，2 = 上半身层 / 瞄准朝向。其它值引擎按"非 2"处理。
+- 引擎复刻只改**动画模式下的体素位置计算**；绑骨数据、XML 读写格式不变。
 
 ## Commit 列表
 
-每个 commit 自成一体，可单独验证、单独回滚。
-
 ---
 
-### Commit 1 — `feat(bind): live stick budget indicator`
+### Commit 1 — `fix(anim): 兼容注释内含 -- 的动画 XML`
 
-**目标**：状态栏 / 骨段面板把 `Sticks: N` 改为 `Sticks: N / 17`，按差值染色（= 绿；≠ 红 / 黄）。让用户全程都知道还差几根。
+**目标**：能加载 1.98.1 的 vanilla `soldier_animations.xml`。
 
 **改动**：
-- `ui_panels.py` 的 `sticks_count` 翻译串改为 `Sticks: {count} / {target}`（中英两份）
-- 在 [ui_panels.py:1280](ui_panels.py:1280) 那一行把 `imgui.text` 换成 `imgui.text_colored`，按 `count == EXPECTED_STICK_COUNT` 选颜色（建议：等于 → 默认 / 不等于 → `(1.0, 0.6, 0.2)` 黄）
-- 注意此面板对绑骨和动画工具都要展示
+- `animation_io.py`：`parse_animation_index` / `parse_single_animation` 在 `ET.fromstring` 前用 `re.sub(r'<!--.*?-->', '', raw, flags=re.S)` 去注释（抽成 `_read_xml_text(path)` 共用）。
+- `xml_io.parse_xml` 同样处理一次（模型 XML 目前没见到，防御性）。
 
-**验收**：打开 `presets/human_skeleton.json` 显示 `Sticks: 17 / 17`（默认色）；删 1 根变红/黄。
-
-**补充**：当存在 dummy stick 时，指标应区分真实骨段数和 dummy 数，如 `Sticks: 17/17 (12 real + 5 dummy)`，避免用户误以为骨架完整。可在 bone 面板 `sticks_count` 行下方加一行小字 `dummy_count_hint`（仅在 dummy > 0 时显示）。
+**验收**：vanilla 文件索引出 556 个动画；"vanilla still 基准 pose" 能加载；旧格式文件结果不变。
 
 ---
 
-### Commit 2 — `feat(bind): pre-flight dialog for animation entry`
+### Commit 2 — `feat(anim): 引擎精确蒙皮模块 engine_skin.py`
 
-**目标**：进动画模式前，如果骨段数 ≠ 17，弹对话框说明差距，而不是只 toast。
+**目标**：把研究原型落为正式模块，纯函数、无 UI 依赖。
 
 **改动**：
-- 在 `ui_panels.py` 加 `draw_anim_stick_count_dialog(ui_state, editor_state)`：显示当前骨段数 vs 17，列出后续 commit 会加的"补足/帮助"按钮入口（commit 4 之前先放占位，给"取消"按钮关闭即可）。
-- `UIState` 加 `_show_anim_stick_count_dialog: bool = False`、`_anim_stick_count_diff: int = 0`。
-- 把 `enter_animation_mode` 的 `try/except` 调用点（[ui_panels.py:2498/2560/2663](ui_panels.py:2498)、[main_animation.py:731/743/851](main_animation.py:731)）改为先检查 `len(sticks) != EXPECTED_STICK_COUNT`，命中则置位 dialog 标志，跳过原 try/except。
-- 保留 `enter_animation_mode` 内部的 `ValueError` 兜底（防御万一），但 UI 不再依赖它。
+- 新文件 `engine_skin.py`：与游戏一致的四元数运算（FromAxes 不正交化）、`body_frame(P)`、`stick_orientation(index, pa, pb, F)`、`bind(particles, sticks, voxels, bindings)`、`pose(P) -> (positions, per_stick_matrix)`。
+- 用 numpy 按 stick 分组向量化，保持与现有 `_voxel_groups` 同量级开销。
+- 验证脚本（按项目惯例为临时脚本，依赖本机游戏文件，不入库）：① bind 姿态还原误差 < 1e-9；② vanilla T-pose 17 个坐标系正交且 z 轴 = 骨段方向；③ 若干固定输入的四元数与手算值一致；④ 粒子 < 13 时抛明确异常。
 
-**验收**：用 16 / 18 骨段的 skeleton 试图进动画 → 对话框弹出说明差几根，点"取消"回到绑骨。
-
-**补充**：`> 17` 时对话框除显示差距数外，应加一行提示文字引导用户手动操作，如"请手动合并或删除多余骨段后重试"（翻译一条 `stick_count_over_target_hint`）。
+**验收**：验证脚本通过；用正式模块对照 vanilla 动画，数字与报告一致。
 
 ---
 
-### Commit 3 — `feat(bind): dummy stick classification helper`
+### Commit 3 — `feat(anim): 动画模式默认使用引擎精确蒙皮`
 
-**目标**：在 `EditorState` 上加一个纯派生函数 `classify_sticks()` 和 `dummy_stick_indices()`，给后续 UI / 渲染区分用。**纯逻辑、无副作用、无数据结构变更**。
+**目标**：动画预览与游戏一致。
 
 **改动**：
-- `editor_state.py` 加：
-  ```python
-  def classify_sticks(self) -> dict[int, str]:
-      """每根 stick 标 'skinned' | 'connected_unskinned' | 'dummy'。
-      dummy = 无 voxel binding 且 两端点不与其他 stick 共享。
-      """
-  def dummy_stick_indices(self) -> list[int]:
-      ...
-  ```
-- 单测可选：写 1-2 个 vanilla preset case 验证。
+- `EditorState` 新增 `skinning_mode: "engine" | "legacy"`，默认 `"engine"`；满足条件（stick = 17、粒子 ≥ 13、binding 下标 < 17）才用 engine，否则自动落回 legacy 并在状态栏说明原因。
+- `record_voxel_bind_pose` / `update_voxel_positions_from_skeleton` 按模式分派；engine 模式 bind 源仍用 `_canonical_skeleton_pose`。
+- 体素朝向槽 `_bone_orientations`：引擎矩阵可能非刚性，oriented cube 用其极分解后的最近旋转（位置用精确矩阵，立方体不被剪切）。
+- 动画面板把现有"全局蒙皮规则（拓扑驱动）"复选框改为下拉：`引擎精确（与游戏一致）` / `旧版 lateral 规则` / `旧版拓扑规则`，切换时重录 bind（复用 `set_use_global_lateral_ref` 的流程）。
+- 中英翻译。
 
-**验收**：`presets/human_skeleton.json` 调用 `classify_sticks()` 全 17 根都不是 dummy；手动加一对孤立粒子 + 一根 stick → 该 stick 标记 dummy。
-
-**补充**：`connected_unskinned`（有拓扑连接但无 voxel binding）在 Commit 5 的骨段列表中应给出弱提示，如名字旁加灰色 `(未绑定)` 标记，帮助用户发现遗漏的绑定。
+**验收**：vanilla 模型播放 `running`，工具体素位置与引擎复刻逐点一致；切到旧版规则行为与当前版本相同；16 根 stick 的骨架进入动画时落回 legacy 并提示。
 
 ---
 
-### Commit 4 — `feat(bind): one-click pad to 17 sticks`
+### Commit 4 — `feat(anim): 引擎规则体检`
 
-**目标**：骨段面板加按钮 `Pad to 17 (+N dummy)`，自动补 N 对孤立粒子 + N 根 dummy stick。
+**目标**：异形骨作者能看到"游戏会怎么对待每根骨段"。
 
 **改动**：
-- `EditorState.pad_dummy_sticks_to_target(target=EXPECTED_STICK_COUNT)`：
-  - 计算 `need = target - len(self.sticks)`，需要 ≤ 0 直接返回。
-  - 选一块远离 voxel 模型的位置（比如沿 -X 轴远端），按 `(particle_count_now + i)` 步进生成两两成对的粒子。
-  - 粒子命名 `dummy_pX_a` / `dummy_pX_b`，id 取当前最大 id + 偏移避免冲突。
-  - 调 `_normalize_stick_indices()` + `_mark_skeleton_changed()`。
-  - 推 undo（标准 `_push_undo`）。
-- 在 commit 2 的对话框里加这个按钮：仅当 `len(sticks) < 17` 时启用。
-- 骨段面板顶部也直接显示这个按钮，永远可点（`> 17` 时灰）。
-- 翻译：`pad_to_target_sticks` / `pad_to_target_sticks_tip` 两条。
+- 骨段面板每行显示下标规则标签（如 `#11 前臂·继承左上臂`）和它引用的粒子下标。
+- 粒子面板给下标 1、2、3、4、5、8、9、10、11、12 加"引擎语义"小标记，悬停说明用途。
+- 每帧计算每根 stick 的退化度（`FromAxes` 输入的 x·u、|y|）与畸变（σmax/σmin − 1），超阈值的骨段在视口标红，动画面板列出"本动画最差的骨段与帧"。
+- 进入动画前预检：粒子 < 13、binding 下标 ≥ 17 给出警告（粒子下限为推断，文案注明"待实测"）。
 
-**验收**：12 骨段 skeleton 点 Pad 按钮 → 立刻变 17 / 17（5 对孤立粒子在远端）。能 Ctrl+Z 撤销。
-
-**补充**：
-- **命名防冲突**：dummy 粒子用 `_dummy_N_a` / `_dummy_N_b` 前缀（下划线开头降低与用户命名冲突概率），生成前检查名称冲突，冲突时自动加后缀。
-- **位置启发式**：不写死 -X 远端，改为动态计算 `min(voxel_x) - max(voxel_span) * 1.5`（确保在任何模型尺寸下都在视口外），无 voxel 时默认放 `(-50, 0, 0)`。
-- **预设加载交互**：加载预设后 dummy 粒子/骨段应被清理（预设自带完整骨架拓扑）。`load_skeleton_preset` 内部调用一次 `_prune_dummy_sticks()` 清理孤立 dummy 后再恢复。
-- **幂等性**：`pad_dummy_sticks_to_target` 需判断 `need <= 0` 时直接返回（已在 plan 中）；但若已有部分 dummy 且仍不足 17，应只补差额，不重复创建。
+**验收**：vanilla 全绿；把自定义骨架的第 16 根 stick 摆成与肩线平行，体检标红并指出引用的是粒子 2、3。
 
 ---
 
-### Commit 5 — `feat(bind): visually distinguish dummy sticks`
+### Commit 5 — `feat(bind): bodyAreaHint 语义化`
 
-**目标**：dummy stick 在 3D 视口染色更暗 / 配独立可见性开关；骨段列表分组显示。
+**目标**：用户知道 hint 决定上下半身分层。
 
 **改动**：
-- `renderer.py` 画骨段线段时：dummy stick（按 `dummy_stick_indices()`）颜色乘 0.4 alpha 或换灰色。
-- **Renderer API**：`upload_skeleton_lines()` 新增可选参数 `dummy_indices: set[int] | None = None`，不混用现有 `visible` 字段（`visible` 是用户偏好，dummy 是拓扑属性，语义不同）。渲染时 dummy stick 的颜色/alpha 由该集合决定。
-- `UIState.show_dummy_sticks: bool = True`，骨段面板加 checkbox 切换。
-- 骨段列表（[ui_panels.py:1099](ui_panels.py:1099) 附近）按 classify 结果分两段渲染：先 skinned + connected_unskinned，再 `--- Dummy (N) ---` 折叠区。
-- 翻译：`show_dummy_sticks` / `dummy_section_header`。
+- 粒子属性里 `bodyAreaHint` 从 `input_int` 改为下拉：`1 下半身（跟移动方向）` / `2 上半身（跟瞄准、可被上身动画替换）` / `其它`，悬停说明。
+- 视口可选"按层着色"：hint 2 粒子与 hint 1 粒子不同色，跨层骨段虚线。
+- 预检：粒子 8 不是 hint 1、或 hint 2 粒子为 0 时提示。
 
-**验收**：补 5 根 dummy 后，视口能立刻分辨真实骨段和 dummy；toggle 可隐藏 dummy。
+**验收**：vanilla 骨架按层着色结果为头颈肩肘手一组、其余一组。
 
 ---
 
-### Commit 6 — `feat(bind): guard against accidental stick removal at target`
-
-**目标**：在骨段数 == 17 时删除骨段会破坏动画就绪态，给用户红字警告。
+### Commit 6 — `feat(anim): 动画数据校验`
 
 **改动**：
-- 删除骨段的入口（搜 `del self.sticks` / `pop` / 删除按钮 handler）增加 toast：`tr(ui_state, "stick_count_dropped_below_target", count=N)`，配色 warning。
-- 不阻断操作（用户有时确实要重新设计），只提示。
-- 翻译：一条 warning 字符串。
+- 第一帧 time ≠ 0：时间线警告（引擎会记 `CHECK: error in animation`）。
+- control 选"自定义"时显示提示："游戏只认 14 个 key，其它一律当作 magazine"。
+- 保存前汇总上述警告（不阻断）。
 
-**验收**：17 根状态下删 1 根，弹 "骨段数已降至 16/17，进入动画模式将受阻" toast。
+**验收**：构造首帧 0.1 s 的动画、自定义 key 的帧，均出现提示。
 
 ---
 
-### Commit 7 — `docs(architecture): document heterogeneous skeleton workflow`
+### Commit 7 — `feat(anim): 游戏内合成预览`（P2）
 
-**目标**：补一节 `docs/architecture/ARCHITECTURE.md`：异形骨工作流（先建真实拓扑 → Pad to 17 → 检查 dummy 视觉 → 进动画）。说明 dummy 是派生定义不是数据 flag、为什么 17 是引擎硬约束。
+**目标**：预览"上半身动画 + 下半身动画 + 扭身"在游戏里的效果，不修改正在编辑的动画。
 
 **改动**：
-- 在 § 7 「关键约定与隐式知识」加一小节 `异形骨与 dummy stick`。中英两份。
-- **修正 § 7 已有过期内容**：`EXPECTED_PARTICLE_COUNT = 15` 小节 → 改为 `EXPECTED_STICK_COUNT = 17`，说明引擎只校验骨段数、不限粒子数和拓扑。
+- 动画面板新增"合成预览"折叠区：选择下半身动画（可来自已加载的动画文件）；当前编辑的动画作为上半身层（或反过来）。
+- 合成规则：hint 2 粒子取上身层并以粒子 8 对齐。
+- "上身相对移动方向扭转角"滑杆（默认 0，参考值：奔跑 ≤ 36.9°、走路 ≤ 60°），按 hint 分别绕竖直轴旋转。
+- 预览态只读，退出后恢复编辑态。
 
-**验收**：人读完一遍能复述出"为什么要补 17 根"和"dummy 是怎么识别的"。
+**验收**：`running` + `reloading` 合成后，下身跑动、上身换弹，midspine 不跳变；扭转滑杆拖动时蒙皮随之变化。
 
 ---
+
+### Commit 8 — `feat(render): 游戏外观渲染模式`（P2）
+
+**改动**：
+- 视口新增"游戏外观"开关：体素以屏幕对齐方形绘制（固定像素尺寸，可调），先画放大的黑色描边层，再画本体；颜色做 HSB（饱和度 ×1.05、亮度 ×1.28），方块下半部 ×0.85。
+- 默认仍是现有 oriented cube 编辑视图。
+
+**验收**：vanilla 士兵与游戏内截图观感接近（颜色偏亮、黑描边）。
+
+---
+
+### Commit 9 — `docs: 架构与 README 更新`
+
+- `ARCHITECTURE.md` / `_EN.md`：§7「表驱动 lateral reference 蒙皮」改写为"引擎精确蒙皮 + 旧版规则"，补 stick 下标语义、粒子语义下标、bodyAreaHint 分层、控制 key 映射。
+- README 蒙皮小节同步。
 
 ## 实现顺序与依赖
 
-- Commit 1：独立。
-- Commit 2：独立（对话框先放占位按钮，commit 4 落地后再补功能）。
-- Commit 3：commit 4、5 的依赖。
-- Commit 4：依赖 3，复用 commit 2 的对话框。
-- Commit 5：依赖 3。
-- Commit 6：独立。
-- Commit 7：所有 feature commit 之后写。
+- Commit 1：独立，可先单独合入。
+- Commit 2 → 3 → 4：顺序依赖。
+- Commit 5、6：独立。
+- Commit 7：依赖 3（蒙皮）与 5（hint 语义）。
+- Commit 8：独立。
+- Commit 9：最后。
 
-建议按 1 → 3 → 2 → 4 → 5 → 6 → 7 实现（先把派生分类立起来，UI 跟上）。
+建议：1 → 2 → 3 →（用户游戏内 A/B 截图验证）→ 4 → 5 → 6 → 7 → 8 → 9。
+
+## 用户决定（2026-09-19）
+
+1. 引擎精确蒙皮设为默认，旧版查表 / 拓扑规则保留为可选。
+2. Commit 1–9 全部实施。
+3. 研究文档与复刻脚本不公开（`/docs/research` 已加入 .gitignore）。
 
 ## 不做的事 / 范围外
 
-- **不做 dummy stick 的数据 flag**（派生即可，避免一致性负担）
-- **不做自动合并 > 17 骨段**（语义不明确，让用户手动）
-- **不做 dummy stick 在动画文件里被特殊处理**（动画只关心粒子位置，dummy 粒子和普通粒子在 XML 里没区别）
-- **不做 dummy stick 模板预设**（先看 commit 4 够不够用）
-
+- 不复刻 Verlet 物理、布娃娃、脚底贴地等运行时行为（动画编辑用不到）。
+- 不追通道 1 由哪些动画驱动、点精灵随缩放的尺寸公式（尚未证实）。
+- 不改变 XML 格式与绑骨数据。
