@@ -15,7 +15,7 @@ The repository has two independent executable entry points:
 | `main.py` | `rwrsb_bind.exe` | Binding tool: edit the skeleton structure and voxel binding of voxel models |
 | `main_animation.py` | `rwrsb_anim.exe` | Animation tool: author keyframe animations for RWR soldier skeletons |
 
-Both entry points **share the same source modules** (`editor_state.py`, `ui_panels.py`, `renderer.py`, `camera.py`, `xml_io.py`, etc.). At startup each creates its own `EditorState` and `UIState` instances (stored in module-level globals `g_editor` / `g_ui`).
+Both entry points **share the same source modules** (`editor_state.py`, `ui_panels.py`, `renderer.py`, `camera.py`, `xml_io.py`, `engine_skin.py`, etc.). At startup each creates its own `EditorState` and `UIState` instances (stored in module-level globals `g_editor` / `g_ui`).
 
 The `UIState.app_mode` field (`"skeleton"` / `"animation"`) is the runtime dispatch key:
 - Panel rendering functions in `ui_panels.py` read this field to decide which panels and buttons to show.
@@ -83,6 +83,9 @@ The main loop structure is identical in both entry points (GLFW init → frame l
 | `_anim_undo_stack` | Animation-mode-specific undo stack |
 | `_anim_redo_stack` | Animation-mode-specific redo stack |
 | `_anim_reference_lengths` | Per-stick reference lengths recorded on entering animation mode (used by the stick length check) |
+| `composite_other_anim` / `composite_other_name` | Other-layer animation for the in-game composite preview (read-only preview, see §7) |
+| `composite_current_is_upper` | The edited animation acts as the upper-body layer (otherwise the lower-body layer) |
+| `composite_twist_deg` | Twist of the upper-body layer relative to the lower-body layer |
 
 ### Baseline pose
 | Field | Description |
@@ -103,8 +106,12 @@ The main loop structure is identical in both entry points (GLFW init → frame l
 |-------|-------------|
 | `gpu_dirty` | GPU render buffer needs to be rebuilt |
 | `skeleton_dirty` | Skeleton line data needs to be re-uploaded to the renderer |
-| `_voxel_local_offsets` | `{voxel_index: np.ndarray(3,)}` — fixed local-space offset of each bound voxel within its stick's coordinate frame (skinning bind pose) |
-| `_voxel_groups` | Skinning data pre-grouped by `constraint_index`; used by `update_voxel_positions_from_skeleton` |
+| `skinning_mode` | Skinning rule: `"engine"` (default, matches the game) / `"legacy_table"` / `"legacy_topology"`; switch via `set_skinning_mode` |
+| `skinning_fallback_reason` | Why the engine rule could not be built (empty = fine); `legacy_table` is in effect in that case |
+| `_engine_skin` | Bind data for the engine rule (`engine_skin.EngineSkinBinding`); built even without voxels because the rule inspector needs it |
+| `_engine_diag_*` | Rule-inspector cache: an engine bind built from the canonical skeleton when the preview uses a legacy rule, plus per-frame results |
+| `_voxel_local_offsets` | `{voxel_index: np.ndarray(3,)}` — legacy rules: fixed local-space offset of each bound voxel within its stick's coordinate frame (skinning bind pose) |
+| `_voxel_groups` | Legacy rules: skinning data pre-grouped by `constraint_index`; used by `update_voxel_positions_from_skeleton` |
 | `_bone_orientations` | `np.ndarray(MAX_BONE_SLOTS, 16)` — per-bone R_cube matrix (mat4 column-major), used for oriented voxel rendering. Slot 0 is the identity sentinel |
 | `_voxel_bone_indices` | `np.ndarray(N_voxels,)` — per-voxel bone slot index (bound voxel = ci+1, unbound = 0); used by the shader as a uniform array index |
 
@@ -180,14 +187,14 @@ Execution order:
 4. Set `animation_mode = True`, clear animation undo/redo stacks
 5. Choose the bind-pose source: prefer `_canonical_skeleton_pose`, fallback to `_particle_positions_before_anim` only if canonical data is unavailable
 6. If `_canonical_voxel_positions` exists and matches the current voxel count, restore `self.voxels` to canonical positions first so the previous animation's skinned voxel positions cannot contaminate local offsets
-7. Call `record_voxel_bind_pose()` with that bind pose
+7. Call `record_voxel_bind_pose()` with that bind pose (steps 5–7 live in `_rebind_from_canonical()`, reused when switching skinning rules). If the engine rule cannot be built it falls back to `legacy_table` and stores the reason in `skinning_fallback_reason`
 8. Call `_apply_frame_to_particles(0)` to set particle positions to frame 0
 9. Call `_record_reference_lengths()` to record per-stick reference lengths
 
 ### Exiting animation mode: `exit_animation_mode(force=False)`
 
 - If `_anim_dirty == True` and `force=False`, returns `"dirty_needs_confirmation"` — the UI layer shows a confirmation dialog.
-- Otherwise: restores particle positions from `_particle_positions_before_anim` and calls `update_voxel_positions_from_skeleton()` to return voxels to the bind pose.
+- Otherwise: turns off the composite preview first (so voxels are restored from the real pose), restores particle positions from `_particle_positions_before_anim` and calls `update_voxel_positions_from_skeleton()` to return voxels to the bind pose.
 
 ### Key distinction: skinning is only triggered in animation mode
 
@@ -204,6 +211,8 @@ Reason: In binding mode, voxels are the actual geometry — dragging a particle 
 Defined in `animation_io.py`. The RWR engine constraint for soldier animation is **exactly 17 sticks per frame**, NOT particle count. The engine does not enforce any particle count limit (15 particles is a vanilla humanoid skeleton convention, not a hard engine restriction). It also does not enforce connectivity or topology — isolated, unbound sticks load fine.
 
 Skeleton loading, frame editing, and XML export in the animation tool all depend on this constraint. A pre-flight dialog checks stick count before entering animation mode and guides the user to pad or prune as needed.
+
+Two more skinning-related limits (`engine_skin.py`): the game's bone-matrix array has 17 entries, so voxels may only be bound to sticks with index < 17; engine skinning reads particles by index up to 12, so with fewer than 13 particles the game will most likely fail when rendering (inferred, untested) — the tool falls back to the legacy rule and says so.
 
 ### constraintIndex == sticks list index
 
@@ -232,17 +241,38 @@ The RWR engine only enforces stick count = 17; topology is unrestricted. This en
 - **Pre-flight check**: A dialog appears before entering animation mode if stick count != 17, showing the delta and guiding the user (< 17: one-click pad, > 17: manual prune).
 - **Visual distinction**: Dummy sticks render in gray with reduced alpha in the 3D viewport; the bone panel has an independent dummy visibility toggle; the panel list marks dummies with `[D]` prefix and connected_unskinned sticks with `(unbound)`.
 
-### Table-driven lateral-reference skinning
+### Engine-exact skinning (default) and legacy rules
 
-Two-endpoint sticks do not have a third vector to define roll around their main axis. The generic "shortest bind→now rotation" algorithm (`_rotate_basis`) can leave unpredictable twist when such sticks become nearly vertical or change pose significantly.
+A two-endpoint stick has no third vector to define roll around its main axis, so the reference must come from elsewhere. Animation mode now uses `engine_skin.py`, which reproduces the game's approach (`skinning_mode == "engine"`), so the preview matches the game:
 
-Skinning now consults `_LATERAL_REF_RULES_BY_ID` / `_LATERAL_REF_RULES_BY_NAME` to decide whether a stick should build an orthonormal basis with a lateral reference. Id rules match first; name rules are the fallback for presets with non-vanilla ids. Rule types:
+- **Table keyed by stick index**: each stick's frame is decided by its index in the XML (0–16), with reference directions taken from a "body frame" built from fixed particle indices 1, 2, 3, 4, 5, 8, 9, 10, 11, 12 (hip line, pelvis normal, shoulder line, chest normal, upper-arm directions, thigh swing). Particle ids and names play no part. Index ≥ 17 uses the shortest arc from world +Z to the stick direction, with unconstrained roll.
+- **Origin is the stick's A particle**, scale is always 1: when a stick stretches, its voxels follow the A end instead of stretching.
+- **Forearms inherit the upper arm's frame**; the upper arms (indices 10, 12) take their orientation from particles 3→5 and 2→4, not from their own endpoints.
+- **Quaternion math follows OGRE 1.7**: `FromAxes` does not orthonormalize its input, so the quaternion may be non-unit and voxels deform slightly non-rigidly. The game really does this, so it is reproduced. About 0.8 ms per frame on the vanilla model.
+- When the prerequisites fail (fewer than 13 particles, missing endpoints, voxels bound to stick index ≥ 17) it falls back to `legacy_table`; the reason goes into `skinning_fallback_reason` and is shown in the status bar and when entering animation mode.
 
-- `"midspine_to_origin"`: used by hip / shoulder bridges. The reference vector is midspine relative to the bridge center.
-- `"shoulder_lateral"`: used by neck→head, elbow→hand, midspine/shoulder, and shoulder/neck upper-body sticks. The reference vector is the left-right shoulder line.
-- `"hip_lateral"`: used by hip→midspine and leg sticks. The reference vector is the left-right hip line.
+The two legacy rules stay available for comparison via the "Skinning" dropdown in the animation panel:
 
-The unified entry point is `_compute_body_bridge_frame()`: it looks up the lateral reference type, then calls `_basis_from_axis_and_reference()` to build the basis. Bind-time and now-time use the same rules, keeping the local↔world mapping self-consistent. If required reference particles are missing or a vector degenerates, it returns `None` and the caller falls back to the `_rotate_basis` shortest-rotation path.
+- `legacy_table`: `_LATERAL_REF_RULES_BY_ID` / `_LATERAL_REF_RULES_BY_NAME` look up rules by particle id / name (`midspine_to_origin` / `shoulder_lateral` / `hip_lateral`) and build a Gram-Schmidt basis with `_basis_from_axis_and_reference()`; unmatched sticks use `_rotate_basis` (shortest bind→now rotation, path-dependent); origin is the stick midpoint.
+- `legacy_topology`: the reference is the direction of the topological neighbour most perpendicular to the stick; the neighbour identity is fixed at bind time (sticks with no neighbour at bind time record `None` and never pick one at runtime).
+
+Across all vanilla animations, the median rotation difference between the legacy rules and the game is 33°–56° on upper arms, 71°–74° on forearms, 4°–10° on legs and about 8° on the shoulder/neck sticks.
+
+### Stick and particle order carry meaning
+
+Because the engine looks rules up by index, stick i of a custom (heterogeneous) skeleton gets vanilla stick i's rule, and particle indices 1, 2, 3, 4, 5, 8, 9, 10, 11, 12 are treated as fixed body reference points. The rule inspector in the animation tool's "Engine..." window lists each stick's rule and referenced particles and grades it by σmin (smallest singular value of the axes fed to the engine; near 0 means the reference is parallel to the stick and the voxels collapse or flip in game) and by distortion relative to the bind pose; thresholds (`engine_skin.SIGMA_*` / `DISTORTION_*`) are calibrated on vanilla animations. Structural checks (`engine_skin.static_warnings`) show in the binding tool's panel and in the engine view.
+
+### bodyAreaHint decides the upper/lower animation layer
+
+In game, particles with `bodyAreaHint == 2` belong to the upper-body layer: they turn with the aim direction, and while an upper-body animation plays (aiming, reloading...) their positions come from that animation, aligned at particle 8. Any other value is the lower-body layer, which turns with the movement direction. Running lets the upper body twist up to about 37° from the legs, walking about 60°. The binding tool edits the hint with a dropdown, and both tools can "Color by body layer".
+
+### Control keys
+
+The game recognizes only 14 keys (`animation_io.ENGINE_CONTROL_KEYS`); any other key is treated as `magazine`. `validate_animation()` also checks that the first keyframe is at 0 s (otherwise sampling before it makes the game log `CHECK: error in animation`) and each frame's position count. Results are warnings only and never block saving.
+
+### Composite preview is read-only: `display_positions()`
+
+The composite preview layers another animation and a twist angle over the animation being edited. `self.particles` always holds the edited pose; only the viewport skeleton, picking, skinning and the per-frame inspector use `display_positions()` / `display_particles()`. The edited data therefore cannot be polluted by the composite; to keep "what you see" and "what you edit" consistent, drags, gizmo edits and rotations are refused while the preview is on.
 
 ### stick.visible is not cloned — it goes through the visible_by_pair channel
 
@@ -289,7 +319,7 @@ Rule: **use `id` for anything that must be persisted to file or kept stable acro
 
 ---
 
-## 10. Selection Gizmo and Oriented Voxel Rendering (v1.1.0)
+## 10. Selection Gizmo, Oriented Voxels and Game-Look Rendering
 
 ### 10.1 Selection gizmo
 
@@ -348,6 +378,16 @@ vec3 world_pos = R * in_vert + i_pos;
 v_normal = R * in_normal;   // R is orthonormal; no inverse-transpose needed
 ```
 
-**Trigger**: animation mode only. `update_voxel_positions_from_skeleton` computes `R_cube` per stick and writes it into `_bone_orientations[ci+1]`. In binding mode all slots stay identity, voxel cubes remain axis-aligned, preserving historical behavior.
+**Trigger**: animation mode only. `update_voxel_positions_from_skeleton` computes `R_cube` per stick and writes it into `_bone_orientations[ci+1]`. Under the engine rule the matrix relative to bind may be non-rigid, so the slot receives its nearest rotation (polar decomposition) — voxel positions use the exact matrix while the cubes themselves are not sheared. In binding mode all slots stay identity, voxel cubes remain axis-aligned, preserving historical behavior.
 
 **Bone idx VBO upload timing**: only when bindings change (rebuilt inside `build_instance_arrays`). Each animation tick only uploads the orientations uniform.
+
+### 10.3 Game-look rendering
+
+In game, voxels are screen-aligned square point sprites with no orientation. "Game look" in the animation tool's "View..." popup reproduces this with [shaders/voxel_sprite.vert](../../shaders/voxel_sprite.vert) / `.frag`:
+
+- Reuses the same instance VBOs (read per vertex), draws `POINTS`, converts the voxel size to pixels through the projection (both perspective and ortho follow zoom); needs `set_sprite_camera(view, proj, viewport_h)`
+- Two passes: an outline pass at 4.2/2.6 times the size, pure black, pushed 1.5 voxels away along the view direction; then the body pass
+- Colors get the same adjustment the game applies when loading voxels: saturation ×1.05, brightness ×1.28; the lower half of each square ×0.85
+- `PROGRAM_POINT_SIZE` is disabled afterwards, otherwise the particle handles (whose shader does not write `gl_PointSize`) would have undefined size
+- No scene lighting or fog; original voxel colors are always used

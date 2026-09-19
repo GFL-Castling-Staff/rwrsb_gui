@@ -92,13 +92,14 @@ Click "Load Animation" in the toolbar → select `soldier_animations.xml` → ch
 
 **C. Custom Skeleton**
 
-Click "Open Skeleton" in the toolbar → select a custom skeleton XML (must have exactly 15 particles) → create or load an animation → edit → save.
+Click "Open Skeleton" in the toolbar → select a custom skeleton XML (must have exactly 17 sticks; at least 13 particles recommended) → create or load an animation → edit → save.
 
 You can also drag an XML file directly onto the window; the tool will automatically detect whether it is a skeleton file or an animation file.
 
 ### File Compatibility
 
 - Output XML is compatible with `soldier_animations.xml` and can be read directly by the RWR engine.
+- The `soldier_animations.xml` shipped with game 1.98.1 loads fine (it contains non-conforming `<!-- ---- -->` comments; the tool strips comments before parsing).
 - Animation XML exported by `rwrac.exe` can be loaded as input (note that rwrac's particle name fields usually have a `.dae` suffix; the animation data is usable, but any logic that depends on particle names will need to be corrected manually).
 
 ### Grid Snapping
@@ -112,9 +113,24 @@ The "Check stick lengths" checkbox in the lower-right of the animation panel ena
 ### Selection Gizmo / Skinning / Voxel Orientation
 
 - Selecting a particle shows a Blender-style 3-axis gizmo in the viewport: drag arrows to translate along an axis, drag rings to rotate around an axis (Ctrl for 15° snap), drag the center handle to translate freely. Ring rotation in both tools follows the toolbar pivot selector: active particle, selection centroid, or world origin. The Shift / Ctrl / Alt modifier-key axis lock still works as a shortcut when dragging particles directly.
-- Skinning: sticks that are prone to roll drift use table-driven lateral reference rules. Hip/shoulder bridges use midspine; neck/head, hand endpoints, chest/shoulder cross sticks, and leg sticks use shoulder or hip lateral lines as roll references so two-point sticks do not twist unpredictably around their main axis.
+- Skinning: the default "Engine-exact" rule matches the game — each stick's roll comes from a fixed table keyed by its index in the XML (0–16), with references taken from particles 1, 2, 3, 4, 5, 8, 9, 10, 11, 12; the origin is the stick's A particle; forearms inherit the upper arm's frame. **Particle and stick order carry meaning** — keep that in mind for custom skeletons. The older "table / topology" rules remain in the animation panel's "Skinning" dropdown for comparison; cases such as fewer than 13 particles fall back to the legacy rule automatically, with a notice.
 - Bind-pose stability: when animation mode records skinning local offsets, it prefers the canonical pose captured when the skeleton/model was loaded, and restores voxels to their canonical positions first. This prevents one animation's skinned voxel positions from contaminating the next animation switch.
 - Oriented voxel rendering: in animation mode each voxel cube's orientation rotates with its bone, eliminating the "staircase" silhouette at non-90° rotations. GPU data flows through a per-bone uniform — even 100k voxels only need 8 KB per frame.
+
+### Engine View (toolbar "Engine...")
+
+- **Structure checks**: fewer than 13 particles, voxels bound to stick index ≥ 17, upper-arm sticks whose endpoints differ from the particle pair the game takes their orientation from, no upper-body-layer particles, and so on.
+- **Per-stick rule inspector**: the game rule each stick gets, the particles it references, and whether the current frame is degenerate (a reference parallel to the stick makes the voxels collapse or flip in game) or distorted; "Scan whole animation" finds the worst moment and jumps there on click; flagged sticks can be highlighted orange / magenta in the viewport.
+- **Body layers**: the game uses `bodyAreaHint` to put each particle in a layer — `2` is the upper body (turns with the aim direction, replaced by upper-body animations such as reloading), anything else is the lower body (turns with the movement direction). Particles can be colored by layer; the binding tool's particle properties now use a dropdown for it.
+- **In-game composite preview (read-only)**: combines the current animation with another one into upper and lower body the way the game does (aligned at particle 8), with an upper-body twist slider (in game, up to about 37° while running, 60° while walking). Particles cannot be dragged during the preview, and the edited data is untouched.
+
+### Game Look
+
+"Game look (point sprites)" under "View..." draws voxels the way the game does: screen-facing squares with a black outline, brighter colors (saturation ×1.05, brightness ×1.28), and the lower half of each square darkened. Scene lighting and fog are not reproduced.
+
+### Animation Checks
+
+A `[!]` badge next to the frame counter warns when the first keyframe is not at 0 s, when a control key is unknown to the game (only 14 keys are recognized; anything else is treated as `magazine`), or when a frame's position count differs from the skeleton. Warnings never block saving.
 
 ### Planned
 
@@ -183,7 +199,8 @@ The project is still a flat Python tool repository. Runtime code lives in the re
 |------|----------------|
 | `main.py` | Binding tool entry point (`rwrsb_bind.exe`); GLFW loop, viewport input, voxel binding, bone-edit gizmo |
 | `main_animation.py` | Animation tool entry point (`rwrsb_anim.exe`); playback tick, keyframe editing, animation viewport interaction |
-| `editor_state.py` | Core state center; voxels / particles / sticks / bindings, undo/redo, presets, animation mode, skinning, canonical bind pose |
+| `editor_state.py` | Core state center; voxels / particles / sticks / bindings, undo/redo, presets, animation mode, skinning, canonical bind pose, rule inspector and composite preview |
+| `engine_skin.py` | Soldier voxel skinning that matches the game (table keyed by stick index, OGRE quaternion math), rule descriptions and structure checks; pure functions + numpy |
 | `ui_panels.py` | ImGui panels, popups, toolbar, bilingual text, toasts, gizmo pivot selector, animation timeline UI |
 | `renderer.py` | OpenGL rendering; voxels, skeleton, particles, grid, gizmo, oriented-voxel shader data upload |
 | `animation_io.py` | Soldier animation XML parsing, writing, indexing, interpolation, and `Animation` / `AnimationFrame` data classes |

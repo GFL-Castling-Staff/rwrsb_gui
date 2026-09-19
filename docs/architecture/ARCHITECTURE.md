@@ -15,7 +15,7 @@
 | `main.py` | `rwrsb_bind.exe` | 绑骨工具：编辑体素模型的骨架结构与绑定关系 |
 | `main_animation.py` | `rwrsb_anim.exe` | 动画工具：为 RWR soldier 骨架制作关键帧动画 |
 
-两个入口**共用同一套源码模块**（`editor_state.py`、`ui_panels.py`、`renderer.py`、`camera.py`、`xml_io.py` 等），启动时各自创建独立的 `EditorState` 和 `UIState` 实例（存入模块级全局变量 `g_editor` / `g_ui`）。
+两个入口**共用同一套源码模块**（`editor_state.py`、`ui_panels.py`、`renderer.py`、`camera.py`、`xml_io.py`、`engine_skin.py` 等），启动时各自创建独立的 `EditorState` 和 `UIState` 实例（存入模块级全局变量 `g_editor` / `g_ui`）。
 
 `UIState.app_mode` 字段（`"skeleton"` / `"animation"`）是运行时的分流键：
 - `ui_panels.py` 里的面板渲染函数会读这个字段决定显示哪些面板和按钮
@@ -85,6 +85,9 @@
 | `_anim_undo_stack` | 动画模式独立 undo 栈 |
 | `_anim_redo_stack` | 动画模式独立 redo 栈 |
 | `_anim_reference_lengths` | 进入动画模式时记录的各骨段参考长度（骨段长度检查用） |
+| `composite_other_anim` / `composite_other_name` | 游戏内合成预览的另一层动画（只读预览，见 §7） |
+| `composite_current_is_upper` | 当前编辑的动画作为上半身层（否则作为下半身层） |
+| `composite_twist_deg` | 上半身层相对下半身层的扭转角 |
 
 ### baseline pose
 | 字段 | 说明 |
@@ -105,8 +108,12 @@
 |------|------|
 | `gpu_dirty` | GPU 渲染缓冲区需要重建 |
 | `skeleton_dirty` | 骨架线段数据需要重传给 renderer |
-| `_voxel_local_offsets` | `{voxel_index: np.ndarray(3,)}`，每个绑定体素在其骨段局部坐标系里的固定偏移（蒙皮 bind pose） |
-| `_voxel_groups` | 按 constraint_index 预分组的蒙皮数据，`update_voxel_positions_from_skeleton` 使用 |
+| `skinning_mode` | 蒙皮规则：`"engine"`（默认，与游戏一致）/ `"legacy_table"` / `"legacy_topology"`，切换走 `set_skinning_mode` |
+| `skinning_fallback_reason` | engine 规则建不起来时的原因（空串 = 正常）；此时实际生效的是 `legacy_table` |
+| `_engine_skin` | engine 规则的 bind 数据（`engine_skin.EngineSkinBinding`），无体素时也会建，供规则体检使用 |
+| `_engine_diag_*` | 规则体检缓存：预览用旧版规则时按 canonical 骨架另建的引擎 bind，以及逐帧结果 |
+| `_voxel_local_offsets` | `{voxel_index: np.ndarray(3,)}`，旧版规则下每个绑定体素在其骨段局部坐标系里的固定偏移（蒙皮 bind pose） |
+| `_voxel_groups` | 旧版规则按 constraint_index 预分组的蒙皮数据，`update_voxel_positions_from_skeleton` 使用 |
 | `_bone_orientations` | `np.ndarray(MAX_BONE_SLOTS, 16)`，每根骨段的 R_cube 矩阵（mat4 列优先），用于 oriented voxel 渲染。槽 0 为 identity 哨位 |
 | `_voxel_bone_indices` | `np.ndarray(N_voxels,)`，每个体素的骨段下标（绑定 voxel = ci+1，未绑定 = 0）；shader 用作 uniform 数组下标 |
 
@@ -182,14 +189,14 @@ particles ──── sticks ──── bindings
 4. 设 `animation_mode = True`，清空动画 undo/redo 栈
 5. 选择 bind pose 来源：优先 `_canonical_skeleton_pose`，缺失时才 fallback 到 `_particle_positions_before_anim`
 6. 若 `_canonical_voxel_positions` 与当前 voxel 数量匹配，先把 `self.voxels` 还原到 canonical 位置，避免上一段动画的蒙皮结果污染 local offsets
-7. 用上述 bind pose 调用 `record_voxel_bind_pose()`
+7. 用上述 bind pose 调用 `record_voxel_bind_pose()`（第 5–7 步封装在 `_rebind_from_canonical()`，切换蒙皮规则时复用）。engine 规则建不起来时自动落回 `legacy_table`，原因写入 `skinning_fallback_reason`
 8. 调用 `_apply_frame_to_particles(0)` 把 particle 位置设为第 0 帧
 9. 调用 `_record_reference_lengths()` 记录各骨段参考长度
 
 ### 退出动画模式：`exit_animation_mode(force=False)`
 
 - 若 `_anim_dirty == True` 且 `force=False`，返回 `"dirty_needs_confirmation"`，UI 层弹确认对话框
-- 否则：恢复 `_particle_positions_before_anim` 里的 particle 位置，调用 `update_voxel_positions_from_skeleton()` 把体素归位到 bind pose
+- 否则：先关掉合成预览（否则归位时会按合成姿态算），再恢复 `_particle_positions_before_anim` 里的 particle 位置，调用 `update_voxel_positions_from_skeleton()` 把体素归位到 bind pose
 
 ### 关键区别：蒙皮只在动画模式下触发
 
@@ -206,6 +213,8 @@ particles ──── sticks ──── bindings
 定义在 `animation_io.py`。RWR 引擎的 soldier animation 约束是**每帧骨段数必须正好 17**，不校验粒子数（15 粒子是 vanilla 人形骨架的惯例，并非引擎硬限制）。引擎不限骨架拓扑和连通性——孤立的、无绑定的骨段也能正常载入。
 
 动画工具的骨架加载、帧编辑、XML 导出全部依赖此约束。进入动画模式前会自动检查骨段数并弹出对话框引导补足或删减。
+
+另外两条与蒙皮相关的限制（`engine_skin.py`）：游戏的骨骼矩阵数组长度是 17，体素只能绑在下标 < 17 的骨段上；引擎蒙皮按下标读取到粒子 12，粒子少于 13 个时游戏大概率在渲染时出错（推断，未实测），工具在这种情况下落回旧版规则并提示。
 
 ### constraintIndex == sticks 列表下标
 
@@ -234,17 +243,38 @@ RWR 引擎只校验骨段数 = 17，不限制骨架拓扑。这一特性支持**
 - **进入动画模式前检查**：若骨段数 != 17，弹出对话框显示差额并引导用户操作（< 17 一键补足，> 17 手动删减）。
 - **视觉区分**：dummy stick 在 3D 视口以灰色半透明渲染；骨段面板可独立控制 dummy 可见性；面板列表中以 `[D]` 前缀标记 dummy，以 `(未绑定)` 标记 connected_unskinned。
 
-### 表驱动 lateral reference 蒙皮
+### 引擎精确蒙皮（默认）与旧版规则
 
-只有两个端点的骨段没有第三向量定义绕主轴的 roll。普通的"bind→now 最短旋转"算法（`_rotate_basis`）在这类骨段接近垂直或姿态大幅变化时会留下不可预测的扭转。
+只有两个端点的骨段没有第三向量定义绕主轴的 roll，必须从别处取参考方向。动画模式默认用 `engine_skin.py` 复刻游戏的做法（`skinning_mode == "engine"`），预览与游戏一致：
 
-现在蒙皮通过 `_LATERAL_REF_RULES_BY_ID` / `_LATERAL_REF_RULES_BY_NAME` 查表决定是否为某根 stick 构造带横向参考的正交基。id 优先匹配，name 兜底覆盖非 vanilla id 的预设。规则类型：
+- **按 stick 下标查表**：每根骨段的坐标系由它在 XML 里的下标（0–16）决定，参考方向取自固定粒子下标 1、2、3、4、5、8、9、10、11、12 组成的"身体参考系"（胯线、骨盆法向、肩线、胸廓法向、上臂方向、大腿外摆）。与粒子 id、名字无关。下标 ≥ 17 用世界 +Z 到骨段方向的最短弧，roll 无约束。
+- **原点取 stick 的 a 端粒子**，缩放恒为 1：骨段拉长时体素跟着 a 端走，不被拉伸。
+- **前臂继承上臂坐标系**；上臂（下标 10、12）的朝向取自粒子 3→5、2→4，不看本骨段端点。
+- **四元数运算沿用 OGRE 1.7**：`FromAxes` 不正交化输入，结果四元数可能非单位，体素会有轻度非刚性变形——这是游戏里真实存在的效果，照样复刻。每帧开销约 0.8 ms（vanilla 模型）。
+- 前提不满足（粒子 < 13、端点缺失、体素绑在下标 ≥ 17 的骨段）时自动落回 `legacy_table`，原因记在 `skinning_fallback_reason`，状态栏与进入动画时都有提示。
 
-- `"midspine_to_origin"`：用于 hip / shoulder bridge。参考向量取 midspine 相对桥中心的方向。
-- `"shoulder_lateral"`：用于 neck→head、elbow→hand、midspine/shoulder 和 shoulder/neck 等上半身骨段。参考向量取左右肩连线。
-- `"hip_lateral"`：用于 hip→midspine 和腿部骨段。参考向量取左右胯连线。
+旧版两种规则保留作对比，在动画面板的「蒙皮规则」下拉里切换：
 
-统一入口是 `_compute_body_bridge_frame()`：先查表得到 lateral reference 类型，再用 `_basis_from_axis_and_reference()` 构造正交基。bind 时和 now 时使用同一套规则，local↔world 映射自洽；如果缺少关键参考粒子或长度退化，则返回 `None`，调用方落回 `_rotate_basis` 最短旋转路径。
+- `legacy_table`：`_LATERAL_REF_RULES_BY_ID` / `_LATERAL_REF_RULES_BY_NAME` 按粒子 id / name 查表（`midspine_to_origin` / `shoulder_lateral` / `hip_lateral`），用 `_basis_from_axis_and_reference()` 做 Gram-Schmidt；未命中的骨段走 `_rotate_basis`（bind→now 最短旋转，路径依赖）；原点取中点。
+- `legacy_topology`：用拓扑邻居中"最垂直于本骨段"的骨段方向作参考，邻居身份 bind 时固化（bind 时选不出邻居的骨段记 `None`，运行时不再改选）。
+
+在 vanilla 全部动画上，旧版规则与游戏的旋转差中位数：上臂 33°–56°、前臂 71°–74°、腿 4°–10°、肩颈约 8°。
+
+### stick 与粒子的顺序有语义
+
+因为引擎按下标查表，自定义骨架（异形骨）的第 i 根 stick 会拿到 vanilla 第 i 根的规则，粒子下标 1、2、3、4、5、8、9、10、11、12 也被当作固定的身体参考点。动画工具「引擎...」窗口里的规则体检会逐骨段列出所套规则、引用粒子，并按 σmin（传给引擎的坐标轴最小奇异值，接近 0 = 参考方向与骨段平行，游戏里会塌缩或翻转）和相对 bind 的畸变打分；阈值（`engine_skin.SIGMA_*` / `DISTORTION_*`）按 vanilla 动画标定。结构检查（`engine_skin.static_warnings`）见绑骨工具面板和引擎视图。
+
+### bodyAreaHint 决定上下半身动画层
+
+游戏里 `bodyAreaHint == 2` 的粒子属于上半身层：跟瞄准方向转；播放上半身动画（瞄准、换弹等）时，位置取自该动画并以粒子 8 对齐。其它值属于下半身层：跟移动方向转。奔跑时上身相对腿部最多扭约 37°，走路约 60°。绑骨工具的粒子属性用下拉框编辑它，两个工具都可以「按上下半身层着色」。
+
+### control key
+
+游戏只认 14 个 key（`animation_io.ENGINE_CONTROL_KEYS`），其它任何 key 都被当作 `magazine`。`validate_animation()` 还会检查第一帧是否在 0 秒（否则游戏在它之前采样会记 `CHECK: error in animation`）和每帧 position 数；结果只提示、不阻断保存。
+
+### 合成预览只读：`display_positions()`
+
+合成预览把另一层动画和扭转角叠到正在编辑的动画上。`self.particles` 始终是正在编辑的姿态；只有视口骨架、拾取、蒙皮和逐帧体检改用 `display_positions()` / `display_particles()`。这样编辑数据不可能被合成结果污染；为避免"看到的"和"改到的"不一致，预览期间拖动、gizmo 与旋转操作被拒。
 
 ### stick.visible 不进 clone，走 visible_by_pair 通道
 
@@ -291,7 +321,7 @@ particle 有两种"编号"，语义和用途不同：
 
 ---
 
-## 10. 选区 gizmo 与 oriented voxel rendering（v1.1.0）
+## 10. 选区 gizmo、oriented voxel 与游戏外观渲染
 
 ### 10.1 选区 gizmo
 
@@ -350,6 +380,16 @@ vec3 world_pos = R * in_vert + i_pos;
 v_normal = R * in_normal;   // R 正交，无需逆转置
 ```
 
-**触发**：仅动画模式。`update_voxel_positions_from_skeleton` 内每根骨段算 R_cube 后写入 `_bone_orientations[ci+1]`。绑骨模式下所有槽保持 identity，cube axis-aligned 兼容历史行为。
+**触发**：仅动画模式。`update_voxel_positions_from_skeleton` 内每根骨段算 R_cube 后写入 `_bone_orientations[ci+1]`。engine 规则下相对 bind 的矩阵可能非刚性，写入的是它的极分解最近旋转——体素位置用精确矩阵，立方体本身不被剪切。绑骨模式下所有槽保持 identity，cube axis-aligned 兼容历史行为。
 
 **bone idx VBO 重传时机**：仅 bindings 变化时（在 `build_instance_arrays` 内重建）。每帧动画 tick 只上传 orientations uniform。
+
+### 10.3 游戏外观渲染
+
+游戏里体素是屏幕对齐的方形点精灵，没有朝向。动画工具「视图...」里的「游戏外观」用 [shaders/voxel_sprite.vert](../../shaders/voxel_sprite.vert) / `.frag` 复刻：
+
+- 复用同一组实例 VBO（逐顶点读），`POINTS` 绘制，点径按投影换算成像素（透视 / 正交都随缩放变化），需要 `set_sprite_camera(view, proj, viewport_h)`
+- 两遍：描边层点径为本体的 4.2/2.6 倍、纯黑、沿视线往远处推 1.5 体素；再画本体
+- 颜色按游戏加载体素时的调整：饱和度 ×1.05、亮度 ×1.28；方块下半部 ×0.85
+- 画完关掉 `PROGRAM_POINT_SIZE`，否则粒子把手（着色器不写 `gl_PointSize`）尺寸未定义
+- 不含场景光照与雾；开启时固定用体素原色
