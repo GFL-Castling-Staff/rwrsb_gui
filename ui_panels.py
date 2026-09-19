@@ -322,6 +322,13 @@ _TEXT = {
         "composite_readonly": "Composite preview is on (read-only). Turn it off in the Engine window to edit.",
         "composite_status": "Composite preview (read-only)",
         "composite_load_failed": "Cannot use this animation: {error}",
+        # 游戏外观渲染
+        "game_look": "Game look (point sprites)",
+        "game_look_tip": ("Draw voxels the way the game does: screen-facing squares (voxels have no orientation in\n"
+                          "game) over a larger black outline pass, colors brightened (saturation x1.05, brightness\n"
+                          "x1.28) and the lower half of each square darkened to 85%. Scene lighting and fog are not\n"
+                          "reproduced."),
+        "game_look_size": "Sprite size (voxels)##game_look_size",
         "grid_btn": "Grid...",
         "grid_popup_title": "Grid options",
         "settings_btn": "View...",
@@ -762,6 +769,12 @@ _TEXT = {
         "composite_readonly": "合成预览中（只读）。要编辑请先在「引擎...」窗口关闭合成预览。",
         "composite_status": "合成预览（只读）",
         "composite_load_failed": "无法使用这个动画：{error}",
+        # 游戏外观渲染
+        "game_look": "游戏外观（点精灵）",
+        "game_look_tip": ("按游戏的方式画体素：屏幕对齐的方块（游戏里体素没有朝向），底下先画一层放大的黑色描边；\n"
+                          "颜色做游戏同样的调整（饱和度 ×1.05、亮度 ×1.28），每个方块下半部压暗到 85%。\n"
+                          "不含场景光照与雾。"),
+        "game_look_size": "精灵大小（体素）##game_look_size",
         "grid_btn": "网格...",
         "grid_popup_title": "网格选项",
         "settings_btn": "视图...",
@@ -1055,6 +1068,9 @@ class UIState:
         self._engine_scan = None        # editor_state.engine_scan_animation() 的结果
         self._engine_scan_sig = None    # 扫描时的动画签名，改动后提示重扫
         self._composite_doc = None      # 合成预览：正在挑选另一层动画的文件索引
+        # 游戏外观渲染（动画工具）：点精灵 + 黑描边 + 游戏配色
+        self.game_look = False
+        self.game_look_size = 1.0
         self._composite_filter = ""
 
     def push_toast(self, message: str, level: str = "info",
@@ -2786,6 +2802,14 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
             ui_state.show_voxel_original_colors)
         if chg_oc:
             ui_state.show_voxel_original_colors = v_oc
+        _, ui_state.game_look = imgui.checkbox(
+            tr(ui_state, "game_look") + "##anim_game_look", ui_state.game_look)
+        if imgui.is_item_hovered():
+            imgui.set_tooltip(tr(ui_state, "game_look_tip"))
+        if ui_state.game_look:
+            imgui.set_next_item_width(160)
+            _, ui_state.game_look_size = imgui.slider_float(
+                tr(ui_state, "game_look_size"), ui_state.game_look_size, 0.5, 2.0, "%.2f")
         imgui.separator()
         imgui.text_disabled(tr(ui_state, "tip_axis"))
         imgui.end_popup()

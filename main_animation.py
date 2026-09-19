@@ -937,7 +937,8 @@ def main():
             # voxel GPU buffer 更新
             if g_editor.voxels and g_renderer is not None:
                 global g_voxel_color_mode_cache
-                _color_mode = g_ui.show_voxel_original_colors
+                # 游戏外观总是用体素原色
+                _color_mode = g_ui.show_voxel_original_colors or g_ui.game_look
                 _color_mode_changed = (_color_mode != g_voxel_color_mode_cache)
                 if _color_mode_changed:
                     g_voxel_color_mode_cache = _color_mode
@@ -1038,6 +1039,11 @@ def main():
                 )
                 g_camera.resize(vp_w, vp_h)
                 mvp = g_camera.get_mvp()
+                g_renderer.game_look = g_ui.game_look
+                g_renderer.game_look_size = g_ui.game_look_size
+                if g_ui.game_look:
+                    g_renderer.set_sprite_camera(g_camera.get_view_matrix(),
+                                                 g_camera.get_proj_matrix(), vp_h * scale_y)
                 # active 粒子单独用青色渲染，从 selected 列表中排除避免颜色叠加
                 act = g_editor.active_particle_idx
                 g_renderer.highlight_active_particle_idx = act

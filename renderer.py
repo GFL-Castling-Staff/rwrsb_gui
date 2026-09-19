@@ -106,6 +106,17 @@ class VoxelRenderer:
         line_frag = (shader_dir / "line.frag").read_text(encoding="utf-8")
         self.line_prog = ctx.program(vertex_shader=line_vert, fragment_shader=line_frag)
 
+        # 游戏外观：体素画成屏幕对齐的点精灵 + 黑色描边层（与游戏的体素渲染一致）
+        sprite_vert = (shader_dir / "voxel_sprite.vert").read_text(encoding="utf-8")
+        sprite_frag = (shader_dir / "voxel_sprite.frag").read_text(encoding="utf-8")
+        self.sprite_prog = ctx.program(vertex_shader=sprite_vert, fragment_shader=sprite_frag)
+        self.sprite_vao = None
+        self.game_look = False
+        self.game_look_size = 1.0          # 精灵边长（体素）
+        self._sprite_view = np.eye(4, dtype=np.float32)
+        self._sprite_proj = np.eye(4, dtype=np.float32)
+        self._sprite_viewport_h = 1.0
+
         self.cube_vbo = ctx.buffer(_make_cube_vbo().tobytes())
 
         self.inst_pos_vbo = None
@@ -207,6 +218,17 @@ class VoxelRenderer:
     def _rebuild_vao(self):
         if self.vao:
             self.vao.release()
+        if self.sprite_vao:
+            self.sprite_vao.release()
+        # 点精灵复用同一组实例 VBO，按逐顶点属性读（每个体素一个点）
+        self.sprite_vao = self.ctx.vertex_array(
+            self.sprite_prog,
+            [
+                (self.inst_pos_vbo, "3f", "i_pos"),
+                (self.inst_color_vbo, "4f", "i_color"),
+                (self.inst_sel_vbo, "1f", "i_selected"),
+            ],
+        )
         self.vao = self.ctx.vertex_array(
             self.prog,
             [
@@ -738,7 +760,10 @@ class VoxelRenderer:
             self.ctx.enable(moderngl.DEPTH_TEST)
             self.ctx.disable(moderngl.CULL_FACE)
             self.ctx.disable(moderngl.BLEND)
-            self.vao.render(moderngl.TRIANGLES, instances=self.n_voxels)
+            if self.game_look and self.sprite_vao is not None:
+                self._render_sprites()
+            else:
+                self.vao.render(moderngl.TRIANGLES, instances=self.n_voxels)
 
         if self.show_skeleton and self.n_lines > 0 and self.line_vao:
             self.line_prog["u_mvp"].write(mvp_bytes)
@@ -865,8 +890,31 @@ class VoxelRenderer:
             self.ctx.disable(moderngl.BLEND)
             self.ctx.enable(moderngl.DEPTH_TEST)
 
+    def set_sprite_camera(self, view, proj, viewport_h_px):
+        """游戏外观需要分开的 view / proj（描边层沿视线后推）和视口像素高度（精灵尺寸）。"""
+        self._sprite_view = np.asarray(view, dtype=np.float32)
+        self._sprite_proj = np.asarray(proj, dtype=np.float32)
+        self._sprite_viewport_h = float(max(viewport_h_px, 1))
+
+    def _render_sprites(self):
+        prog = self.sprite_prog
+        prog["u_view"].write(self._sprite_view.T.tobytes())
+        prog["u_proj"].write(self._sprite_proj.T.tobytes())
+        prog["u_point_scale"].value = 0.5 * self._sprite_viewport_h * float(self._sprite_proj[1, 1])
+        prog["u_outline_push"].value = 1.5
+        self.ctx.enable(moderngl.PROGRAM_POINT_SIZE)
+        # 游戏：描边层点径 4.2、本体 2.6（像素，约等于一个体素宽）
+        for outline, size_mult in ((1.0, 4.2 / 2.6), (0.0, 1.0)):
+            prog["u_outline"].value = outline
+            prog["u_sprite_size"].value = float(self.game_look_size) * size_mult
+            self.sprite_vao.render(moderngl.POINTS, vertices=self.n_voxels)
+        # 其它点（粒子把手）用 ctx.point_size，关掉以免着色器没写 gl_PointSize 时尺寸未定义
+        self.ctx.disable(moderngl.PROGRAM_POINT_SIZE)
+
     def release(self):
         for obj in [
+            self.sprite_vao,
+            self.sprite_prog,
             self.cube_vbo,
             self.inst_pos_vbo,
             self.inst_color_vbo,
