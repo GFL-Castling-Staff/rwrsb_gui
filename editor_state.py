@@ -122,7 +122,8 @@ class EditorState:
     渲染同步
         gpu_dirty                            — GPU 缓冲区需重建
         skeleton_dirty                       — 骨架线段需重传给 renderer
-        _voxel_local_offsets, _voxel_groups  — 蒙皮 bind pose 数据
+        _voxel_local_offsets, _voxel_groups  — 旧版规则的蒙皮 bind pose 数据
+        _engine_skin                         — 引擎规则的 bind 数据（skinning_mode 见 set_skinning_mode）
     """
     def __init__(self):
         self.voxels = []
@@ -177,10 +178,19 @@ class EditorState:
         # 5b：各 stick 的参考长度（进入动画模式时记录）
         self._anim_reference_lengths = {}
 
-        # 全局蒙皮规则开关：True 时 _compute_body_bridge_frame 跳过 vanilla 硬编码表，
+        # 蒙皮规则（切换走 set_skinning_mode，会重录 bind pose）：
+        #   "engine"          — 与游戏一致（engine_skin.py），默认
+        #   "legacy_table"    — 旧版：按 vanilla 粒子 id/name 查 lateral 规则表
+        #   "legacy_topology" — 旧版：拓扑邻居作 lateral 参考
+        self.skinning_mode = "engine"
+        # engine 模式建不起来时的原因（空串 = 正常）；此时实际落回 legacy_table
+        self.skinning_fallback_reason = ""
+        self._engine_skin = None  # engine_skin.EngineSkinBinding | None
+
+        # 旧版全局蒙皮规则开关（由 skinning_mode 派生，legacy_topology 时为 True）：
+        # True 时 _compute_body_bridge_frame 跳过 vanilla 硬编码表，
         # 改用拓扑邻居中"最垂直于本骨段方向"的 stick 主轴作为 lateral 参考。
         # 孤立骨段（无邻居）自然落回 _compute_stick_frame 默认世界轴。
-        # 切换值时调用方需重录 bind pose（set_use_global_lateral_ref 已封装）。
         self.use_global_lateral_ref = False
 
         # 全局规则缓存：ci → frozenset({neighbor_a_id, neighbor_b_id})。
@@ -1383,22 +1393,8 @@ class EditorState:
         # 蒙皮：bind pose 用 canonical 状态（加载 skeleton 时快照的 T-pose particles
         # + 原始 voxels），与"当前动画状态"完全解耦。两个都从 canonical 取避免
         # 上一个动画的 skinning 残留污染 local_offsets。
-        bind_source = (self._canonical_skeleton_pose
-                       if self._canonical_skeleton_pose is not None
-                       else self._particle_positions_before_anim)
-        if self.voxels and self.bindings and bind_source:
-            # 还原 voxels 到 canonical（如果有）：上一个动画 skinning 把 self.voxels
-            # 改到了非 T 位置，这里整体替换回出厂位置以便正确录 local_offsets。
-            if (self._canonical_voxel_positions is not None
-                    and len(self._canonical_voxel_positions) == len(self.voxels)):
-                self.voxels = list(self._canonical_voxel_positions)
-            still_particles = []
-            for i, (x, y, z) in enumerate(bind_source):
-                if i < len(self.particles):
-                    p = dict(self.particles[i])
-                    p["x"], p["y"], p["z"] = x, y, z
-                    still_particles.append(p)
-            self.record_voxel_bind_pose(particle_positions=still_particles)
+        # 无体素时也要录：引擎规则体检需要每根 stick 的 bind 坐标系
+        self._rebind_from_canonical()
 
         # 视觉上 particle 位置变成第 0 帧
         self._apply_frame_to_particles(0)
@@ -1773,6 +1769,7 @@ class EditorState:
         self.selected_voxels = set()
         self._voxel_local_offsets = {}
         self._voxel_groups = {}
+        self._engine_skin = None
         self.gpu_dirty = True
 
     def _compute_stick_frame(self, particle_a, particle_b):
@@ -1989,38 +1986,62 @@ class EditorState:
         R = self._basis_from_axis_and_reference(u, ref)
         return origin, R, u
 
-    def set_use_global_lateral_ref(self, value: bool):
-        """切换全局蒙皮规则开关，并重录 bind pose 与刷新 voxel 位置。
+    SKINNING_MODES = ("engine", "legacy_table", "legacy_topology")
 
-        切换规则后，bind 时使用的 lateral 参考变了，旧的 _voxel_local_offsets
-        是按旧规则记录的，必须重录；否则下一帧会"用旧 bind 配新 now"导致体素跳变。
+    def set_skinning_mode(self, mode):
+        """切换蒙皮规则，并重录 bind pose 与刷新 voxel 位置。
+
+        切换规则后 bind 时用的参考变了，旧的局部偏移按旧规则记录，必须重录；
+        否则下一帧会"用旧 bind 配新 now"导致体素跳变。
         """
-        new_v = bool(value)
-        if new_v == self.use_global_lateral_ref:
+        if mode not in self.SKINNING_MODES:
+            raise ValueError(f"未知蒙皮规则: {mode}")
+        if mode == self.skinning_mode:
             return
-        self.use_global_lateral_ref = new_v
-        if not (self.animation_mode and self.voxels and self.bindings):
+        self.skinning_mode = mode
+        self.use_global_lateral_ref = (mode == "legacy_topology")
+        if not self.animation_mode:
             return
-        # 用 canonical pose 重录 bind（与 enter_animation_mode 同源）
-        bind_source = (self._canonical_skeleton_pose
-                       if self._canonical_skeleton_pose is not None
-                       else self._particle_positions_before_anim)
-        if bind_source:
-            still_particles = []
-            for i, (x, y, z) in enumerate(bind_source):
-                if i < len(self.particles):
-                    p = dict(self.particles[i])
-                    p["x"], p["y"], p["z"] = x, y, z
-                    still_particles.append(p)
-            if (self._canonical_voxel_positions is not None
-                    and len(self._canonical_voxel_positions) == len(self.voxels)):
-                self.voxels = list(self._canonical_voxel_positions)
-            self.record_voxel_bind_pose(particle_positions=still_particles)
-        else:
-            self.record_voxel_bind_pose()
+        self._rebind_from_canonical()
         # 把当前帧的蒙皮按新规则刷一遍
         self.update_voxel_positions_from_skeleton()
         self.gpu_dirty = True
+
+    def set_use_global_lateral_ref(self, value: bool):
+        """旧接口：在两种旧版规则之间切换。"""
+        self.set_skinning_mode("legacy_topology" if value else "legacy_table")
+
+    def effective_skinning_mode(self):
+        """实际生效的规则：engine 建不起来时是 legacy_table。"""
+        if self.skinning_mode == "engine":
+            return "engine" if self._engine_skin is not None else "legacy_table"
+        return self.skinning_mode
+
+    def has_skin_binding(self):
+        """是否已有可用于蒙皮的 bind 数据（任一规则）。"""
+        if self._engine_skin is not None:
+            return bool(self._engine_skin.groups)
+        return bool(self._voxel_groups)
+
+    def _rebind_from_canonical(self):
+        """用 canonical pose 重录 bind（与 enter_animation_mode 同源）。"""
+        bind_source = (self._canonical_skeleton_pose
+                       if self._canonical_skeleton_pose is not None
+                       else self._particle_positions_before_anim)
+        if not bind_source:
+            self.record_voxel_bind_pose()
+            return
+        # 上一个动画的蒙皮把 self.voxels 改到了非 bind 位置，先整体换回出厂位置
+        if (self._canonical_voxel_positions is not None
+                and len(self._canonical_voxel_positions) == len(self.voxels)):
+            self.voxels = list(self._canonical_voxel_positions)
+        still_particles = []
+        for i, (x, y, z) in enumerate(bind_source):
+            if i < len(self.particles):
+                p = dict(self.particles[i])
+                p["x"], p["y"], p["z"] = x, y, z
+                still_particles.append(p)
+        self.record_voxel_bind_pose(particle_positions=still_particles)
 
     def _compute_global_lateral_frame(self, stick, id_to_p, ci=None):
         """拓扑全局规则：用共享端点的邻居 stick 中"最垂直于本骨段"的方向作为 lateral 参考。
@@ -2157,12 +2178,24 @@ class EditorState:
         self._voxel_groups = {}
         # 清空全局规则的邻居缓存：bind 时重新挑选邻居身份
         self._global_lateral_neighbors = {}
-        if not self.voxels or not self.bindings:
-            return
+        self._engine_skin = None
+        self.skinning_fallback_reason = ""
 
         particles = particle_positions if particle_positions is not None else self.particles
         if particle_positions is not None and len(particle_positions) != len(self.particles):
             particles = self.particles
+
+        if self.skinning_mode == "engine":
+            # 引擎规则不依赖体素，无体素时也建（体检要用每根 stick 的 bind 坐标系）
+            try:
+                self._engine_skin = self._build_engine_skin(particles)
+                return
+            except Exception as exc:
+                self.skinning_fallback_reason = str(exc)
+                logger.info("engine skinning unavailable, fall back to legacy table: %s", exc)
+
+        if not self.voxels or not self.bindings:
+            return
 
         id_to_p = {int(p["id"]): p for p in particles}
 
@@ -2213,13 +2246,65 @@ class EditorState:
             _origin, R_bind, u_bind = stick_frames[ci]
             self._voxel_groups[ci] = (vis, locals_arr, u_bind, R_bind)
 
+    def _stick_index_pairs(self, particles):
+        """按 stick 顺序返回 (a 粒子下标, b 粒子下标)；端点缺失时抛 EngineSkinUnavailable。"""
+        from engine_skin import EngineSkinUnavailable
+        id_to_idx = {int(p["id"]): i for i, p in enumerate(particles)}
+        pairs = []
+        for ci, s in enumerate(self.sticks):
+            a = id_to_idx.get(int(s.particle_a_id))
+            b = id_to_idx.get(int(s.particle_b_id))
+            if a is None or b is None:
+                raise EngineSkinUnavailable(f"stick {ci} 的端点粒子不存在")
+            pairs.append((a, b))
+        return pairs
+
+    def _build_engine_skin(self, particles):
+        from engine_skin import EngineSkinBinding, EngineSkinUnavailable, MAX_GPU_STICKS
+        over = sorted({ci for ci in self.bindings.values() if ci >= MAX_GPU_STICKS})
+        if over:
+            raise EngineSkinUnavailable(
+                f"有体素绑在下标 ≥ {MAX_GPU_STICKS} 的 stick 上（{over}），游戏无法渲染")
+        positions = [(float(p["x"]), float(p["y"]), float(p["z"])) for p in particles]
+        voxels_xyz = [v[:3] for v in self.voxels] if self.voxels else []
+        return EngineSkinBinding(positions, self._stick_index_pairs(particles),
+                                 voxels_xyz, self.bindings)
+
+    def _update_voxels_engine(self):
+        from engine_skin import nearest_rotation
+        skin = self._engine_skin
+        if len(self.particles) != skin.n_particles:
+            return
+        P = np.array([(p["x"], p["y"], p["z"]) for p in self.particles], dtype=np.float64)
+        worlds, deltas = skin.pose(P)
+        if not worlds:
+            return
+        self._ensure_bone_orientation_arrays()
+        voxels = self.voxels
+        for ci, (vis, pos) in worlds.items():
+            for k, vi in enumerate(vis.tolist()):
+                old = voxels[vi]
+                voxels[vi] = (float(pos[k, 0]), float(pos[k, 1]), float(pos[k, 2]),
+                              old[3], old[4], old[5], old[6])
+            # 体素立方体朝向：引擎矩阵可能非刚性，立方体只取最近旋转，避免被剪切
+            slot = ci + 1
+            if 0 < slot < self._MAX_BONE_SLOTS:
+                m4 = np.eye(4, dtype=np.float32)
+                m4[:3, :3] = nearest_rotation(deltas[ci])
+                self._bone_orientations[slot] = m4.flatten('F')
+
     def update_voxel_positions_from_skeleton(self):
         """根据当前 skeleton 重新计算所有绑定 voxel 的世界位置。
 
-        使用预分组 _voxel_groups：每根 stick 只计算一次坐标系，然后向量化批量应用。
-        调用方负责标 self.gpu_dirty = True。
+        engine 规则走 engine_skin；旧版规则使用预分组 _voxel_groups：每根 stick
+        只计算一次坐标系，然后向量化批量应用。调用方负责标 self.gpu_dirty = True。
         """
-        if not self._voxel_groups or not self.voxels:
+        if not self.voxels:
+            return
+        if self._engine_skin is not None:
+            self._update_voxels_engine()
+            return
+        if not self._voxel_groups:
             return
 
         self._ensure_bone_orientation_arrays()

@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 _TOAST_TTL = {
     "success": 3.0,
     "info":    3.0,
+    "warning": 4.5,
     "error":   5.5,
 }
 _TOAST_FADE_DUR = 0.5
@@ -28,7 +29,7 @@ _TOAST_MAX = 6
 @dataclass
 class Toast:
     message: str
-    level: str          # "success" | "info" | "error"
+    level: str          # "success" | "info" | "warning" | "error"
     created_at: float   # time.time()
     expires_at: float   # 绝对过期时刻
     count: int = 1
@@ -227,8 +228,16 @@ _TEXT = {
         "anim_length_threshold": "Threshold (%)",
         "anim_length_dev_header": "Length deviations",
         "anim_length_dev_none": "All sticks within threshold",
-        "anim_global_lateral_ref": "Global skinning rule (topology-based)",
-        "anim_global_lateral_ref_tip": "Replace hardcoded vanilla rules with neighbor-stick lateral reference. Isolated bones fall back to world axis.",
+        "anim_skinning_mode": "Skinning",
+        "skin_mode_engine": "Engine-exact (matches game)",
+        "skin_mode_legacy_table": "Legacy: vanilla table",
+        "skin_mode_legacy_topology": "Legacy: topology",
+        "skin_mode_tip": ("Engine-exact: same rules as the game. Each stick's roll comes from a fixed table keyed by\n"
+                          "stick index (0-16), using particles 1,2,3,4,5,8,9,10,11,12 as body references; origin is the\n"
+                          "stick's A particle. Particle and stick ORDER matter.\n"
+                          "Legacy modes are the tool's older approximations, kept for comparison."),
+        "skin_fallback": "Engine skinning unavailable, using legacy table: {reason}",
+        "skin_status": "Skinning: {mode}",
         "grid_btn": "Grid...",
         "grid_popup_title": "Grid options",
         "settings_btn": "View...",
@@ -577,8 +586,16 @@ _TEXT = {
         "anim_length_threshold": "阈值 (%)",
         "anim_length_dev_header": "长度偏差",
         "anim_length_dev_none": "所有骨段均在阈值内",
-        "anim_global_lateral_ref": "全局蒙皮规则（拓扑驱动）",
-        "anim_global_lateral_ref_tip": "替换 vanilla 硬编码规则，用邻居骨段方向作为 lateral 参考；孤立骨段落回世界轴。",
+        "anim_skinning_mode": "蒙皮规则",
+        "skin_mode_engine": "引擎精确（与游戏一致）",
+        "skin_mode_legacy_table": "旧版：vanilla 查表",
+        "skin_mode_legacy_topology": "旧版：拓扑邻居",
+        "skin_mode_tip": ("引擎精确：与游戏同一套规则。每根骨段的扭转按它的下标（0–16）查固定的表，\n"
+                          "参考方向取自粒子 1、2、3、4、5、8、9、10、11、12；原点是骨段的 a 端粒子。\n"
+                          "粒子和骨段的顺序本身有语义。\n"
+                          "两种旧版规则是工具以前的近似做法，保留作对比。"),
+        "skin_fallback": "引擎蒙皮不可用，已退回旧版查表：{reason}",
+        "skin_status": "蒙皮：{mode}",
         "grid_btn": "网格...",
         "grid_popup_title": "网格选项",
         "settings_btn": "视图...",
@@ -1792,6 +1809,15 @@ def draw_status_bar(ui_state, editor_state, WIN_W, WIN_H):
         mode = tr(ui_state, "mode_bone_edit")
     dirty = tr(ui_state, "unsaved") if editor_state.is_dirty else ""
     imgui.text(tr(ui_state, "status", src=src, total=total, sticks=ns, bound=bound, mode=mode, dirty=dirty))
+    if ui_state.app_mode == "animation" and editor_state.animation_mode:
+        imgui.same_line()
+        mode_label = tr(ui_state, f"skin_mode_{editor_state.effective_skinning_mode()}")
+        if editor_state.skinning_fallback_reason:
+            imgui.text_colored("| " + tr(ui_state, "skin_fallback",
+                                         reason=editor_state.skinning_fallback_reason),
+                               1.0, 0.6, 0.2, 1.0)
+        else:
+            imgui.text_disabled("| " + tr(ui_state, "skin_status", mode=mode_label))
     imgui.end()
 
 
@@ -2148,6 +2174,7 @@ def draw_box_select_overlay(ui_state):
 _TOAST_COLORS = {
     "success": (0.15, 0.55, 0.20),
     "info":    (0.20, 0.40, 0.65),
+    "warning": (0.70, 0.45, 0.10),
     "error":   (0.65, 0.20, 0.20),
 }
 
@@ -2741,6 +2768,9 @@ def _enter_anim_safe(ui_state, editor_state, anim):
         if hasattr(anim, 'name'):
             ui_state.push_toast(
                 tr(ui_state, "anim_loaded", name=anim.name), "success")
+        if editor_state.skinning_fallback_reason:
+            ui_state.push_toast(tr(ui_state, "skin_fallback",
+                                   reason=editor_state.skinning_fallback_reason), "warning")
     except ValueError as exc:
         ui_state.push_toast(str(exc), "error")
 
@@ -3253,13 +3283,22 @@ def _draw_anim_panel_inner(ui_state, editor_state, WIN_W, WIN_H):
         imgui.text_disabled(tr(ui_state, "anim_no_frame_selected"))
 
     imgui.separator()
-    chg_glr, v_glr = imgui.checkbox(
-        tr(ui_state, "anim_global_lateral_ref") + "##global_lateral",
-        editor_state.use_global_lateral_ref)
-    if chg_glr:
-        editor_state.set_use_global_lateral_ref(v_glr)
+    modes = editor_state.SKINNING_MODES
+    mode_idx = modes.index(editor_state.skinning_mode)
+    imgui.set_next_item_width(220)
+    chg_sm, new_sm = imgui.combo(
+        tr(ui_state, "anim_skinning_mode") + "##skin_mode", mode_idx,
+        [tr(ui_state, f"skin_mode_{m}") for m in modes])
+    if chg_sm and new_sm != mode_idx:
+        editor_state.set_skinning_mode(modes[new_sm])
+        if editor_state.skinning_fallback_reason:
+            ui_state.push_toast(tr(ui_state, "skin_fallback",
+                                   reason=editor_state.skinning_fallback_reason), "warning")
     if imgui.is_item_hovered():
-        imgui.set_tooltip(tr(ui_state, "anim_global_lateral_ref_tip"))
+        imgui.set_tooltip(tr(ui_state, "skin_mode_tip"))
+    if editor_state.skinning_fallback_reason:
+        imgui.text_colored(tr(ui_state, "skin_fallback", reason=editor_state.skinning_fallback_reason),
+                           1.0, 0.6, 0.2, 1.0)
 
     chg_chk, v = imgui.checkbox(
         tr(ui_state, "anim_check_lengths") + "##check_len",

@@ -937,7 +937,7 @@ def main():
 
                 if g_editor.gpu_dirty:
                     _n = len(g_editor.voxels)
-                    if (g_editor.animation_mode and g_editor._voxel_groups
+                    if (g_editor.animation_mode and g_editor.has_skin_binding()
                             and g_renderer.n_voxels == _n
                             and not _color_mode_changed):
                         # 快速路径：VBO 已建好、体素数一致、颜色模式未变。
