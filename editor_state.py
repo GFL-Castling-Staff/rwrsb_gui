@@ -204,6 +204,14 @@ class EditorState:
         # 动画过程中排名翻转会让 lateral ref 跳变 → 蒙皮抖动。
         self._global_lateral_neighbors = {}
 
+        # 游戏内合成预览（只读）：另一层动画 + 上身相对腿部的扭转角。
+        # 启用时视口骨架与蒙皮改用合成后的位置（display_positions）；self.particles
+        # 仍是正在编辑的动画姿态，编辑数据不受影响。
+        self.composite_other_anim = None        # animation_io.Animation | None
+        self.composite_other_name = ""
+        self.composite_current_is_upper = True  # 当前编辑的动画作为上半身层
+        self.composite_twist_deg = 0.0
+
         # 半身基准 pose（P2）
         self._baseline_positions = None  # list[tuple[float,float,float]] | None
         self._baseline_name = ""
@@ -588,6 +596,8 @@ class EditorState:
         """
         if not self.selected_particles:
             raise ValueError("至少选择 1 个粒子")
+        if self.composite_active():
+            raise ValueError("合成预览中只读：先在「引擎...」窗口关闭合成预览")
 
         if pivot_mode == "active":
             if self.active_particle_idx < 0 or self.active_particle_idx not in self.selected_particles:
@@ -668,6 +678,7 @@ class EditorState:
 
         if trans_bias is not None:
             self.trans_bias = trans_bias
+        self.clear_composite(refresh=False)
         self.voxels = parse_vox(path, self.trans_bias)
         self.bindings = {}
         self.selected_voxels = set()
@@ -699,6 +710,7 @@ class EditorState:
         if trans_bias is not None:
             self.trans_bias = trans_bias
         voxels, skeleton, bindings = parse_xml(path)
+        self.clear_composite(refresh=False)
         self.voxels = voxels
         self.bindings = bindings
         self.selected_voxels = set()
@@ -735,6 +747,7 @@ class EditorState:
         if preset_path is None:
             preset_path = resource_path("presets", "human_skeleton.json")
         data = json.loads(Path(preset_path).read_text(encoding="utf-8"))
+        self.clear_composite(refresh=False)
         self.particles = list(data.get("particles", []))
         self._rebuild_sticks_from_raw(data.get("sticks", []))
         self.active_stick_idx = 0
@@ -754,6 +767,7 @@ class EditorState:
         from xml_io import parse_xml
 
         voxels, skeleton, bindings = parse_xml(path)
+        self.clear_composite(refresh=False)
         # 保留 voxels 和 bindings（供蒙皮用）
         self.voxels = voxels
         self.bindings = bindings
@@ -1418,6 +1432,9 @@ class EditorState:
             return None
         if self._anim_dirty and not force:
             return "dirty_needs_confirmation"
+
+        # 合成预览只在动画模式里有意义；先关掉，下面归位体素时才按原始姿态算
+        self.clear_composite(refresh=False)
 
         # 恢复 particle 位置
         if self._particle_positions_before_anim:
@@ -2284,6 +2301,96 @@ class EditorState:
                                  voxels_xyz, self.bindings)
 
     # ──────────────────────────────────────────────
+    # 游戏内合成预览（只读）
+    # ──────────────────────────────────────────────
+    # 游戏每帧先采样下半身动画，再用上半身动画替换 bodyAreaHint = 2 的粒子
+    # （以粒子 8 对齐）；随后上半身层跟瞄准方向、下半身层跟移动方向各自旋转。
+
+    # 上半身层按粒子下标 8 对齐
+    COMPOSITE_ANCHOR = 8
+
+    def composite_active(self):
+        return self.animation_mode and (
+            self.composite_other_anim is not None or abs(self.composite_twist_deg) > 1e-6)
+
+    def set_composite(self, other_anim=None, other_name=None, current_is_upper=None, twist_deg=None):
+        """修改合成预览参数（传 None 的项保持不变）；另一层动画的粒子数须与骨架一致。"""
+        if other_anim is not None:
+            n = len(self.particles)
+            if n <= self.COMPOSITE_ANCHOR:
+                raise ValueError(f"合成预览需要至少 {self.COMPOSITE_ANCHOR + 1} 个粒子（按粒子 "
+                                 f"{self.COMPOSITE_ANCHOR} 对齐）")
+            if not other_anim.frames:
+                raise ValueError("另一层动画没有关键帧")
+            bad = [f.time for f in other_anim.frames if len(f.positions) != n]
+            if bad:
+                raise ValueError(f"另一层动画有 {len(bad)} 帧的粒子数与骨架（{n}）不一致")
+            self.composite_other_anim = other_anim
+            self.composite_other_name = other_name or other_anim.name
+        if current_is_upper is not None:
+            self.composite_current_is_upper = bool(current_is_upper)
+        if twist_deg is not None:
+            self.composite_twist_deg = float(twist_deg)
+        self._refresh_display()
+
+    def clear_composite(self, refresh=True):
+        self.composite_other_anim = None
+        self.composite_other_name = ""
+        self.composite_twist_deg = 0.0
+        if refresh:
+            self._refresh_display()
+
+    def _refresh_display(self):
+        self.skeleton_dirty = True
+        if self.animation_mode:
+            self.update_voxel_positions_from_skeleton()
+            self.gpu_dirty = True
+
+    def _composite_other_time(self):
+        """另一层动画的时刻：两层按各自 speed 同步走过同一段真实时间。"""
+        other = self.composite_other_anim
+        cur = self.current_animation
+        speed = cur.speed if cur is not None and abs(cur.speed) > 1e-6 else 1.0
+        t = self.playback_time / speed * other.speed
+        if other.loop and other.end > 0:
+            return t % other.end
+        return max(0.0, t)
+
+    def display_positions(self):
+        """视口与蒙皮用的粒子位置 (N,3)：合成预览关闭时就是 self.particles。"""
+        from animation_io import interpolate_positions
+        P = np.array([(p["x"], p["y"], p["z"]) for p in self.particles], dtype=np.float64)
+        if not self.composite_active() or len(P) == 0:
+            return P
+        upper_mask = np.array([int(p.get("bodyAreaHint", 1)) == 2 for p in self.particles])
+        other = self.composite_other_anim
+        if other is not None and len(P) > self.COMPOSITE_ANCHOR:
+            O = np.array(interpolate_positions(other, self._composite_other_time(), len(P)),
+                         dtype=np.float64)
+            if O.shape == P.shape:
+                upper, lower = (P, O) if self.composite_current_is_upper else (O, P)
+                offset = lower[self.COMPOSITE_ANCHOR] - upper[self.COMPOSITE_ANCHOR]
+                P = lower.copy()
+                P[upper_mask] = upper[upper_mask] + offset
+        if abs(self.composite_twist_deg) > 1e-6:
+            # 上半身层绕姿态原点的竖直轴相对下半身层转动（游戏两层各自绕角色原点旋转）
+            R = _rotation_matrix("y", np.radians(self.composite_twist_deg)).astype(np.float64)
+            P = P.copy()
+            P[upper_mask] = P[upper_mask] @ R.T
+        return P
+
+    def display_particles(self):
+        """同 display_positions，但返回粒子 dict 列表（合成预览关闭时直接返回 self.particles）。"""
+        if not self.composite_active():
+            return self.particles
+        out = []
+        for p, (x, y, z) in zip(self.particles, self.display_positions()):
+            q = dict(p)
+            q["x"], q["y"], q["z"] = float(x), float(y), float(z)
+            out.append(q)
+        return out
+
+    # ──────────────────────────────────────────────
     # 引擎规则体检
     # ──────────────────────────────────────────────
 
@@ -2319,7 +2426,7 @@ class EditorState:
         if skin is None:
             return None
         if positions is None:
-            positions = [(p["x"], p["y"], p["z"]) for p in self.particles]
+            positions = self.display_positions()
         P = np.asarray(positions, dtype=np.float64)
         if len(P) != skin.n_particles:
             return None
@@ -2388,8 +2495,7 @@ class EditorState:
         skin = self._engine_skin
         if len(self.particles) != skin.n_particles:
             return
-        P = np.array([(p["x"], p["y"], p["z"]) for p in self.particles], dtype=np.float64)
-        worlds, deltas = skin.pose(P)
+        worlds, deltas = skin.pose(self.display_positions())
         if not worlds:
             return
         self._ensure_bone_orientation_arrays()
@@ -2421,7 +2527,7 @@ class EditorState:
             return
 
         self._ensure_bone_orientation_arrays()
-        id_to_p = {int(p["id"]): p for p in self.particles}
+        id_to_p = {int(p["id"]): p for p in self.display_particles()}
 
         for ci, (vis, locals_arr, u_bind, R_bind) in self._voxel_groups.items():
             if ci >= len(self.sticks):

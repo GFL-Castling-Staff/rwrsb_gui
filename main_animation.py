@@ -141,10 +141,8 @@ def rebuild_positions_cache():
     if not g_editor.particles:
         g_positions_np = None
         return
-    g_positions_np = np.array(
-        [(p["x"], p["y"], p["z"]) for p in g_editor.particles],
-        dtype=np.float32,
-    )
+    # 拾取用视口里看到的位置（合成预览时是合成后的姿态）
+    g_positions_np = g_editor.display_positions().astype(np.float32)
 
 
 def _pick_particle(mx, my):
@@ -211,6 +209,11 @@ def _start_particle_drag(mx, my, particle_idx, axis_preset=None):
     global g_particle_drag_active, g_drag_particle_idx
     global g_drag_plane_normal, g_drag_grab_offset, g_drag_particle_origin
     global g_drag_origins, g_drag_axis_preset
+
+    # 合成预览只读：视口里是合成姿态，拖动会改到看不见的编辑姿态
+    if g_editor.composite_active():
+        g_ui.push_toast(tr(g_ui, "composite_readonly"), "warning")
+        return
 
     # 单选：锁定粒子不可拖
     if particle_idx in g_editor._baseline_locked_indices:
@@ -305,6 +308,9 @@ def _start_rotate_drag(particle_idx, axis_preset=None):
     global g_rotate_drag_snapshot, g_rotate_drag_pivot, g_rotate_drag_axis
 
     if not g_editor.selected_particles:
+        return
+    if g_editor.composite_active():
+        g_ui.push_toast(tr(g_ui, "composite_readonly"), "warning")
         return
 
     # 推 undo（在修改粒子之前推一次，拖动过程中不再推）
@@ -920,7 +926,7 @@ def main():
                     g_editor._apply_interpolated_to_particles(g_editor.playback_time)
 
             if g_editor.skeleton_dirty and g_renderer is not None:
-                g_renderer.upload_skeleton_lines(g_editor.particles, g_editor.sticks, set(g_editor.dummy_stick_indices()), skip_dummy=not g_ui.show_dummy_sticks)
+                g_renderer.upload_skeleton_lines(g_editor.display_particles(), g_editor.sticks, set(g_editor.dummy_stick_indices()), skip_dummy=not g_ui.show_dummy_sticks)
                 rebuild_positions_cache()
                 g_editor.skeleton_dirty = False
 

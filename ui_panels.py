@@ -303,6 +303,25 @@ _TEXT = {
         "anim_warnings_header": "Animation checks (saving is not blocked):",
         "anim_control_custom_warn": "The game only knows 14 control keys; any other key is treated as 'magazine'.",
         "anim_save_warnings": "Saved with {n} warning(s): {first}",
+        # 游戏内合成预览
+        "composite_header": "In-game composite preview (read-only)",
+        "composite_intro": ("Preview how the game combines an upper-body and a lower-body animation: upper-layer "
+                            "particles (bodyAreaHint 2) come from the upper animation, aligned at particle 8. "
+                            "The edited animation itself is not changed."),
+        "composite_current_as": "Current animation is the",
+        "composite_as_upper": "upper layer",
+        "composite_as_lower": "lower layer",
+        "composite_other": "Other layer: {name}",
+        "composite_other_none": "Other layer: (none)",
+        "composite_pick_same_file": "From current animation file",
+        "composite_pick_file": "From file...",
+        "composite_filter": "Filter##composite_filter",
+        "composite_twist": "Upper-body twist (deg)##composite_twist",
+        "composite_twist_hint": "In game: running up to ~37 deg, walking ~60 deg, fully toward the crosshair when aiming.",
+        "composite_clear": "Turn off composite preview",
+        "composite_readonly": "Composite preview is on (read-only). Turn it off in the Engine window to edit.",
+        "composite_status": "Composite preview (read-only)",
+        "composite_load_failed": "Cannot use this animation: {error}",
         "grid_btn": "Grid...",
         "grid_popup_title": "Grid options",
         "settings_btn": "View...",
@@ -725,6 +744,24 @@ _TEXT = {
         "anim_warnings_header": "动画检查（不影响保存）：",
         "anim_control_custom_warn": "游戏只认 14 个 control key，其它一律当作 magazine 处理。",
         "anim_save_warnings": "已保存，但有 {n} 条提示：{first}",
+        # 游戏内合成预览
+        "composite_header": "游戏内合成预览（只读）",
+        "composite_intro": ("预览游戏如何把上半身动画和下半身动画拼起来：上半身层（bodyAreaHint 2）的粒子"
+                            "取自上身动画，并以粒子 8 对齐。正在编辑的动画本身不会被修改。"),
+        "composite_current_as": "当前动画作为",
+        "composite_as_upper": "上半身层",
+        "composite_as_lower": "下半身层",
+        "composite_other": "另一层：{name}",
+        "composite_other_none": "另一层：（未选）",
+        "composite_pick_same_file": "从当前动画文件选",
+        "composite_pick_file": "从文件选...",
+        "composite_filter": "过滤##composite_filter",
+        "composite_twist": "上身扭转（度）##composite_twist",
+        "composite_twist_hint": "游戏里：奔跑最多约 37°、走路约 60°，瞄准时完全转向准星。",
+        "composite_clear": "关闭合成预览",
+        "composite_readonly": "合成预览中（只读）。要编辑请先在「引擎...」窗口关闭合成预览。",
+        "composite_status": "合成预览（只读）",
+        "composite_load_failed": "无法使用这个动画：{error}",
         "grid_btn": "网格...",
         "grid_popup_title": "网格选项",
         "settings_btn": "视图...",
@@ -1017,6 +1054,8 @@ class UIState:
         self.show_body_layers = False   # 视口按 bodyAreaHint 给粒子 / 骨段分层着色（两个工具共用）
         self._engine_scan = None        # editor_state.engine_scan_animation() 的结果
         self._engine_scan_sig = None    # 扫描时的动画签名，改动后提示重扫
+        self._composite_doc = None      # 合成预览：正在挑选另一层动画的文件索引
+        self._composite_filter = ""
 
     def push_toast(self, message: str, level: str = "info",
                    also_log: bool = True, exc_info=None) -> None:
@@ -1995,6 +2034,9 @@ def draw_status_bar(ui_state, editor_state, WIN_W, WIN_H):
                                1.0, 0.6, 0.2, 1.0)
         else:
             imgui.text_disabled("| " + tr(ui_state, "skin_status", mode=mode_label))
+        if editor_state.composite_active():
+            imgui.same_line()
+            imgui.text_colored("| " + tr(ui_state, "composite_status"), 0.75, 0.45, 1.0, 1.0)
     imgui.end()
 
 
@@ -3814,9 +3856,99 @@ def _draw_engine_window_inner(ui_state, editor_state):
 
             _draw_engine_rules_table(ui_state, editor_state, editor_state.engine_diagnose(), scan)
 
+    # ── 游戏内合成预览 ──
+    if editor_state.animation_mode and imgui.collapsing_header(tr(ui_state, "composite_header"))[0]:
+        _draw_composite_section(ui_state, editor_state)
+
     # ── 引擎语义粒子 ──
     if imgui.collapsing_header(tr(ui_state, "engine_particles_header"))[0]:
         _draw_engine_particles_table(ui_state, editor_state)
+
+
+def _composite_use(ui_state, editor_state, doc, name):
+    from animation_io import parse_single_animation
+    try:
+        anim = parse_single_animation(doc.path, doc.name_to_index[name])
+        editor_state.set_composite(other_anim=anim, other_name=name)
+        ui_state._composite_doc = None
+    except Exception as exc:
+        ui_state.push_toast(tr(ui_state, "composite_load_failed", error=exc), "error")
+
+
+def _composite_pick_file(ui_state, editor_state):
+    from file_dialogs import open_file_dialog, _is_supported as _fd_supported
+    from animation_io import parse_animation_index
+    if not _fd_supported():
+        ui_state.push_toast(tr(ui_state, "system_dialog_unavailable"), "error")
+        return
+    try:
+        path = open_file_dialog(tr(ui_state, "composite_pick_file"),
+                                [("XML files", "*.xml"), ("All files", "*.*")])
+        if not path:
+            return
+        doc = parse_animation_index(path)
+    except Exception as exc:
+        ui_state.push_toast(tr(ui_state, "anim_parse_failed", error=exc), "error", exc_info=True)
+        return
+    if len(doc.names) == 1:
+        _composite_use(ui_state, editor_state, doc, doc.names[0])
+    elif doc.names:
+        ui_state._composite_doc = doc
+        ui_state._composite_filter = ""
+
+
+def _draw_composite_section(ui_state, editor_state):
+    imgui.text_wrapped(tr(ui_state, "composite_intro"))
+
+    imgui.text(tr(ui_state, "composite_current_as"))
+    imgui.same_line()
+    if imgui.radio_button(tr(ui_state, "composite_as_upper") + "##comp_upper",
+                          editor_state.composite_current_is_upper):
+        editor_state.set_composite(current_is_upper=True)
+    imgui.same_line()
+    if imgui.radio_button(tr(ui_state, "composite_as_lower") + "##comp_lower",
+                          not editor_state.composite_current_is_upper):
+        editor_state.set_composite(current_is_upper=False)
+
+    if editor_state.composite_other_anim is not None:
+        imgui.text(tr(ui_state, "composite_other", name=editor_state.composite_other_name))
+    else:
+        imgui.text_disabled(tr(ui_state, "composite_other_none"))
+    if editor_state.animation_source_doc is not None:
+        if imgui.button(tr(ui_state, "composite_pick_same_file") + "##comp_same"):
+            ui_state._composite_doc = editor_state.animation_source_doc
+            ui_state._composite_filter = ""
+        imgui.same_line()
+    if imgui.button(tr(ui_state, "composite_pick_file") + "##comp_file"):
+        _composite_pick_file(ui_state, editor_state)
+
+    doc = ui_state._composite_doc
+    if doc is not None:
+        imgui.set_next_item_width(200)
+        _, ui_state._composite_filter = imgui.input_text(
+            tr(ui_state, "composite_filter"), ui_state._composite_filter, 64)
+        flt = ui_state._composite_filter.lower().strip()
+        imgui.begin_child("##comp_list", 0, 140, border=True)
+        try:
+            for name in [n for n in doc.names if not flt or flt in n.lower()][:500]:
+                if imgui.selectable(f"{name}##comp_{name}")[0]:
+                    _composite_use(ui_state, editor_state, doc, name)
+                    break
+        finally:
+            imgui.end_child()
+
+    imgui.set_next_item_width(220)
+    chg, v = imgui.slider_float(tr(ui_state, "composite_twist"),
+                                float(editor_state.composite_twist_deg), -90.0, 90.0, "%.1f")
+    if chg:
+        editor_state.set_composite(twist_deg=v)
+    imgui.text_disabled(tr(ui_state, "composite_twist_hint"))
+
+    if editor_state.composite_active():
+        _push_red()
+        if imgui.button(tr(ui_state, "composite_clear") + "##comp_clear"):
+            editor_state.clear_composite()
+        imgui.pop_style_color()
 
 
 def _draw_engine_rules_table(ui_state, editor_state, diag, scan):
