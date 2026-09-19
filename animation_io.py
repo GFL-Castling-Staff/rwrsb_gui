@@ -18,6 +18,7 @@ RWR animation XML parsing and writing.
 本模块是纯函数 + 数据类，不持有 EditorState 引用，不依赖 imgui/ModernGL。
 """
 import logging
+import re
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from pathlib import Path
@@ -67,14 +68,27 @@ class AnimationDocIndex:
 # 解析
 # ──────────────────────────────────────────────
 
+_XML_COMMENT_RE = re.compile(r'<!--.*?-->', re.S)
+
+
+def _read_xml_root(path):
+    """读 XML 并解析为根元素；解析前先去掉全部注释。
+
+    游戏自带的 soldier_animations.xml（1.98.1）含 `<!-- --------------- -->`
+    这类注释，XML 规范禁止注释内出现 `--`，expat 直接报错，但游戏的解析器照收。
+    注释对动画数据没有意义，统一剥掉再交给 ElementTree。
+    """
+    raw = Path(path).read_text(encoding='utf-8', errors='replace')
+    return ET.fromstring(_XML_COMMENT_RE.sub('', raw))
+
+
 def parse_animation_index(path) -> AnimationDocIndex:
     """扫描动画文件，只提取每个 animation 的 comment 名。
 
     重名时自动加 _1 / _2 后缀（vanilla soldier_animations.xml 实测无重名，
     但兼容自定义文件防御性处理）。
     """
-    raw = Path(path).read_text(encoding='utf-8', errors='replace')
-    root = ET.fromstring(raw)
+    root = _read_xml_root(path)
     if root.tag != 'animations':
         raise ValueError(f"Expected root <animations>, got <{root.tag}>")
 
@@ -101,8 +115,7 @@ def parse_single_animation(path, animation_index: int) -> Animation:
     animation_index 必须是文件中 <animation> 元素的真实序号
     （即 AnimationDocIndex.name_to_index 的 value）。
     """
-    raw = Path(path).read_text(encoding='utf-8', errors='replace')
-    root = ET.fromstring(raw)
+    root = _read_xml_root(path)
     anim_elems = list(root.iterfind('animation'))
     if animation_index < 0 or animation_index >= len(anim_elems):
         raise ValueError(
@@ -123,7 +136,11 @@ def parse_first_animation(path) -> Animation:
 
 def _parse_animation_element(anim_elem) -> Animation:
     name = anim_elem.get('comment', 'unnamed')
-    loop = anim_elem.get('loop', '0') == '1'
+    # 游戏按整数读 loop，非 0 即循环（不只认 "1"）
+    try:
+        loop = int(float(anim_elem.get('loop', '0'))) != 0
+    except ValueError:
+        loop = False
     end = float(anim_elem.get('end', '0.0'))
     speed = float(anim_elem.get('speed', '1.0'))
     speed_spread = anim_elem.get('speed_spread')

@@ -214,6 +214,8 @@ def parse_xml(path: str | Path) -> tuple[list[tuple[float, ...]], dict[str, list
     字符清除掉；对正常 XML 此操作是 no-op。
     """
     raw = Path(path).read_text(encoding='utf-8', errors='replace')
+    # 注释里可能出现 XML 规范禁止的 `--`（游戏的解析器照收），先整体剥掉
+    raw = re.sub(r'<!--.*?-->', '', raw, flags=re.S)
     cleaned = re.sub(r'>([^\r\n<>]+)(?=[\r\n])', '>', raw)
     if cleaned != raw:
         logger.info("已清理 XML 尾部垃圾字符: %s", path)
