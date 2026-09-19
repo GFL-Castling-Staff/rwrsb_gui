@@ -2069,6 +2069,11 @@ class EditorState:
         u = diff / L
 
         self_endpoints = {int(stick.particle_a_id), int(stick.particle_b_id)}
+        if ci is not None and ci in self._global_lateral_neighbors \
+                and self._global_lateral_neighbors[ci] is None:
+            # bind 时就没找到邻居（记了 None）：运行时保持世界轴路径，不再按当前姿态改选，
+            # 否则 bind 与运行时用的坐标系不一致，体素会跳
+            return None
         cached_pair = self._global_lateral_neighbors.get(ci) if ci is not None else None
 
         best_ref = None
@@ -2210,6 +2215,9 @@ class EditorState:
                 pb = id_to_p.get(int(stick.particle_b_id))
                 if pa is not None and pb is not None:
                     body_frame = self._compute_body_bridge_frame(stick, id_to_p, ci)
+                    if self.use_global_lateral_ref and ci not in self._global_lateral_neighbors:
+                        # 拓扑规则 bind 时没选出邻居：显式记下，运行时不再改选
+                        self._global_lateral_neighbors[ci] = None
                     if body_frame is not None:
                         origin, R, u_bind = body_frame
                     else:
