@@ -21,6 +21,8 @@ _PARTICLE_SELECTED_COLOR = (1.0, 0.85, 0.35, 1.0)  # 次亮淡黄（已选非 ac
 _PARTICLE_SIZE_ACTIVE = 15.0
 _PARTICLE_ACTIVE_COLOR = (0.25, 0.95, 1.0, 1.0)    # 青色，与淡黄明显区分
 _PARTICLE_LOCKED_COLOR = (0.45, 0.55, 0.75, 0.7)   # 半透明灰蓝（锁定粒子，P2）
+_ENGINE_WARN_COLOR = (1.0, 0.65, 0.2, 1.0)          # 引擎体检：注意
+_ENGINE_BAD_COLOR = (1.0, 0.3, 0.85, 1.0)           # 引擎体检：异常
 _GRID_MINOR_COLOR = (0.28, 0.31, 0.38)
 _GRID_MAJOR_COLOR = (0.52, 0.56, 0.66)
 _MIRROR_PLANE_COLOR = (0.25, 0.90, 0.95)
@@ -134,6 +136,8 @@ class VoxelRenderer:
         self.show_mirror_handles = False
         # 5b：长度违规 stick 索引列表，驱动红色额外 draw call
         self.violation_stick_indices = []
+        # 引擎规则体检：[(stick 下标, 等级 1 注意 / 2 异常)]，橙 / 品红覆盖
+        self.engine_warn_sticks = []
         # P2：锁定粒子索引列表，渲染为灰蓝色（P5a：locked 覆盖 selected）
         self.locked_particle_indices: list = []
         # 原点坐标轴 Gizmo（任务4）
@@ -763,6 +767,19 @@ class VoxelRenderer:
                     if 0 <= vi < len(self.stick_segments):
                         off, cnt = self.stick_segments[vi]
                         if cnt > 0:
+                            self.line_vao.render(moderngl.LINES, vertices=cnt, first=off)
+                self.ctx.line_width = _LINE_WIDTH
+
+            # 引擎规则体检：注意 = 橙，异常 = 品红（与长度违规的红色区分）
+            if self.engine_warn_sticks and self.stick_segments:
+                self.ctx.disable(moderngl.DEPTH_TEST)
+                self.ctx.line_width = _LINE_WIDTH_HIGHLIGHT
+                for si, grade in self.engine_warn_sticks:
+                    if 0 <= si < len(self.stick_segments):
+                        off, cnt = self.stick_segments[si]
+                        if cnt > 0:
+                            self.line_prog["u_color_mult"].value = (
+                                _ENGINE_BAD_COLOR if grade >= 2 else _ENGINE_WARN_COLOR)
                             self.line_vao.render(moderngl.LINES, vertices=cnt, first=off)
                 self.ctx.line_width = _LINE_WIDTH
 

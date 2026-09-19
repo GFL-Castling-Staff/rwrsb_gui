@@ -30,7 +30,8 @@ from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_toasts,
                           draw_animation_panel, draw_anim_source_picker,
                           draw_anim_exit_confirm, draw_anim_stick_count_dialog,
-                          draw_invalid_binding_dialog, _enter_anim_safe, tr)
+                          draw_invalid_binding_dialog, _enter_anim_safe, tr,
+                          draw_engine_window, engine_flagged_sticks)
 from animation_io import (parse_animation_index, parse_single_animation,
                           parse_first_animation, Animation, AnimationFrame,
                           EXPECTED_STICK_COUNT)
@@ -1005,6 +1006,11 @@ def main():
                     ]
                 else:
                     g_renderer.violation_stick_indices = []
+                # 引擎规则体检：引擎视图打开且勾选高亮时，标出本帧需注意 / 异常的骨段
+                if g_ui.show_engine_window and g_ui.engine_highlight_sticks and g_editor.animation_mode:
+                    g_renderer.engine_warn_sticks = engine_flagged_sticks(g_editor)
+                else:
+                    g_renderer.engine_warn_sticks = []
 
             fb_w, fb_h = glfw.get_framebuffer_size(window)
             ctx.viewport = (0, 0, max(fb_w, 1), max(fb_h, 1))
@@ -1071,6 +1077,7 @@ def main():
             draw_anim_exit_confirm(g_ui, g_editor)
             draw_anim_stick_count_dialog(g_ui, g_editor)
             draw_invalid_binding_dialog(g_ui, g_editor)
+            draw_engine_window(g_ui, g_editor, WIN_W, WIN_H)
 
             draw_status_bar(g_ui, g_editor, WIN_W, WIN_H)
 

@@ -10,6 +10,7 @@ from pathlib import Path
 import imgui
 
 from animation_io import EXPECTED_STICK_COUNT
+from engine_skin import SEMANTIC_PARTICLES
 
 logger = logging.getLogger(__name__)
 
@@ -238,6 +239,47 @@ _TEXT = {
                           "Legacy modes are the tool's older approximations, kept for comparison."),
         "skin_fallback": "Engine skinning unavailable, using legacy table: {reason}",
         "skin_status": "Skinning: {mode}",
+        # 引擎规则体检
+        "engine_btn": "Engine...",
+        "engine_window_title": "Engine view",
+        "engine_preview_mode": "Preview skinning: {mode}",
+        "engine_structure_header": "Structure checks",
+        "engine_structure_ok": "No structural issues",
+        "engine_rules_header": "Per-stick engine rules",
+        "engine_highlight_sticks": "Highlight flagged sticks in viewport",
+        "engine_scan_btn": "Scan whole animation",
+        "engine_scan_worst": "Worst: #{ci} {name}  {grade} at t={t:.3f}s",
+        "engine_scan_clean": "Whole animation: all sticks OK",
+        "engine_scan_stale": "(animation changed, rescan)",
+        "engine_diag_unavailable": "Engine check unavailable: {reason}",
+        "engine_col_stick": "Stick",
+        "engine_col_rule": "Engine rule",
+        "engine_col_refs": "Refs",
+        "engine_col_now": "Now",
+        "engine_col_worst": "Worst",
+        "engine_grade_0": "OK",
+        "engine_grade_1": "Caution",
+        "engine_grade_2": "Bad",
+        "engine_cell_diag": "{grade} s{sigma:.2f} d{dist:.0f}%",
+        "engine_diag_tip": ("s = smallest singular value of the axes fed to the engine (1 = ideal, near 0 = reference\n"
+                            "almost parallel to the stick, voxels collapse or flip in game).\n"
+                            "d = stretch/squash relative to bind pose. Thresholds are calibrated on vanilla animations."),
+        "engine_jump_tip": "Click to jump to this moment",
+        "engine_particles_header": "Engine-semantic particles",
+        "engine_col_index": "Index",
+        "engine_col_particle": "Current particle",
+        "engine_col_role": "Role",
+        "engine_col_vanilla": "Vanilla",
+        "engine_particle_missing": "(missing)",
+        "engine_semantic_tag": " *",
+        "engine_semantic_tip": "Engine-semantic particle #{idx}: {role}",
+        "engine_stick_rule_tip": "Engine rule #{ci}: {rule}\nReference particles: {refs}",
+        "engine_structure_toast": "Engine structure checks: {n} issue(s), see Engine view",
+        "eng_w_too_few_particles": "Only {n} particles; the engine reads particle 12, needs at least {min}. The game may fail when rendering (inferred, untested).",
+        "eng_w_binding_over_17": "Voxels bound to stick index >= 17 ({sticks}); the game only has 17 bone matrices and cannot render them.",
+        "eng_w_arm_source_mismatch": "Stick #{stick} does not connect particles {a} and {b}; in game its voxels take their orientation from the {a}->{b} line, not from this stick.",
+        "eng_w_anchor_not_lower": "Particle 8 has bodyAreaHint {hint} (vanilla: 1); it will turn with the upper body (aim direction).",
+        "eng_w_no_upper_layer": "No particle has bodyAreaHint = 2; upper-body animation layers (aiming, reloading) will have no effect in game.",
         "grid_btn": "Grid...",
         "grid_popup_title": "Grid options",
         "settings_btn": "View...",
@@ -596,6 +638,47 @@ _TEXT = {
                           "两种旧版规则是工具以前的近似做法，保留作对比。"),
         "skin_fallback": "引擎蒙皮不可用，已退回旧版查表：{reason}",
         "skin_status": "蒙皮：{mode}",
+        # 引擎规则体检
+        "engine_btn": "引擎...",
+        "engine_window_title": "引擎视图",
+        "engine_preview_mode": "预览蒙皮：{mode}",
+        "engine_structure_header": "结构检查",
+        "engine_structure_ok": "没有结构问题",
+        "engine_rules_header": "逐骨段引擎规则",
+        "engine_highlight_sticks": "视口标出需注意的骨段",
+        "engine_scan_btn": "扫描整段动画",
+        "engine_scan_worst": "最差：#{ci} {name}  {grade}，t={t:.3f}s",
+        "engine_scan_clean": "整段动画：所有骨段正常",
+        "engine_scan_stale": "（动画已改动，请重新扫描）",
+        "engine_diag_unavailable": "引擎体检不可用：{reason}",
+        "engine_col_stick": "骨段",
+        "engine_col_rule": "引擎规则",
+        "engine_col_refs": "参考粒子",
+        "engine_col_now": "本帧",
+        "engine_col_worst": "整段最差",
+        "engine_grade_0": "正常",
+        "engine_grade_1": "注意",
+        "engine_grade_2": "异常",
+        "engine_cell_diag": "{grade} s{sigma:.2f} d{dist:.0f}%",
+        "engine_diag_tip": ("s = 传给引擎的坐标轴最小奇异值（1 = 理想，接近 0 = 参考方向与骨段几乎平行，\n"
+                            "游戏里这段体素会塌缩或翻转）。\n"
+                            "d = 相对 bind 姿态的拉伸/压扁。阈值按 vanilla 动画标定。"),
+        "engine_jump_tip": "点击跳到这一刻",
+        "engine_particles_header": "引擎语义粒子",
+        "engine_col_index": "下标",
+        "engine_col_particle": "当前粒子",
+        "engine_col_role": "用途",
+        "engine_col_vanilla": "vanilla",
+        "engine_particle_missing": "（缺失）",
+        "engine_semantic_tag": " *",
+        "engine_semantic_tip": "引擎语义粒子 #{idx}：{role}",
+        "engine_stick_rule_tip": "引擎规则 #{ci}：{rule}\n参考粒子：{refs}",
+        "engine_structure_toast": "引擎结构检查：{n} 条问题，详见「引擎...」窗口",
+        "eng_w_too_few_particles": "只有 {n} 个粒子；引擎会按下标读到粒子 12，至少需要 {min} 个。游戏可能在渲染时出错（推断，待实测）。",
+        "eng_w_binding_over_17": "有体素绑在下标 ≥ 17 的骨段上（{sticks}）；游戏只有 17 个骨骼矩阵，无法渲染。",
+        "eng_w_arm_source_mismatch": "骨段 #{stick} 两端不是粒子 {a}、{b}；游戏里它的体素朝向取自 {a}→{b} 连线，不跟本骨段转。",
+        "eng_w_anchor_not_lower": "粒子 8 的 bodyAreaHint 是 {hint}（vanilla 为 1）；它会随上半身层跟瞄准方向转。",
+        "eng_w_no_upper_layer": "没有 bodyAreaHint = 2 的粒子；游戏里的上半身动画层（瞄准、换弹等）不会生效。",
         "grid_btn": "网格...",
         "grid_popup_title": "网格选项",
         "settings_btn": "视图...",
@@ -881,6 +964,12 @@ class UIState:
 
         # Commit 5：dummy stick 可见性开关
         self.show_dummy_sticks = True
+
+        # 引擎视图（动画工具）
+        self.show_engine_window = False
+        self.engine_highlight_sticks = True
+        self._engine_scan = None        # editor_state.engine_scan_animation() 的结果
+        self._engine_scan_sig = None    # 扫描时的动画签名，改动后提示重扫
 
     def push_toast(self, message: str, level: str = "info",
                    also_log: bool = True, exc_info=None) -> None:
@@ -1259,7 +1348,10 @@ def _draw_stick_list(ui_state, editor_state):
                 f"ci={idx}\n"
                 f"{pa.get('name', '?')} ({stick.particle_a_id})\n"
                 f"-> {pb.get('name', '?')} ({stick.particle_b_id})\n"
-                f"{tr(ui_state, 'tooltip_bound_voxels', count=n_bound)}"
+                f"{tr(ui_state, 'tooltip_bound_voxels', count=n_bound)}\n"
+                + tr(ui_state, "engine_stick_rule_tip", ci=idx,
+                     rule=_engine_rule_text(ui_state, idx),
+                     refs=_engine_refs_label(ui_state, editor_state, idx))
             )
         imgui.same_line()
 
@@ -1368,9 +1460,14 @@ def _draw_particle_editor(ui_state, editor_state):
         # 注意：tree_node 在展开期间每帧都返回 True，不能无条件 set_active —
         # 否则展开的节点会逐帧覆盖外部状态变更（视口点击清选 / extend_chain 切 active），
         # 表现为：点空白取消不掉、右侧闪烁、gizmo 因 active 不在 selected 里而 fallback 到原点。
-        opened = imgui.tree_node(f"{particle['name']} ({particle['id']})##node")
+        semantic = SEMANTIC_PARTICLES.get(idx)
+        tag = tr(ui_state, "engine_semantic_tag") if semantic else ""
+        opened = imgui.tree_node(f"[{idx}] {particle['name']} ({particle['id']}){tag}##node")
         if imgui.is_item_clicked():
             editor_state.set_active_particle(idx)
+        if semantic and imgui.is_item_hovered():
+            imgui.set_tooltip(tr(ui_state, "engine_semantic_tip", idx=idx,
+                                 role=_engine_lang_pick(ui_state, semantic)))
         if opened:
             changed_name, new_name = imgui.input_text(tr(ui_state, "name"), particle["name"], 128)
             changed_id, new_id = imgui.input_int(tr(ui_state, "id"), int(particle["id"]))
@@ -1548,6 +1645,8 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
                    real=stick_count - dummy_count, dummy=dummy_count),
                 0.5, 0.5, 0.5, 1.0,
             )
+    # 引擎结构检查（只在有问题时显示）
+    _draw_engine_warnings(ui_state, editor_state, show_ok=False)
     if 0 <= editor_state.active_particle_idx < len(editor_state.particles):
         active_particle = editor_state.particles[editor_state.active_particle_idx]
         imgui.text(tr(ui_state, "active_particle", name=active_particle["name"], pid=active_particle["id"]))
@@ -2729,6 +2828,9 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
 
         imgui.end_popup()
     imgui.same_line()
+    if imgui.button(tr(ui_state, "engine_btn") + "##anim_engine_btn"):
+        ui_state.show_engine_window = not ui_state.show_engine_window
+    imgui.same_line()
     imgui.text("|")
     imgui.same_line()
 
@@ -2771,6 +2873,9 @@ def _enter_anim_safe(ui_state, editor_state, anim):
         if editor_state.skinning_fallback_reason:
             ui_state.push_toast(tr(ui_state, "skin_fallback",
                                    reason=editor_state.skinning_fallback_reason), "warning")
+        n_issues = len(editor_state.engine_structure_warnings())
+        if n_issues:
+            ui_state.push_toast(tr(ui_state, "engine_structure_toast", n=n_issues), "warning")
     except ValueError as exc:
         ui_state.push_toast(str(exc), "error")
 
@@ -3438,6 +3543,247 @@ def _draw_anim_timeline(ui_state, editor_state, WIN_W):
         else:
             t = max(0.0, min(end, (rel_x / timeline_w) * end))
             editor_state.anim_add_frame_at(t)
+
+
+# ── 引擎视图（规则体检）─────────────────────────────
+
+_ENGINE_GRADE_COLORS = {
+    0: (0.45, 0.90, 0.45, 1.0),
+    1: (1.00, 0.65, 0.20, 1.0),
+    2: (1.00, 0.30, 0.60, 1.0),
+}
+# 结构检查的严重程度配色
+_ENGINE_WARNING_COLORS = {
+    "too_few_particles": (1.0, 0.35, 0.35, 1.0),
+    "binding_over_17": (1.0, 0.35, 0.35, 1.0),
+    "arm_source_mismatch": (1.0, 0.65, 0.2, 1.0),
+    "no_upper_layer": (1.0, 0.65, 0.2, 1.0),
+    "anchor_not_lower": (0.75, 0.75, 0.75, 1.0),
+}
+
+
+def _engine_lang_pick(ui_state, pair):
+    """(中文, English) 按界面语言取一项。"""
+    return pair[0] if getattr(ui_state, "language", "en") == "zh" else pair[1]
+
+
+def _engine_rule_text(ui_state, ci):
+    from engine_skin import stick_rule
+    zh, en, _refs = stick_rule(ci)
+    return _engine_lang_pick(ui_state, (zh, en))
+
+
+def _engine_rule_refs(editor_state, ci):
+    """规则引用的粒子：[(下标, 当前名字或 None)]。"""
+    from engine_skin import stick_rule
+    refs = stick_rule(ci)[2]
+    return [(i, editor_state.particles[i]["name"] if i < len(editor_state.particles) else None)
+            for i in refs]
+
+
+def _engine_refs_label(ui_state, editor_state, ci):
+    missing = tr(ui_state, "engine_particle_missing")
+    return ", ".join(f"{i} {name if name is not None else missing}"
+                     for i, name in _engine_rule_refs(editor_state, ci)) or "-"
+
+
+def _engine_warning_lines(ui_state, warnings):
+    """结构检查结果 → [(文本, 颜色)]。"""
+    out = []
+    for code, params in warnings:
+        text = tr(ui_state, f"eng_w_{code}", **params)
+        out.append((text, _ENGINE_WARNING_COLORS.get(code, (1.0, 0.65, 0.2, 1.0))))
+    return out
+
+
+def _draw_engine_warnings(ui_state, editor_state, show_ok=True):
+    lines = _engine_warning_lines(ui_state, editor_state.engine_structure_warnings())
+    if not lines:
+        if show_ok:
+            imgui.text_colored(tr(ui_state, "engine_structure_ok"), *_ENGINE_GRADE_COLORS[0])
+        return
+    for text, col in lines:
+        imgui.push_style_color(imgui.COLOR_TEXT, *col)
+        imgui.text_wrapped(text)
+        imgui.pop_style_color()
+
+
+def _engine_anim_signature(editor_state):
+    """动画内容签名：用来判断扫描结果是否过期。"""
+    anim = editor_state.current_animation
+    if anim is None:
+        return None
+    return hash((
+        anim.name,
+        tuple((round(f.time, 6), tuple(f.positions)) for f in anim.frames),
+        tuple(sorted(editor_state._baseline_locked_indices)),
+        tuple(editor_state._baseline_positions or ()),
+        tuple((s.particle_a_id, s.particle_b_id) for s in editor_state.sticks),
+    ))
+
+
+def _engine_diag_cell(ui_state, info):
+    from engine_skin import grade
+    g = info["grade"] if "grade" in info else grade(info)
+    dist = info["distortion"]
+    dist_pct = dist * 100.0 if dist != float("inf") else 999.0
+    text = tr(ui_state, "engine_cell_diag", grade=tr(ui_state, f"engine_grade_{g}"),
+              sigma=info["sigma_min"], dist=dist_pct)
+    return text, _ENGINE_GRADE_COLORS[g]
+
+
+def engine_flagged_sticks(editor_state):
+    """当前帧需注意/异常的骨段：[(stick 下标, 等级)]，供视口高亮。"""
+    from engine_skin import grade
+    diag = editor_state.engine_diagnose()
+    if not diag:
+        return []
+    return [(ci, g) for ci, g in ((ci, grade(info)) for ci, info in enumerate(diag)) if g > 0]
+
+
+def draw_engine_window(ui_state, editor_state, WIN_W, WIN_H):
+    """引擎视图：结构检查 + 逐骨段规则体检 + 引擎语义粒子。"""
+    if not ui_state.show_engine_window:
+        return
+    imgui.set_next_window_size(720, 560, imgui.FIRST_USE_EVER)
+    imgui.set_next_window_position(WIN_W - 740, 60, imgui.FIRST_USE_EVER)
+    expanded, opened = imgui.begin(tr(ui_state, "engine_window_title") + "##engine_window", closable=True)
+    if not opened:
+        ui_state.show_engine_window = False
+    try:
+        if expanded:
+            _draw_engine_window_inner(ui_state, editor_state)
+    except Exception:
+        logger.exception("draw_engine_window 内部异常")
+    finally:
+        imgui.end()
+
+
+def _draw_engine_window_inner(ui_state, editor_state):
+    mode_label = tr(ui_state, f"skin_mode_{editor_state.effective_skinning_mode()}")
+    imgui.text(tr(ui_state, "engine_preview_mode", mode=mode_label))
+    if editor_state.skinning_fallback_reason:
+        imgui.text_colored(tr(ui_state, "skin_fallback", reason=editor_state.skinning_fallback_reason),
+                           1.0, 0.6, 0.2, 1.0)
+
+    # ── 结构检查 ──
+    if imgui.collapsing_header(tr(ui_state, "engine_structure_header"),
+                               flags=imgui.TREE_NODE_DEFAULT_OPEN)[0]:
+        _draw_engine_warnings(ui_state, editor_state)
+
+    # ── 逐骨段规则体检 ──
+    if imgui.collapsing_header(tr(ui_state, "engine_rules_header"),
+                               flags=imgui.TREE_NODE_DEFAULT_OPEN)[0]:
+        _, ui_state.engine_highlight_sticks = imgui.checkbox(
+            tr(ui_state, "engine_highlight_sticks") + "##eng_hl", ui_state.engine_highlight_sticks)
+
+        skin, reason = editor_state._engine_skin_for_diag()
+        if skin is None:
+            imgui.text_colored(tr(ui_state, "engine_diag_unavailable", reason=reason), 1.0, 0.6, 0.2, 1.0)
+        else:
+            can_scan = editor_state.animation_mode and editor_state.current_animation is not None
+            if can_scan and imgui.button(tr(ui_state, "engine_scan_btn") + "##eng_scan"):
+                ui_state._engine_scan = editor_state.engine_scan_animation()
+                ui_state._engine_scan_sig = _engine_anim_signature(editor_state)
+            scan = ui_state._engine_scan
+            if scan is not None:
+                imgui.same_line()
+                if ui_state._engine_scan_sig != _engine_anim_signature(editor_state):
+                    imgui.text_disabled(tr(ui_state, "engine_scan_stale"))
+                else:
+                    worst_ci = max(scan, key=lambda c: (scan[c]["grade"], -scan[c]["sigma_min"],
+                                                        scan[c]["distortion"]), default=None)
+                    if worst_ci is None or scan[worst_ci]["grade"] == 0:
+                        imgui.text_colored(tr(ui_state, "engine_scan_clean"), *_ENGINE_GRADE_COLORS[0])
+                    else:
+                        w = scan[worst_ci]
+                        name = editor_state.sticks[worst_ci].name if worst_ci < len(editor_state.sticks) else "?"
+                        imgui.text_colored(
+                            tr(ui_state, "engine_scan_worst", ci=worst_ci, name=name,
+                               grade=tr(ui_state, f"engine_grade_{w['grade']}"), t=w["time"]),
+                            *_ENGINE_GRADE_COLORS[w["grade"]])
+
+            _draw_engine_rules_table(ui_state, editor_state, editor_state.engine_diagnose(), scan)
+
+    # ── 引擎语义粒子 ──
+    if imgui.collapsing_header(tr(ui_state, "engine_particles_header"))[0]:
+        _draw_engine_particles_table(ui_state, editor_state)
+
+
+def _draw_engine_rules_table(ui_state, editor_state, diag, scan):
+    flags = (imgui.TABLE_BORDERS | imgui.TABLE_ROW_BACKGROUND | imgui.TABLE_RESIZABLE
+             | imgui.TABLE_SIZING_FIXED_FIT)
+    table = imgui.begin_table("##eng_rules", 5, flags)
+    if not table.opened:
+        return
+    # try/finally：行内出错也要 end_table，否则 imgui 的 ID 栈失衡、整帧断言
+    try:
+        for key in ("engine_col_stick", "engine_col_rule", "engine_col_refs",
+                    "engine_col_now", "engine_col_worst"):
+            imgui.table_setup_column(tr(ui_state, key))
+        imgui.table_headers_row()
+        for ci, stick in enumerate(editor_state.sticks):
+            imgui.table_next_row()
+            imgui.table_set_column_index(0)
+            imgui.text(f"#{ci} {stick.name}")
+            imgui.table_set_column_index(1)
+            imgui.text(_engine_rule_text(ui_state, ci))
+            imgui.table_set_column_index(2)
+            refs = _engine_rule_refs(editor_state, ci)
+            imgui.text(" ".join(str(i) for i, _n in refs) or "-")
+            if refs and imgui.is_item_hovered():
+                imgui.set_tooltip(_engine_refs_label(ui_state, editor_state, ci))
+            imgui.table_set_column_index(3)
+            if diag and ci < len(diag):
+                text, col = _engine_diag_cell(ui_state, diag[ci])
+                imgui.text_colored(text, *col)
+                if imgui.is_item_hovered():
+                    imgui.set_tooltip(tr(ui_state, "engine_diag_tip"))
+            imgui.table_set_column_index(4)
+            if scan is not None and ci in scan:
+                w = scan[ci]
+                text, col = _engine_diag_cell(ui_state, w)
+                imgui.push_style_color(imgui.COLOR_TEXT, *col)
+                try:
+                    clicked = imgui.small_button(f"{text} @{w['time']:.2f}s##eng_jump_{ci}")
+                finally:
+                    imgui.pop_style_color()
+                if clicked:
+                    editor_state.playback_playing = False
+                    editor_state.playback_time = float(w["time"])
+                    editor_state._apply_interpolated_to_particles(float(w["time"]))
+                if imgui.is_item_hovered():
+                    imgui.set_tooltip(tr(ui_state, "engine_jump_tip"))
+    finally:
+        imgui.end_table()
+
+
+def _draw_engine_particles_table(ui_state, editor_state):
+    from engine_skin import VANILLA_PARTICLE_NAMES
+    table = imgui.begin_table("##eng_particles", 4, imgui.TABLE_BORDERS | imgui.TABLE_ROW_BACKGROUND
+                              | imgui.TABLE_SIZING_FIXED_FIT)
+    if not table.opened:
+        return
+    try:
+        for key in ("engine_col_index", "engine_col_particle", "engine_col_role", "engine_col_vanilla"):
+            imgui.table_setup_column(tr(ui_state, key))
+        imgui.table_headers_row()
+        for idx in sorted(SEMANTIC_PARTICLES):
+            imgui.table_next_row()
+            imgui.table_set_column_index(0)
+            imgui.text(str(idx))
+            imgui.table_set_column_index(1)
+            if idx < len(editor_state.particles):
+                p = editor_state.particles[idx]
+                imgui.text(f"{p['name']} ({p['id']})")
+            else:
+                imgui.text_colored(tr(ui_state, "engine_particle_missing"), 1.0, 0.35, 0.35, 1.0)
+            imgui.table_set_column_index(2)
+            imgui.text(_engine_lang_pick(ui_state, SEMANTIC_PARTICLES[idx]))
+            imgui.table_set_column_index(3)
+            imgui.text_disabled(VANILLA_PARTICLE_NAMES[idx])
+    finally:
+        imgui.end_table()
 
 
 # ── 非法 voxel binding 对话框 ─────────────────────

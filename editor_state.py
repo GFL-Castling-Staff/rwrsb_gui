@@ -186,6 +186,11 @@ class EditorState:
         # engine 模式建不起来时的原因（空串 = 正常）；此时实际落回 legacy_table
         self.skinning_fallback_reason = ""
         self._engine_skin = None  # engine_skin.EngineSkinBinding | None
+        # 引擎规则体检：预览用旧版规则时临时按 canonical 建的 bind，以及逐帧结果缓存
+        self._engine_diag_key = None
+        self._engine_diag_skin = None
+        self._engine_diag_reason = ""
+        self._engine_diag_cache = (None, None)
 
         # 旧版全局蒙皮规则开关（由 skinning_mode 派生，legacy_topology 时为 True）：
         # True 时 _compute_body_bridge_frame 跳过 vanilla 硬编码表，
@@ -2277,6 +2282,106 @@ class EditorState:
         voxels_xyz = [v[:3] for v in self.voxels] if self.voxels else []
         return EngineSkinBinding(positions, self._stick_index_pairs(particles),
                                  voxels_xyz, self.bindings)
+
+    # ──────────────────────────────────────────────
+    # 引擎规则体检
+    # ──────────────────────────────────────────────
+
+    def _engine_skin_for_diag(self):
+        """体检用的引擎 bind，返回 (binding | None, 不可用原因)。
+
+        预览本身在用引擎规则时直接复用；用旧版规则时按 canonical 骨架另建一个
+        不带体素的 bind——体检回答的是"游戏会怎么处理"，与预览选哪种规则无关。
+        """
+        if self._engine_skin is not None:
+            return self._engine_skin, ""
+        from engine_skin import EngineSkinBinding
+        source = self._canonical_skeleton_pose or [
+            (float(p["x"]), float(p["y"]), float(p["z"])) for p in self.particles]
+        key = (tuple(source), tuple((s.particle_a_id, s.particle_b_id) for s in self.sticks),
+               tuple(int(p["id"]) for p in self.particles))
+        if key != self._engine_diag_key:
+            self._engine_diag_key = key
+            self._engine_diag_skin = None
+            self._engine_diag_reason = ""
+            try:
+                if len(source) != len(self.particles):
+                    raise ValueError("canonical 骨架与当前粒子数不一致")
+                self._engine_diag_skin = EngineSkinBinding(
+                    source, self._stick_index_pairs(self.particles), [], {})
+            except Exception as exc:
+                self._engine_diag_reason = str(exc)
+        return self._engine_diag_skin, self._engine_diag_reason
+
+    def engine_diagnose(self, positions=None):
+        """按当前（或给定）粒子位置逐 stick 体检；不可用时返回 None。结果按位置缓存。"""
+        skin, _reason = self._engine_skin_for_diag()
+        if skin is None:
+            return None
+        if positions is None:
+            positions = [(p["x"], p["y"], p["z"]) for p in self.particles]
+        P = np.asarray(positions, dtype=np.float64)
+        if len(P) != skin.n_particles:
+            return None
+        key = (id(skin), P.tobytes())
+        if self._engine_diag_cache[0] == key:
+            return self._engine_diag_cache[1]
+        result = skin.diagnose(P)
+        self._engine_diag_cache = (key, result)
+        return result
+
+    def _positions_at(self, t):
+        """动画在时刻 t 的粒子位置（含半身锁定），不改动 self.particles。"""
+        from animation_io import interpolate_positions
+        pos = [list(p) for p in interpolate_positions(
+            self.current_animation, t, n_particles=len(self.particles))]
+        if self._baseline_positions is not None:
+            for idx in self._baseline_locked_indices:
+                if 0 <= idx < len(pos) and idx < len(self._baseline_positions):
+                    pos[idx] = list(self._baseline_positions[idx])
+        return pos
+
+    def engine_scan_animation(self, n_samples=60):
+        """整段动画体检：返回 {stick 下标: {"grade","sigma_min","distortion","time"}}（取最差一刻）。
+
+        采样点 = 全部关键帧时刻 + 均匀 n_samples 个点。不可用时返回 None。
+        """
+        from engine_skin import grade
+        anim = self.current_animation
+        if not self.animation_mode or anim is None or not anim.frames:
+            return None
+        skin, _reason = self._engine_skin_for_diag()
+        if skin is None:
+            return None
+        # 最后一帧之后游戏保持末帧姿态，采样到最后一帧即可
+        last = max(f.time for f in anim.frames)
+        times = sorted({round(f.time, 6) for f in anim.frames}
+                       | {round(float(t), 6) for t in np.linspace(0.0, last, n_samples)})
+        worst = {}
+        for t in times:
+            P = self._positions_at(t)
+            if len(P) != skin.n_particles:
+                return None
+            for ci, info in enumerate(skin.diagnose(P)):
+                g = grade(info)
+                key = (g, -info["sigma_min"], info["distortion"])
+                prev = worst.get(ci)
+                if prev is None or key > prev["_key"]:
+                    worst[ci] = {"grade": g, "sigma_min": info["sigma_min"],
+                                 "distortion": info["distortion"], "degenerate": info["degenerate"],
+                                 "time": t, "_key": key}
+        for w in worst.values():
+            w.pop("_key", None)
+        return worst
+
+    def engine_structure_warnings(self):
+        """与姿态无关的引擎结构检查，返回 [(code, params)]。"""
+        from engine_skin import static_warnings
+        id_to_idx = {int(p["id"]): i for i, p in enumerate(self.particles)}
+        pairs = [(id_to_idx.get(int(s.particle_a_id), -1), id_to_idx.get(int(s.particle_b_id), -1))
+                 for s in self.sticks]
+        hints = [int(p.get("bodyAreaHint", 1)) for p in self.particles]
+        return static_warnings(len(self.particles), pairs, self.bindings, hints)
 
     def _update_voxels_engine(self):
         from engine_skin import nearest_rotation
