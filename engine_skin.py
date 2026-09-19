@@ -25,6 +25,13 @@ SIGMA_WARN = 0.35        # FromAxes 输入最小奇异值低于此值：参考�
 SIGMA_BAD = 0.15
 DISTORTION_WARN = 0.10   # 相对 bind 的拉伸/压扁超过 10%
 DISTORTION_BAD = 0.30
+# bind 往返误差 ‖M(q)·M(q⁻¹) − I‖：bind 四元数非单位时两者不抵消，
+# 游戏里这段体素在 bind 姿态下就已错位（vanilla 为 0）
+BIND_ERROR_WARN = 0.05
+BIND_ERROR_BAD = 0.20
+# bind 姿态下体素实际错位（体素单位）；相对误差不大但骨段上的体素离 a 端很远时同样明显
+BIND_DRIFT_WARN = 0.5
+BIND_DRIFT_BAD = 2.0
 
 VANILLA_PARTICLE_NAMES = (
     "head", "neck", "rightshoulder", "leftshoulder", "rightelbow", "leftelbow",
@@ -191,8 +198,13 @@ def get_rotation_to(src, dest, fallback):
 
 
 def nearest_rotation(m):
-    """极分解取最近的正交旋转（给 oriented cube 用，避免立方体被剪切）。"""
-    u, _s, vt = np.linalg.svd(m)
+    """极分解取最近的正交旋转（给 oriented cube 用，避免立方体被剪切）；输入非有限时返回单位阵。"""
+    if not np.all(np.isfinite(m)):
+        return np.eye(3)
+    try:
+        u, _s, vt = np.linalg.svd(m)
+    except np.linalg.LinAlgError:
+        return np.eye(3)
     r = u @ vt
     if np.linalg.det(r) < 0.0:
         u[:, -1] = -u[:, -1]
@@ -201,8 +213,13 @@ def nearest_rotation(m):
 
 
 def distortion(m):
-    """σmax/σmin − 1：0 为刚性，越大拉伸/压扁越明显；奇异时返回 inf。"""
-    sv = np.linalg.svd(m, compute_uv=False)
+    """σmax/σmin − 1：0 为刚性，越大拉伸/压扁越明显；奇异或非有限时返回 inf。"""
+    if not np.all(np.isfinite(m)):
+        return float("inf")
+    try:
+        sv = np.linalg.svd(m, compute_uv=False)
+    except np.linalg.LinAlgError:
+        return float("inf")
     return float(sv[0] / sv[-1] - 1.0) if sv[-1] > 1e-12 else float("inf")
 
 
@@ -340,11 +357,18 @@ class EngineSkinBinding:
         self.n_particles = n
         V = np.asarray(voxels_xyz, dtype=float).reshape(-1, 3)
         F = body_frame(P)
-        # 每根 stick 的 bind 逆矩阵（与 q_mul_vec(q⁻¹, ·) 等价），体检算畸变也要用
+        # 每根 stick 的 bind 逆矩阵（与 q_mul_vec(q⁻¹, ·) 等价），体检算畸变也要用。
+        # bind_error = ‖M(q)·M(q⁻¹) − I‖（谱范数）：bind 四元数非单位时两者不抵消，
+        # 游戏里这段体素在 bind 姿态下就会错位，错位量约为 bind_error × 体素到 a 端的距离
         self.bind_inv = []
+        self.bind_error = []
         for ci, (a, b) in enumerate(self.stick_pairs):
             q = stick_orientation(ci, P[a], P[b], F)
-            self.bind_inv.append(q_to_matrix(q_inverse(q)))
+            inv = q_to_matrix(q_inverse(q))
+            self.bind_inv.append(inv)
+            roundtrip = q_to_matrix(q) @ inv - np.eye(3)
+            self.bind_error.append(float(np.linalg.norm(roundtrip, 2)) if np.all(np.isfinite(roundtrip))
+                                   else float("inf"))
 
         by_stick = {}
         for vi, ci in bindings.items():
@@ -352,10 +376,16 @@ class EngineSkinBinding:
             if 0 <= vi < len(V) and 0 <= ci < len(self.stick_pairs):
                 by_stick.setdefault(ci, []).append(vi)
         self.groups = {}
+        # 每根 stick 的体素在 bind 姿态下实际被挪开的最大距离（体素单位；无体素为 0）
+        self.bind_drift = [0.0] * len(self.stick_pairs)
         for ci, vis in by_stick.items():
             vis = np.array(sorted(vis), dtype=np.int64)
             a = self.stick_pairs[ci][0]
-            self.groups[ci] = (vis, (V[vis] - P[a]) @ self.bind_inv[ci].T)
+            local = (V[vis] - P[a]) @ self.bind_inv[ci].T
+            self.groups[ci] = (vis, local)
+            q = stick_orientation(ci, P[a], P[self.stick_pairs[ci][1]], F)
+            back = local @ q_to_matrix(q).T + P[a]
+            self.bind_drift[ci] = float(np.max(np.linalg.norm(back - V[vis], axis=1)))
 
     def stick_matrices(self, P, F=None):
         """每根 stick 的 (M_now, 原点)。M_now @ local + 原点 = 世界坐标。"""
@@ -380,22 +410,31 @@ class EngineSkinBinding:
         return worlds, deltas
 
     def diagnose(self, P):
-        """逐 stick 体检：[{"sigma_min", "degenerate", "distortion"}]，distortion 相对 bind。"""
+        """逐 stick 体检：[{"sigma_min", "degenerate", "distortion", "bind_error", "bind_drift"}]。
+
+        distortion 相对 bind；bind_error / bind_drift 与姿态无关，来自 bind 时的计算。
+        """
         P = np.asarray(P, dtype=float)
         F = body_frame(P)
         out = []
         for ci, (a, b) in enumerate(self.stick_pairs):
             q, info = stick_orientation(ci, P[a], P[b], F, diagnose=True)
             info["distortion"] = distortion(q_to_matrix(q) @ self.bind_inv[ci])
+            info["bind_error"] = self.bind_error[ci]
+            info["bind_drift"] = self.bind_drift[ci]
             out.append(info)
         return out
 
 
 def grade(info):
     """体检结果分级：0 正常 / 1 注意 / 2 异常。"""
-    if info["degenerate"] or info["sigma_min"] < SIGMA_BAD or info["distortion"] > DISTORTION_BAD:
+    bind_error = info.get("bind_error", 0.0)
+    bind_drift = info.get("bind_drift", 0.0)
+    if (info["degenerate"] or info["sigma_min"] < SIGMA_BAD or info["distortion"] > DISTORTION_BAD
+            or bind_error > BIND_ERROR_BAD or bind_drift > BIND_DRIFT_BAD):
         return 2
-    if info["sigma_min"] < SIGMA_WARN or info["distortion"] > DISTORTION_WARN:
+    if (info["sigma_min"] < SIGMA_WARN or info["distortion"] > DISTORTION_WARN
+            or bind_error > BIND_ERROR_WARN or bind_drift > BIND_DRIFT_WARN):
         return 1
     return 0
 
@@ -407,8 +446,9 @@ def static_warnings(n_particles, stick_pairs, bindings, body_hints=None):
       too_few_particles   粒子 < 13，引擎会越界（推断，待实测）
       binding_over_17     有体素绑在下标 ≥ 17 的 stick 上，游戏的骨骼矩阵放不下
       arm_source_mismatch 上臂 stick 端点与引擎取朝向的粒子对不一致
-      anchor_not_lower    粒子 8 的 bodyAreaHint 不是 1（上半身层按它对齐）
+      anchor_not_lower    粒子 8 的 bodyAreaHint 是 2：它会随上半身层跟瞄准方向转（vanilla 为 1）
       no_upper_layer      没有 bodyAreaHint = 2 的粒子，上半身动画层不起作用
+    （bind 往返误差需要 EngineSkinBinding，见 bind_warnings）
     """
     out = []
     if n_particles < MIN_PARTICLES:
@@ -420,8 +460,28 @@ def static_warnings(n_particles, stick_pairs, bindings, body_hints=None):
         if ci < len(stick_pairs) and {int(v) for v in stick_pairs[ci]} != {src_a, src_b}:
             out.append(("arm_source_mismatch", {"stick": ci, "a": src_a, "b": src_b}))
     if body_hints is not None:
-        if len(body_hints) > 8 and int(body_hints[8]) != 1:
+        # 游戏只把 hint == 2 当上半身层，其它值都是下半身层
+        if len(body_hints) > 8 and int(body_hints[8]) == 2:
             out.append(("anchor_not_lower", {"hint": int(body_hints[8])}))
         if not any(int(h) == 2 for h in body_hints):
             out.append(("no_upper_layer", {}))
     return out
+
+
+def bind_warnings(skin, only_sticks=None):
+    """bind 往返误差超阈值的 stick：[("bind_drift", {"sticks": "#4 27.1, #0 8.3"})] 或 []。
+
+    only_sticks：只看这些 stick（通常是有体素绑定的）；None 表示全部。
+    有体素时附上 bind 姿态下体素实际被挪开的最大距离（体素单位），否则附相对误差。
+    """
+    items = []
+    for ci, err in enumerate(skin.bind_error):
+        drift = skin.bind_drift[ci]
+        if (err <= BIND_ERROR_WARN and drift <= BIND_DRIFT_WARN) or (
+                only_sticks is not None and ci not in only_sticks):
+            continue
+        items.append((drift if drift > 0 else err, ci, f"#{ci} {drift:.1f}" if drift > 0 else f"#{ci} {err:.0%}"))
+    if not items:
+        return []
+    items.sort(reverse=True)
+    return [("bind_drift", {"sticks": ", ".join(label for _v, _c, label in items)})]

@@ -190,7 +190,7 @@ class EditorState:
         self._engine_diag_key = None
         self._engine_diag_skin = None
         self._engine_diag_reason = ""
-        self._engine_diag_cache = (None, None)
+        self._engine_diag_cache = (None, None, None)  # (binding, 位置字节, 结果)
 
         # 旧版全局蒙皮规则开关（由 skinning_mode 派生，legacy_topology 时为 True）：
         # True 时 _compute_body_bridge_frame 跳过 vanilla 硬编码表，
@@ -679,6 +679,7 @@ class EditorState:
         if trans_bias is not None:
             self.trans_bias = trans_bias
         self.clear_composite(refresh=False)
+        self._reset_skin_binding()
         self.voxels = parse_vox(path, self.trans_bias)
         self.bindings = {}
         self.selected_voxels = set()
@@ -711,6 +712,7 @@ class EditorState:
             self.trans_bias = trans_bias
         voxels, skeleton, bindings = parse_xml(path)
         self.clear_composite(refresh=False)
+        self._reset_skin_binding()
         self.voxels = voxels
         self.bindings = bindings
         self.selected_voxels = set()
@@ -748,6 +750,7 @@ class EditorState:
             preset_path = resource_path("presets", "human_skeleton.json")
         data = json.loads(Path(preset_path).read_text(encoding="utf-8"))
         self.clear_composite(refresh=False)
+        self._reset_skin_binding()
         self.particles = list(data.get("particles", []))
         self._rebuild_sticks_from_raw(data.get("sticks", []))
         self.active_stick_idx = 0
@@ -768,6 +771,7 @@ class EditorState:
 
         voxels, skeleton, bindings = parse_xml(path)
         self.clear_composite(refresh=False)
+        self._reset_skin_binding()
         # 保留 voxels 和 bindings（供蒙皮用）
         self.voxels = voxels
         self.bindings = bindings
@@ -1443,8 +1447,14 @@ class EditorState:
                     self.particles[i]['x'] = x
                     self.particles[i]['y'] = y
                     self.particles[i]['z'] = z
-        # 把 voxel 归位到 bind pose（此时 particles 已恢复到 bind pose 位置）
-        self.update_voxel_positions_from_skeleton()
+        # 把 voxel 归位到 bind pose。有 canonical 时直接换回：引擎规则下 bind 四元数非单位的
+        # 骨段"在 bind 姿态再蒙皮一次"回不到原位（游戏里也一样），不能靠它归位
+        if (self._canonical_voxel_positions is not None
+                and len(self._canonical_voxel_positions) == len(self.voxels)):
+            self.voxels = list(self._canonical_voxel_positions)
+            self._bone_orientations = None  # 立方体朝向回到 identity（下次上传时重建）
+        else:
+            self.update_voxel_positions_from_skeleton()
         self.gpu_dirty = True
 
         self.animation_mode = False
@@ -2276,6 +2286,13 @@ class EditorState:
             _origin, R_bind, u_bind = stick_frames[ci]
             self._voxel_groups[ci] = (vis, locals_arr, u_bind, R_bind)
 
+    def _reset_skin_binding(self):
+        """丢掉旧模型的蒙皮 bind 数据（加载新模型 / 骨架 / 预设时调用）。"""
+        self._engine_skin = None
+        self.skinning_fallback_reason = ""
+        self._voxel_local_offsets = {}
+        self._voxel_groups = {}
+
     def _stick_index_pairs(self, particles):
         """按 stick 顺序返回 (a 粒子下标, b 粒子下标)；端点缺失时抛 EngineSkinUnavailable。"""
         from engine_skin import EngineSkinUnavailable
@@ -2346,26 +2363,30 @@ class EditorState:
             self.update_voxel_positions_from_skeleton()
             self.gpu_dirty = True
 
-    def _composite_other_time(self):
+    def _composite_other_time(self, t_edit):
         """另一层动画的时刻：两层按各自 speed 同步走过同一段真实时间。"""
         other = self.composite_other_anim
         cur = self.current_animation
         speed = cur.speed if cur is not None and abs(cur.speed) > 1e-6 else 1.0
-        t = self.playback_time / speed * other.speed
+        t = t_edit / speed * other.speed
         if other.loop and other.end > 0:
             return t % other.end
         return max(0.0, t)
 
     def display_positions(self):
         """视口与蒙皮用的粒子位置 (N,3)：合成预览关闭时就是 self.particles。"""
-        from animation_io import interpolate_positions
         P = np.array([(p["x"], p["y"], p["z"]) for p in self.particles], dtype=np.float64)
         if not self.composite_active() or len(P) == 0:
             return P
+        return self._apply_composite(P, self.playback_time)
+
+    def _apply_composite(self, P, t_edit):
+        """把合成预览叠到编辑姿态 P（动画时刻 t_edit）上，返回新数组。"""
+        from animation_io import interpolate_positions
         upper_mask = np.array([int(p.get("bodyAreaHint", 1)) == 2 for p in self.particles])
         other = self.composite_other_anim
         if other is not None and len(P) > self.COMPOSITE_ANCHOR:
-            O = np.array(interpolate_positions(other, self._composite_other_time(), len(P)),
+            O = np.array(interpolate_positions(other, self._composite_other_time(t_edit), len(P)),
                          dtype=np.float64)
             if O.shape == P.shape:
                 upper, lower = (P, O) if self.composite_current_is_upper else (O, P)
@@ -2397,14 +2418,17 @@ class EditorState:
     def _engine_skin_for_diag(self):
         """体检用的引擎 bind，返回 (binding | None, 不可用原因)。
 
-        预览本身在用引擎规则时直接复用；用旧版规则时按 canonical 骨架另建一个
-        不带体素的 bind——体检回答的是"游戏会怎么处理"，与预览选哪种规则无关。
+        动画模式且预览在用引擎规则时直接复用；其它情况另建一个不带体素的 bind——
+        体检回答的是"游戏会怎么处理"，与预览选哪种规则无关。bind 源：动画模式用
+        canonical 骨架；绑骨时正在编辑的骨架本身就是 bind 姿态。
         """
-        if self._engine_skin is not None:
+        if self.animation_mode and self._engine_skin is not None:
             return self._engine_skin, ""
         from engine_skin import EngineSkinBinding
-        source = self._canonical_skeleton_pose or [
-            (float(p["x"]), float(p["y"]), float(p["z"])) for p in self.particles]
+        if self.animation_mode and self._canonical_skeleton_pose:
+            source = self._canonical_skeleton_pose
+        else:
+            source = [(float(p["x"]), float(p["y"]), float(p["z"])) for p in self.particles]
         key = (tuple(source), tuple((s.particle_a_id, s.particle_b_id) for s in self.sticks),
                tuple(int(p["id"]) for p in self.particles))
         if key != self._engine_diag_key:
@@ -2428,13 +2452,15 @@ class EditorState:
         if positions is None:
             positions = self.display_positions()
         P = np.asarray(positions, dtype=np.float64)
-        if len(P) != skin.n_particles:
+        if len(P) != skin.n_particles or not np.all(np.isfinite(P)):
             return None
-        key = (id(skin), P.tobytes())
-        if self._engine_diag_cache[0] == key:
-            return self._engine_diag_cache[1]
+        # 缓存按 binding 对象本身（is）与位置比较；不能用 id()——旧对象释放后地址会被新对象复用
+        key = P.tobytes()
+        cached_skin, cached_key, cached = self._engine_diag_cache
+        if cached_skin is skin and cached_key == key:
+            return cached
         result = skin.diagnose(P)
-        self._engine_diag_cache = (key, result)
+        self._engine_diag_cache = (skin, key, result)
         return result
 
     def _positions_at(self, t):
@@ -2449,53 +2475,68 @@ class EditorState:
         return pos
 
     def engine_scan_animation(self, n_samples=60):
-        """整段动画体检：返回 {stick 下标: {"grade","sigma_min","distortion","time"}}（取最差一刻）。
+        """整段动画体检：返回 {stick 下标: {"grade","sigma_min","distortion","time",...}}（取最差一刻）。
 
-        采样点 = 全部关键帧时刻 + 均匀 n_samples 个点。不可用时返回 None。
+        采样点 = 全部关键帧时刻 + 均匀 n_samples 个点；合成预览开着时按合成后的姿态扫，
+        与"本帧"一栏一致。无法扫描时抛 ValueError 说明原因。
         """
         from engine_skin import grade
         anim = self.current_animation
         if not self.animation_mode or anim is None or not anim.frames:
-            return None
-        skin, _reason = self._engine_skin_for_diag()
+            raise ValueError("没有可扫描的动画")
+        skin, reason = self._engine_skin_for_diag()
         if skin is None:
-            return None
+            raise ValueError(reason or "引擎体检不可用")
         # 最后一帧之后游戏保持末帧姿态，采样到最后一帧即可
         last = max(f.time for f in anim.frames)
         times = sorted({round(f.time, 6) for f in anim.frames}
                        | {round(float(t), 6) for t in np.linspace(0.0, last, n_samples)})
+        composite = self.composite_active()
         worst = {}
         for t in times:
-            P = self._positions_at(t)
+            P = np.array(self._positions_at(t), dtype=np.float64)
             if len(P) != skin.n_particles:
-                return None
+                raise ValueError(f"动画的粒子数（{len(P)}）与骨架（{skin.n_particles}）不一致")
+            if composite:
+                P = self._apply_composite(P, t)
+            if not np.all(np.isfinite(P)):
+                continue
             for ci, info in enumerate(skin.diagnose(P)):
                 g = grade(info)
                 key = (g, -info["sigma_min"], info["distortion"])
                 prev = worst.get(ci)
                 if prev is None or key > prev["_key"]:
-                    worst[ci] = {"grade": g, "sigma_min": info["sigma_min"],
-                                 "distortion": info["distortion"], "degenerate": info["degenerate"],
-                                 "time": t, "_key": key}
+                    worst[ci] = dict(info, grade=g, time=t, _key=key)
         for w in worst.values():
             w.pop("_key", None)
         return worst
 
     def engine_structure_warnings(self):
-        """与姿态无关的引擎结构检查，返回 [(code, params)]。"""
-        from engine_skin import static_warnings
+        """与姿态无关的引擎结构检查，返回 [(code, params)]。没有骨架时不检查。"""
+        from engine_skin import static_warnings, bind_warnings
+        if not self.particles:
+            return []
         id_to_idx = {int(p["id"]): i for i, p in enumerate(self.particles)}
         pairs = [(id_to_idx.get(int(s.particle_a_id), -1), id_to_idx.get(int(s.particle_b_id), -1))
                  for s in self.sticks]
         hints = [int(p.get("bodyAreaHint", 1)) for p in self.particles]
-        return static_warnings(len(self.particles), pairs, self.bindings, hints)
+        out = static_warnings(len(self.particles), pairs, self.bindings, hints)
+        skin, _reason = self._engine_skin_for_diag()
+        if skin is not None:
+            # 有体素时只看绑了体素的骨段（没绑体素的骨段错位也看不见）
+            bound = set(self.bindings.values()) if self.bindings else None
+            out += bind_warnings(skin, bound)
+        return out
 
     def _update_voxels_engine(self):
         from engine_skin import nearest_rotation
         skin = self._engine_skin
         if len(self.particles) != skin.n_particles:
             return
-        worlds, deltas = skin.pose(self.display_positions())
+        P = self.display_positions()
+        if not np.all(np.isfinite(P)):
+            return
+        worlds, deltas = skin.pose(P)
         if not worlds:
             return
         self._ensure_bone_orientation_arrays()

@@ -280,6 +280,9 @@ _TEXT = {
         "eng_w_arm_source_mismatch": "Stick #{stick} does not connect particles {a} and {b}; in game its voxels take their orientation from the {a}->{b} line, not from this stick.",
         "eng_w_anchor_not_lower": "Particle 8 has bodyAreaHint {hint} (vanilla: 1); it will turn with the upper body (aim direction).",
         "eng_w_no_upper_layer": "No particle has bodyAreaHint = 2; upper-body animation layers (aiming, reloading) will have no effect in game.",
+        "eng_w_bind_drift": "These sticks' reference direction is nearly parallel to the stick in the bind pose, so in game their voxels are displaced even at rest (max drift in voxels, or relative error): {sticks}. Re-pose those sticks in the model's bind skeleton.",
+        "engine_bind_error_tip": "Bind round-trip error {pct:.0f}%, max voxel drift at bind {drift:.1f}",
+        "engine_scan_failed": "Cannot scan: {error}",
         # bodyAreaHint 语义
         "body_hint_lower": "1 Lower body (follows move direction)",
         "body_hint_upper": "2 Upper body (follows aim, overridden by upper-body anims)",
@@ -728,6 +731,9 @@ _TEXT = {
         "eng_w_arm_source_mismatch": "骨段 #{stick} 两端不是粒子 {a}、{b}；游戏里它的体素朝向取自 {a} -> {b} 连线，不跟本骨段转。",
         "eng_w_anchor_not_lower": "粒子 8 的 bodyAreaHint 是 {hint}（vanilla 为 1）；它会随上半身层跟瞄准方向转。",
         "eng_w_no_upper_layer": "没有 bodyAreaHint = 2 的粒子；游戏里的上半身动画层（瞄准、换弹等）不会生效。",
+        "eng_w_bind_drift": "这些骨段在 bind 姿态下参考方向与骨段几乎平行，游戏里它们的体素在静止时就会错位（最大错位体素数或相对误差）：{sticks}。请调整模型 bind 骨架里这些骨段的摆放。",
+        "engine_bind_error_tip": "bind 往返误差 {pct:.0f}%，bind 姿态下体素最大错位 {drift:.1f}",
+        "engine_scan_failed": "无法扫描：{error}",
         # bodyAreaHint 语义
         "body_hint_lower": "1 下半身（跟移动方向）",
         "body_hint_upper": "2 上半身（跟瞄准方向，可被上身动画替换）",
@@ -3726,6 +3732,7 @@ _ENGINE_WARNING_COLORS = {
     "arm_source_mismatch": (1.0, 0.65, 0.2, 1.0),
     "no_upper_layer": (1.0, 0.65, 0.2, 1.0),
     "anchor_not_lower": (0.75, 0.75, 0.75, 1.0),
+    "bind_drift": (1.0, 0.35, 0.35, 1.0),
 }
 
 
@@ -3859,8 +3866,12 @@ def _draw_engine_window_inner(ui_state, editor_state):
         else:
             can_scan = editor_state.animation_mode and editor_state.current_animation is not None
             if can_scan and imgui.button(tr(ui_state, "engine_scan_btn") + "##eng_scan"):
-                ui_state._engine_scan = editor_state.engine_scan_animation()
-                ui_state._engine_scan_sig = _engine_anim_signature(editor_state)
+                try:
+                    ui_state._engine_scan = editor_state.engine_scan_animation()
+                    ui_state._engine_scan_sig = _engine_anim_signature(editor_state)
+                except ValueError as exc:
+                    ui_state._engine_scan = None
+                    ui_state.push_toast(tr(ui_state, "engine_scan_failed", error=exc), "warning")
             scan = ui_state._engine_scan
             if scan is not None:
                 imgui.same_line()
@@ -4006,7 +4017,12 @@ def _draw_engine_rules_table(ui_state, editor_state, diag, scan):
                 text, col, grade_label = _engine_diag_cell(ui_state, diag[ci])
                 imgui.text_colored(text, *col)
                 if imgui.is_item_hovered():
-                    imgui.set_tooltip(f"{grade_label}  {text}\n" + tr(ui_state, "engine_diag_tip"))
+                    tip = f"{grade_label}  {text}\n"
+                    bind_error = diag[ci].get("bind_error", 0.0)
+                    if bind_error > 1e-6:
+                        tip += tr(ui_state, "engine_bind_error_tip", pct=min(bind_error, 9.99) * 100.0,
+                                  drift=diag[ci].get("bind_drift", 0.0)) + "\n"
+                    imgui.set_tooltip(tip + tr(ui_state, "engine_diag_tip"))
             imgui.table_set_column_index(4)
             if scan is not None and ci in scan:
                 w = scan[ci]
