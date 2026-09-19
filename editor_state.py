@@ -2294,7 +2294,7 @@ class EditorState:
         over = sorted({ci for ci in self.bindings.values() if ci >= MAX_GPU_STICKS})
         if over:
             raise EngineSkinUnavailable(
-                f"有体素绑在下标 ≥ {MAX_GPU_STICKS} 的 stick 上（{over}），游戏无法渲染")
+                f"有体素绑在下标 >= {MAX_GPU_STICKS} 的 stick 上（{over}），游戏无法渲染")
         positions = [(float(p["x"]), float(p["y"]), float(p["z"])) for p in particles]
         voxels_xyz = [v[:3] for v in self.voxels] if self.voxels else []
         return EngineSkinBinding(positions, self._stick_index_pairs(particles),

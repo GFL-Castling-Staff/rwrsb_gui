@@ -260,7 +260,7 @@ _TEXT = {
         "engine_grade_0": "OK",
         "engine_grade_1": "Caution",
         "engine_grade_2": "Bad",
-        "engine_cell_diag": "{grade} s{sigma:.2f} d{dist:.0f}%",
+        "engine_cell_diag": "s{sigma:.2f} d{dist:.0f}%",
         "engine_diag_tip": ("s = smallest singular value of the axes fed to the engine (1 = ideal, near 0 = reference\n"
                             "almost parallel to the stick, voxels collapse or flip in game).\n"
                             "d = stretch/squash relative to bind pose. Thresholds are calibrated on vanilla animations."),
@@ -708,7 +708,7 @@ _TEXT = {
         "engine_grade_0": "正常",
         "engine_grade_1": "注意",
         "engine_grade_2": "异常",
-        "engine_cell_diag": "{grade} s{sigma:.2f} d{dist:.0f}%",
+        "engine_cell_diag": "s{sigma:.2f} d{dist:.0f}%",
         "engine_diag_tip": ("s = 传给引擎的坐标轴最小奇异值（1 = 理想，接近 0 = 参考方向与骨段几乎平行，\n"
                             "游戏里这段体素会塌缩或翻转）。\n"
                             "d = 相对 bind 姿态的拉伸/压扁。阈值按 vanilla 动画标定。"),
@@ -724,8 +724,8 @@ _TEXT = {
         "engine_stick_rule_tip": "引擎规则 #{ci}：{rule}\n参考粒子：{refs}",
         "engine_structure_toast": "引擎结构检查：{n} 条问题，详见「引擎...」窗口",
         "eng_w_too_few_particles": "只有 {n} 个粒子；引擎会按下标读到粒子 12，至少需要 {min} 个。游戏可能在渲染时出错（推断，待实测）。",
-        "eng_w_binding_over_17": "有体素绑在下标 ≥ 17 的骨段上（{sticks}）；游戏只有 17 个骨骼矩阵，无法渲染。",
-        "eng_w_arm_source_mismatch": "骨段 #{stick} 两端不是粒子 {a}、{b}；游戏里它的体素朝向取自 {a}→{b} 连线，不跟本骨段转。",
+        "eng_w_binding_over_17": "有体素绑在下标 >= 17 的骨段上（{sticks}）；游戏只有 17 个骨骼矩阵，无法渲染。",
+        "eng_w_arm_source_mismatch": "骨段 #{stick} 两端不是粒子 {a}、{b}；游戏里它的体素朝向取自 {a} -> {b} 连线，不跟本骨段转。",
         "eng_w_anchor_not_lower": "粒子 8 的 bodyAreaHint 是 {hint}（vanilla 为 1）；它会随上半身层跟瞄准方向转。",
         "eng_w_no_upper_layer": "没有 bodyAreaHint = 2 的粒子；游戏里的上半身动画层（瞄准、换弹等）不会生效。",
         # bodyAreaHint 语义
@@ -3734,10 +3734,10 @@ def _engine_lang_pick(ui_state, pair):
     return pair[0] if getattr(ui_state, "language", "en") == "zh" else pair[1]
 
 
-def _engine_rule_text(ui_state, ci):
+def _engine_rule_text(ui_state, ci, short=False):
     from engine_skin import stick_rule
-    zh, en, _refs = stick_rule(ci)
-    return _engine_lang_pick(ui_state, (zh, en))
+    zh, en, _refs, zh_short, en_short = stick_rule(ci)
+    return _engine_lang_pick(ui_state, (zh_short, en_short) if short else (zh, en))
 
 
 def _engine_rule_refs(editor_state, ci):
@@ -3755,7 +3755,7 @@ def _engine_refs_label(ui_state, editor_state, ci):
 
 
 def _engine_warning_lines(ui_state, warnings):
-    """结构检查结果 → [(文本, 颜色)]。"""
+    """结构检查结果 -> [(文本, 颜色)]。"""
     out = []
     for code, params in warnings:
         text = tr(ui_state, f"eng_w_{code}", **params)
@@ -3790,13 +3790,13 @@ def _engine_anim_signature(editor_state):
 
 
 def _engine_diag_cell(ui_state, info):
+    """返回 (单元格文本, 颜色, 等级文字)。等级靠颜色表达，文字放进悬停提示以节省列宽。"""
     from engine_skin import grade
     g = info["grade"] if "grade" in info else grade(info)
     dist = info["distortion"]
     dist_pct = dist * 100.0 if dist != float("inf") else 999.0
-    text = tr(ui_state, "engine_cell_diag", grade=tr(ui_state, f"engine_grade_{g}"),
-              sigma=info["sigma_min"], dist=dist_pct)
-    return text, _ENGINE_GRADE_COLORS[g]
+    text = tr(ui_state, "engine_cell_diag", sigma=info["sigma_min"], dist=dist_pct)
+    return text, _ENGINE_GRADE_COLORS[g], tr(ui_state, f"engine_grade_{g}")
 
 
 def engine_flagged_sticks(editor_state):
@@ -3812,8 +3812,9 @@ def draw_engine_window(ui_state, editor_state, WIN_W, WIN_H):
     """引擎视图：结构检查 + 逐骨段规则体检 + 引擎语义粒子。"""
     if not ui_state.show_engine_window:
         return
-    imgui.set_next_window_size(720, 560, imgui.FIRST_USE_EVER)
-    imgui.set_next_window_position(WIN_W - 740, 60, imgui.FIRST_USE_EVER)
+    # 贴右上角，尽量少挡视口中央的模型
+    imgui.set_next_window_size(660, 540, imgui.FIRST_USE_EVER)
+    imgui.set_next_window_position(max(0, WIN_W - 670), 50, imgui.FIRST_USE_EVER)
     expanded, opened = imgui.begin(tr(ui_state, "engine_window_title") + "##engine_window", closable=True)
     if not opened:
         ui_state.show_engine_window = False
@@ -3976,8 +3977,8 @@ def _draw_composite_section(ui_state, editor_state):
 
 
 def _draw_engine_rules_table(ui_state, editor_state, diag, scan):
-    flags = (imgui.TABLE_BORDERS | imgui.TABLE_ROW_BACKGROUND | imgui.TABLE_RESIZABLE
-             | imgui.TABLE_SIZING_FIXED_FIT)
+    # 不开 TABLE_RESIZABLE：可调宽的定宽列只在首次出现时按内容定宽，扫描后新内容会被截断
+    flags = imgui.TABLE_BORDERS | imgui.TABLE_ROW_BACKGROUND | imgui.TABLE_SIZING_FIXED_FIT
     table = imgui.begin_table("##eng_rules", 5, flags)
     if not table.opened:
         return
@@ -3992,7 +3993,9 @@ def _draw_engine_rules_table(ui_state, editor_state, diag, scan):
             imgui.table_set_column_index(0)
             imgui.text(f"#{ci} {stick.name}")
             imgui.table_set_column_index(1)
-            imgui.text(_engine_rule_text(ui_state, ci))
+            imgui.text(_engine_rule_text(ui_state, ci, short=True))
+            if imgui.is_item_hovered():
+                imgui.set_tooltip(_engine_rule_text(ui_state, ci))
             imgui.table_set_column_index(2)
             refs = _engine_rule_refs(editor_state, ci)
             imgui.text(" ".join(str(i) for i, _n in refs) or "-")
@@ -4000,17 +4003,17 @@ def _draw_engine_rules_table(ui_state, editor_state, diag, scan):
                 imgui.set_tooltip(_engine_refs_label(ui_state, editor_state, ci))
             imgui.table_set_column_index(3)
             if diag and ci < len(diag):
-                text, col = _engine_diag_cell(ui_state, diag[ci])
+                text, col, grade_label = _engine_diag_cell(ui_state, diag[ci])
                 imgui.text_colored(text, *col)
                 if imgui.is_item_hovered():
-                    imgui.set_tooltip(tr(ui_state, "engine_diag_tip"))
+                    imgui.set_tooltip(f"{grade_label}  {text}\n" + tr(ui_state, "engine_diag_tip"))
             imgui.table_set_column_index(4)
             if scan is not None and ci in scan:
                 w = scan[ci]
-                text, col = _engine_diag_cell(ui_state, w)
+                text, col, grade_label = _engine_diag_cell(ui_state, w)
                 imgui.push_style_color(imgui.COLOR_TEXT, *col)
                 try:
-                    clicked = imgui.small_button(f"{text} @{w['time']:.2f}s##eng_jump_{ci}")
+                    clicked = imgui.small_button(f"{text}##eng_jump_{ci}")
                 finally:
                     imgui.pop_style_color()
                 if clicked:
@@ -4018,7 +4021,7 @@ def _draw_engine_rules_table(ui_state, editor_state, diag, scan):
                     editor_state.playback_time = float(w["time"])
                     editor_state._apply_interpolated_to_particles(float(w["time"]))
                 if imgui.is_item_hovered():
-                    imgui.set_tooltip(tr(ui_state, "engine_jump_tip"))
+                    imgui.set_tooltip(f"{grade_label}  t={w['time']:.3f}s\n" + tr(ui_state, "engine_jump_tip"))
     finally:
         imgui.end_table()
 

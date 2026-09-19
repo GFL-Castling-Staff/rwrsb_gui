@@ -32,47 +32,57 @@ VANILLA_PARTICLE_NAMES = (
     "rightknee", "leftknee", "rightfoot", "leftfoot",
 )
 
+# 以下文案会显示在界面上；UI 字体的字形表不含箭头、数学符号，统一用 ASCII（->、>=）
+
 # 引擎语义粒子：下标 -> (中文, English)
 SEMANTIC_PARTICLES = {
-    1: ("颈：胸廓向上参考（midspine→颈）", "neck: chest-up reference (midspine→neck)"),
+    1: ("颈：胸廓向上参考（midspine -> 颈）", "neck: chest-up reference (midspine -> neck)"),
     2: ("右肩：肩线、右上臂参考", "right shoulder: shoulder line, right upper arm"),
     3: ("左肩：肩线、左上臂参考", "left shoulder: shoulder line, left upper arm"),
-    4: ("右肘：右上臂方向（2→4）", "right elbow: right upper arm direction (2→4)"),
-    5: ("左肘：左上臂方向（3→5）", "left elbow: left upper arm direction (3→5)"),
+    4: ("右肘：右上臂方向（2 -> 4）", "right elbow: right upper arm direction (2 -> 4)"),
+    5: ("左肘：左上臂方向（3 -> 5）", "left elbow: left upper arm direction (3 -> 5)"),
     8: ("midspine：骨盆/胸廓参考、上半身层对齐锚点", "midspine: pelvis/chest reference, upper-layer anchor"),
     9: ("右胯：胯线、右腿参考", "right hip: hip line, right leg"),
     10: ("左胯：胯线、左腿参考", "left hip: hip line, left leg"),
-    11: ("右膝：右腿外摆判定（9→11）", "right knee: right leg swing (9→11)"),
-    12: ("左膝：左腿外摆判定（10→12）", "left knee: left leg swing (10→12)"),
+    11: ("右膝：右腿外摆判定（9 -> 11）", "right knee: right leg swing (9 -> 11)"),
+    12: ("左膝：左腿外摆判定（10 -> 12）", "left knee: left leg swing (10 -> 12)"),
 }
 
-# stick 下标 -> (中文, English, 引用的粒子下标)
-_LEG_R = ("右腿：胯线与骨盆法向按外摆混合", "right leg: hip line / pelvis normal by swing", (8, 9, 10, 11))
-_LEG_L = ("左腿：胯线与骨盆法向按外摆混合", "left leg: hip line / pelvis normal by swing", (8, 9, 10, 12))
-_PELVIS = ("骨盆法向", "pelvis normal", (8, 9, 10))
-_CHEST = ("胸廓法向", "chest normal", (1, 2, 3, 8))
+# stick 下标 -> (中文, English, 引用的粒子下标, 中文短标签, 英文短标签)
+_LEG_R = ("右腿：胯线与骨盆法向按大腿外摆程度混合", "right leg: hip line / pelvis normal blended by thigh swing",
+          (8, 9, 10, 11), "右腿·外摆混合", "R leg: swing blend")
+_LEG_L = ("左腿：胯线与骨盆法向按大腿外摆程度混合", "left leg: hip line / pelvis normal blended by thigh swing",
+          (8, 9, 10, 12), "左腿·外摆混合", "L leg: swing blend")
+_PELVIS = ("骨盆法向", "pelvis normal", (8, 9, 10), "骨盆法向", "pelvis normal")
+_CHEST = ("胸廓法向", "chest normal", (1, 2, 3, 8), "胸廓法向", "chest normal")
 STICK_RULES = {
     0: _LEG_R,
     1: _LEG_R,
-    2: ("胯横骨：骨盆法向（反向）", "hip bar: pelvis normal (negated)", (8, 9, 10)),
+    2: ("胯横骨：骨盆法向（反向）", "hip bar: pelvis normal (negated)", (8, 9, 10),
+        "骨盆法向（反）", "-pelvis normal"),
     3: _LEG_L,
     4: _LEG_L,
     5: _PELVIS,
     6: _CHEST,
-    7: ("肩横骨：胸廓向上", "shoulder bar: chest up", (1, 8)),
+    7: ("肩横骨：胸廓向上", "shoulder bar: chest up", (1, 8), "胸廓向上", "chest up"),
     8: _PELVIS,
     9: _CHEST,
-    10: ("左上臂：朝向取自粒子 3→5，不看本骨段端点", "left upper arm: orientation from particles 3→5, not own endpoints",
-         (1, 2, 3, 5, 8)),
-    11: ("左前臂：继承左上臂坐标系", "left forearm: inherits left upper arm", (1, 2, 3, 5, 8)),
-    12: ("右上臂：朝向取自粒子 2→4，不看本骨段端点", "right upper arm: orientation from particles 2→4, not own endpoints",
-         (1, 2, 3, 4, 8)),
-    13: ("右前臂：继承右上臂坐标系", "right forearm: inherits right upper arm", (1, 2, 3, 4, 8)),
+    10: ("左上臂：朝向取自粒子 3 -> 5，不看本骨段端点",
+         "left upper arm: orientation from particles 3 -> 5, not its own endpoints",
+         (1, 2, 3, 5, 8), "左上臂·取自 3-5", "L upper arm: from 3-5"),
+    11: ("左前臂：继承左上臂坐标系", "left forearm: inherits the left upper arm frame", (1, 2, 3, 5, 8),
+         "继承左上臂", "inherits L upper arm"),
+    12: ("右上臂：朝向取自粒子 2 -> 4，不看本骨段端点",
+         "right upper arm: orientation from particles 2 -> 4, not its own endpoints",
+         (1, 2, 3, 4, 8), "右上臂·取自 2-4", "R upper arm: from 2-4"),
+    13: ("右前臂：继承右上臂坐标系", "right forearm: inherits the right upper arm frame", (1, 2, 3, 4, 8),
+         "继承右上臂", "inherits R upper arm"),
     14: _CHEST,
     15: _CHEST,
-    16: ("颈→头：肩线（反向）", "neck→head: shoulder line (negated)", (2, 3)),
+    16: ("颈 -> 头：肩线（反向）", "neck -> head: shoulder line (negated)", (2, 3), "肩线（反）", "-shoulder line"),
 }
-DEFAULT_RULE = ("超出 17 根：世界 +Z 最短弧，扭转无约束", "beyond 17: shortest arc from world +Z, roll unconstrained", ())
+DEFAULT_RULE = ("超出 17 根：世界 +Z 最短弧，扭转无约束", "beyond 17: shortest arc from world +Z, roll unconstrained",
+                (), "最短弧（无约束）", "shortest arc (free roll)")
 
 # 上臂 stick 的朝向不看自身端点，而是取固定粒子对：stick 下标 -> (起点, 终点)
 UPPER_ARM_SOURCE = {10: (3, 5), 12: (2, 4)}
