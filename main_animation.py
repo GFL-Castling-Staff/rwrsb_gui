@@ -902,6 +902,7 @@ def main():
             # 同步 show_voxels 状态到 renderer
             if g_renderer is not None:
                 g_renderer.show_voxels = g_ui.show_voxels
+                g_renderer.show_body_layers = g_ui.show_body_layers
 
             imgui.new_frame()
 

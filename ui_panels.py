@@ -280,6 +280,21 @@ _TEXT = {
         "eng_w_arm_source_mismatch": "Stick #{stick} does not connect particles {a} and {b}; in game its voxels take their orientation from the {a}->{b} line, not from this stick.",
         "eng_w_anchor_not_lower": "Particle 8 has bodyAreaHint {hint} (vanilla: 1); it will turn with the upper body (aim direction).",
         "eng_w_no_upper_layer": "No particle has bodyAreaHint = 2; upper-body animation layers (aiming, reloading) will have no effect in game.",
+        # bodyAreaHint 语义
+        "body_hint_lower": "1 Lower body (follows move direction)",
+        "body_hint_upper": "2 Upper body (follows aim, overridden by upper-body anims)",
+        "body_hint_other": "Other...",
+        "body_hint_custom": "Value##hint_custom",
+        "body_hint_tip": ("In game, bodyAreaHint picks the animation layer of this particle:\n"
+                          "2 = upper body: turns with the aim direction; while an upper-body animation plays\n"
+                          "(aiming, reloading...) its position comes from that animation, aligned at particle 8.\n"
+                          "Anything else = lower body: turns with the movement direction.\n"
+                          "Running lets the upper body twist up to ~37 deg from the legs, walking ~60 deg."),
+        "show_body_layers": "Color by body layer",
+        "body_layers_legend": "Purple = upper layer (hint 2), green = lower layer",
+        "engine_layers_header": "Body layers (bodyAreaHint)",
+        "engine_layer_upper": "Upper layer ({n}): {names}",
+        "engine_layer_lower": "Lower layer ({n}): {names}",
         "grid_btn": "Grid...",
         "grid_popup_title": "Grid options",
         "settings_btn": "View...",
@@ -679,6 +694,21 @@ _TEXT = {
         "eng_w_arm_source_mismatch": "骨段 #{stick} 两端不是粒子 {a}、{b}；游戏里它的体素朝向取自 {a}→{b} 连线，不跟本骨段转。",
         "eng_w_anchor_not_lower": "粒子 8 的 bodyAreaHint 是 {hint}（vanilla 为 1）；它会随上半身层跟瞄准方向转。",
         "eng_w_no_upper_layer": "没有 bodyAreaHint = 2 的粒子；游戏里的上半身动画层（瞄准、换弹等）不会生效。",
+        # bodyAreaHint 语义
+        "body_hint_lower": "1 下半身（跟移动方向）",
+        "body_hint_upper": "2 上半身（跟瞄准方向，可被上身动画替换）",
+        "body_hint_other": "其它...",
+        "body_hint_custom": "取值##hint_custom",
+        "body_hint_tip": ("游戏用 bodyAreaHint 决定粒子属于哪个动画层：\n"
+                          "2 = 上半身层：跟瞄准方向转；播放上半身动画（瞄准、换弹等）时，位置取自该动画，\n"
+                          "并以粒子 8 对齐。\n"
+                          "其它值 = 下半身层：跟移动方向转。\n"
+                          "奔跑时上身最多相对腿部扭约 37°，走路约 60°。"),
+        "show_body_layers": "按上下半身层着色",
+        "body_layers_legend": "紫 = 上半身层（hint 2），绿 = 下半身层",
+        "engine_layers_header": "上下半身分层（bodyAreaHint）",
+        "engine_layer_upper": "上半身层（{n}）：{names}",
+        "engine_layer_lower": "下半身层（{n}）：{names}",
         "grid_btn": "网格...",
         "grid_popup_title": "网格选项",
         "settings_btn": "视图...",
@@ -968,6 +998,7 @@ class UIState:
         # 引擎视图（动画工具）
         self.show_engine_window = False
         self.engine_highlight_sticks = True
+        self.show_body_layers = False   # 视口按 bodyAreaHint 给粒子 / 骨段分层着色（两个工具共用）
         self._engine_scan = None        # editor_state.engine_scan_animation() 的结果
         self._engine_scan_sig = None    # 扫描时的动画签名，改动后提示重扫
 
@@ -1368,9 +1399,40 @@ def _draw_stick_list(ui_state, editor_state):
         editor_state.unbind_stick_voxels(to_unbind)
 
 
+def _draw_body_hint_editor(ui_state, current):
+    """bodyAreaHint 下拉：1 下半身 / 2 上半身 / 其它（再给一个数值框）。返回 (changed, new_value)。"""
+    cur = int(current)
+    idx = 0 if cur == 1 else 1 if cur == 2 else 2
+    options = [tr(ui_state, "body_hint_lower"), tr(ui_state, "body_hint_upper"),
+               tr(ui_state, "body_hint_other")]
+    chg, new_idx = imgui.combo(tr(ui_state, "body_hint") + "##hint", idx, options)
+    if imgui.is_item_hovered():
+        imgui.set_tooltip(tr(ui_state, "body_hint_tip"))
+    new_val = cur
+    if chg and new_idx != idx:
+        # 切到"其它"时默认 0（游戏按"非 2"当下半身处理）
+        new_val = 1 if new_idx == 0 else 2 if new_idx == 1 else 0
+    if (new_idx if chg else idx) == 2:
+        chg_v, v = imgui.input_int(tr(ui_state, "body_hint_custom"), new_val)
+        if chg_v:
+            new_val = max(0, int(v))
+    return new_val != cur, new_val
+
+
+def _draw_body_layer_toggle(ui_state):
+    _, ui_state.show_body_layers = imgui.checkbox(
+        tr(ui_state, "show_body_layers") + "##body_layers", ui_state.show_body_layers)
+    if imgui.is_item_hovered():
+        imgui.set_tooltip(tr(ui_state, "body_hint_tip"))
+    if ui_state.show_body_layers:
+        imgui.text_disabled(tr(ui_state, "body_layers_legend"))
+
+
 def _draw_particle_editor(ui_state, editor_state):
     if not imgui.collapsing_header(tr(ui_state, "particles"), flags=imgui.TREE_NODE_DEFAULT_OPEN)[0]:
         return
+
+    _draw_body_layer_toggle(ui_state)
 
     if not ui_state.allow_particle_edit:
         imgui.text_disabled(tr(ui_state, "particle_edit_disabled"))
@@ -1472,7 +1534,7 @@ def _draw_particle_editor(ui_state, editor_state):
             changed_name, new_name = imgui.input_text(tr(ui_state, "name"), particle["name"], 128)
             changed_id, new_id = imgui.input_int(tr(ui_state, "id"), int(particle["id"]))
             changed_mass, new_mass = imgui.input_float(tr(ui_state, "inv_mass"), float(particle["invMass"]), 0.0, 0.0, "%.3f")
-            changed_hint, new_hint = imgui.input_int(tr(ui_state, "body_hint"), int(particle["bodyAreaHint"]))
+            changed_hint, new_hint = _draw_body_hint_editor(ui_state, int(particle["bodyAreaHint"]))
             changed_x, new_x = imgui.input_float(tr(ui_state, "x"), float(particle["x"]), 0.0, 0.0, "%.3f")
             changed_y, new_y = imgui.input_float(tr(ui_state, "y"), float(particle["y"]), 0.0, 0.0, "%.3f")
             changed_z, new_z = imgui.input_float(tr(ui_state, "z"), float(particle["z"]), 0.0, 0.0, "%.3f")
@@ -3670,6 +3732,14 @@ def _draw_engine_window_inner(ui_state, editor_state):
     if imgui.collapsing_header(tr(ui_state, "engine_structure_header"),
                                flags=imgui.TREE_NODE_DEFAULT_OPEN)[0]:
         _draw_engine_warnings(ui_state, editor_state)
+
+    # ── 上下半身分层 ──
+    if imgui.collapsing_header(tr(ui_state, "engine_layers_header"))[0]:
+        _draw_body_layer_toggle(ui_state)
+        upper = [p["name"] for p in editor_state.particles if int(p.get("bodyAreaHint", 1)) == 2]
+        lower = [p["name"] for p in editor_state.particles if int(p.get("bodyAreaHint", 1)) != 2]
+        imgui.text_wrapped(tr(ui_state, "engine_layer_upper", n=len(upper), names=", ".join(upper) or "-"))
+        imgui.text_wrapped(tr(ui_state, "engine_layer_lower", n=len(lower), names=", ".join(lower) or "-"))
 
     # ── 逐骨段规则体检 ──
     if imgui.collapsing_header(tr(ui_state, "engine_rules_header"),

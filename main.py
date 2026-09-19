@@ -1472,6 +1472,7 @@ def main():
                 mvp = g_camera.get_mvp()
                 g_renderer.highlight_selected_particle_indices = list(g_editor.selected_particles)
                 g_renderer.show_origin_gizmo = bool(g_ui.show_origin_gizmo)
+                g_renderer.show_body_layers = bool(g_ui.show_body_layers)
                 g_renderer.render(mvp)
 
                 # 选区 gizmo（每帧重建几何，screen-space 恒定大小）

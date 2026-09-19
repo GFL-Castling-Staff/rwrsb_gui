@@ -23,6 +23,10 @@ _PARTICLE_ACTIVE_COLOR = (0.25, 0.95, 1.0, 1.0)    # 青色，与淡黄明显区
 _PARTICLE_LOCKED_COLOR = (0.45, 0.55, 0.75, 0.7)   # 半透明灰蓝（锁定粒子，P2）
 _ENGINE_WARN_COLOR = (1.0, 0.65, 0.2, 1.0)          # 引擎体检：注意
 _ENGINE_BAD_COLOR = (1.0, 0.3, 0.85, 1.0)           # 引擎体检：异常
+# 上下半身分层着色（bodyAreaHint）：游戏里 2 = 上半身层，其余 = 下半身层
+_LAYER_UPPER_COLOR = (0.75, 0.45, 1.0)
+_LAYER_LOWER_COLOR = (0.35, 0.90, 0.50)
+_DUMMY_LINE_COLOR = (0.4, 0.4, 0.4, 0.35)
 _GRID_MINOR_COLOR = (0.28, 0.31, 0.38)
 _GRID_MAJOR_COLOR = (0.52, 0.56, 0.66)
 _MIRROR_PLANE_COLOR = (0.25, 0.90, 0.95)
@@ -42,6 +46,11 @@ _GIZMO_HOVER_COLOR = (1.0, 0.95, 0.25, 1.0)   # 黄
 _GIZMO_CENTER_COLOR = (0.85, 0.85, 0.85, 1.0)
 _GIZMO_HIT_THRESHOLD_PX = 10.0
 _GIZMO_CENTER_HIT_PX = 8.0
+
+
+def body_layer_color(particle):
+    """粒子所属动画层的颜色：bodyAreaHint 2 = 上半身层，其余 = 下半身层。"""
+    return _LAYER_UPPER_COLOR if int(particle.get("bodyAreaHint", 1)) == 2 else _LAYER_LOWER_COLOR
 
 
 def _point_to_segment_dist_2d(px, py, ax, ay, bx, by):
@@ -114,6 +123,14 @@ class VoxelRenderer:
         self.point_vbo = None
         self.point_vao = None
         self.n_points = 0
+
+        # 上下半身分层着色用的同构几何（顶点顺序与上面一致，只换颜色）；
+        # 高亮 / 选中等叠加层仍画白色版本，保持原有配色
+        self.show_body_layers = False
+        self.line_layer_vbo = None
+        self.line_layer_vao = None
+        self.point_layer_vbo = None
+        self.point_layer_vao = None
 
         self.grid_vbo = None
         self.grid_vao = None
@@ -240,6 +257,7 @@ class VoxelRenderer:
 
         _dummy = dummy_indices if dummy_indices is not None else set()
         line_verts = []
+        line_layer_verts = []
         vtx_offset = 0
         for stick in sticks:
             pa = id_to_particle.get(stick.particle_a_id)
@@ -252,61 +270,49 @@ class VoxelRenderer:
                 self.stick_segments.append((vtx_offset, 0))
                 continue
             if is_dummy:
-                r, g, b, a = 0.4, 0.4, 0.4, 0.35
+                col_a = col_b = white = _DUMMY_LINE_COLOR
             else:
-                r, g, b, a = 1.0, 1.0, 1.0, 1.0
-            line_verts += [pa["x"], pa["y"], pa["z"], r, g, b, a]
-            line_verts += [pb["x"], pb["y"], pb["z"], r, g, b, a]
+                white = (1.0, 1.0, 1.0, 1.0)
+                # 分层版本：两端各取所在层颜色，跨层骨段显示为渐变
+                col_a = (*body_layer_color(pa), 1.0)
+                col_b = (*body_layer_color(pb), 1.0)
+            line_verts += [pa["x"], pa["y"], pa["z"], *white]
+            line_verts += [pb["x"], pb["y"], pb["z"], *white]
+            line_layer_verts += [pa["x"], pa["y"], pa["z"], *col_a]
+            line_layer_verts += [pb["x"], pb["y"], pb["z"], *col_b]
             self.stick_segments.append((vtx_offset, 2))
             vtx_offset += 2
 
-        if self.line_vbo:
-            self.line_vbo.release()
-            self.line_vbo = None
-        if self.line_vao:
-            self.line_vao.release()
-            self.line_vao = None
-
-        if line_verts:
-            line_arr = np.array(line_verts, dtype=np.float32)
-            self.line_vbo = self.ctx.buffer(line_arr.tobytes())
-            self.line_vao = self.ctx.vertex_array(
-                self.line_prog,
-                [(self.line_vbo, "3f 4f", "in_vert", "in_color")],
-            )
-            self.n_lines = len(line_verts) // 7
-        else:
-            self.n_lines = 0
+        self.line_vbo, self.line_vao = self._replace_line_geometry(
+            self.line_vbo, self.line_vao, line_verts)
+        self.line_layer_vbo, self.line_layer_vao = self._replace_line_geometry(
+            self.line_layer_vbo, self.line_layer_vao, line_layer_verts)
+        self.n_lines = len(line_verts) // 7
 
         point_verts = []
+        point_layer_verts = []
         for particle in particles:
-            point_verts += [
-                particle["x"],
-                particle["y"],
-                particle["z"],
-                1.0,
-                1.0,
-                1.0,
-                1.0,
-            ]
+            xyz = (particle["x"], particle["y"], particle["z"])
+            point_verts += [*xyz, 1.0, 1.0, 1.0, 1.0]
+            point_layer_verts += [*xyz, *body_layer_color(particle), 1.0]
 
-        if self.point_vbo:
-            self.point_vbo.release()
-            self.point_vbo = None
-        if self.point_vao:
-            self.point_vao.release()
-            self.point_vao = None
+        self.point_vbo, self.point_vao = self._replace_line_geometry(
+            self.point_vbo, self.point_vao, point_verts)
+        self.point_layer_vbo, self.point_layer_vao = self._replace_line_geometry(
+            self.point_layer_vbo, self.point_layer_vao, point_layer_verts)
+        self.n_points = len(point_verts) // 7
 
-        if point_verts:
-            point_arr = np.array(point_verts, dtype=np.float32)
-            self.point_vbo = self.ctx.buffer(point_arr.tobytes())
-            self.point_vao = self.ctx.vertex_array(
-                self.line_prog,
-                [(self.point_vbo, "3f 4f", "in_vert", "in_color")],
-            )
-            self.n_points = len(point_verts) // 7
-        else:
-            self.n_points = 0
+    def _replace_line_geometry(self, vbo, vao, verts):
+        """释放旧的 VBO/VAO，按 "3f 4f"（位置 + 颜色）重建；verts 为空时返回 (None, None)。"""
+        if vbo:
+            vbo.release()
+        if vao:
+            vao.release()
+        if not verts:
+            return None, None
+        vbo = self.ctx.buffer(np.array(verts, dtype=np.float32).tobytes())
+        vao = self.ctx.vertex_array(self.line_prog, [(vbo, "3f 4f", "in_vert", "in_color")])
+        return vbo, vao
 
     def upload_grid(self, center, extent, step, major_every=4,
                     show_xz=True, show_xy=True, show_yz=True):
@@ -740,13 +746,15 @@ class VoxelRenderer:
             self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
             self.ctx.line_width = _LINE_WIDTH
 
+            base_line_vao = (self.line_layer_vao
+                             if self.show_body_layers and self.line_layer_vao else self.line_vao)
             self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, _LINE_ALPHA_OCCLUDED)
             self.ctx.disable(moderngl.DEPTH_TEST)
-            self.line_vao.render(moderngl.LINES, vertices=self.n_lines)
+            base_line_vao.render(moderngl.LINES, vertices=self.n_lines)
 
             self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, _LINE_ALPHA_VISIBLE)
             self.ctx.enable(moderngl.DEPTH_TEST)
-            self.line_vao.render(moderngl.LINES, vertices=self.n_lines)
+            base_line_vao.render(moderngl.LINES, vertices=self.n_lines)
 
             if 0 <= self.highlight_stick_idx < len(self.stick_segments):
                 off, cnt = self.stick_segments[self.highlight_stick_idx]
@@ -810,15 +818,19 @@ class VoxelRenderer:
             self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
             self.ctx.disable(moderngl.DEPTH_TEST)
 
-            # 1) 全量默认色
+            # 1) 全量默认色（分层着色时按 bodyAreaHint 上色）
             self.ctx.point_size = _PARTICLE_SIZE
-            self.line_prog["u_color_mult"].value = (
-                _PARTICLE_COLOR[0],
-                _PARTICLE_COLOR[1],
-                _PARTICLE_COLOR[2],
-                0.95,
-            )
-            self.point_vao.render(moderngl.POINTS, vertices=self.n_points)
+            if self.show_body_layers and self.point_layer_vao:
+                self.line_prog["u_color_mult"].value = (1.0, 1.0, 1.0, 0.95)
+                self.point_layer_vao.render(moderngl.POINTS, vertices=self.n_points)
+            else:
+                self.line_prog["u_color_mult"].value = (
+                    _PARTICLE_COLOR[0],
+                    _PARTICLE_COLOR[1],
+                    _PARTICLE_COLOR[2],
+                    0.95,
+                )
+                self.point_vao.render(moderngl.POINTS, vertices=self.n_points)
 
             # 2) selected 次亮（淡黄，不含 active）
             if self.highlight_selected_particle_indices:
@@ -864,6 +876,10 @@ class VoxelRenderer:
             self.line_vao,
             self.point_vbo,
             self.point_vao,
+            self.line_layer_vbo,
+            self.line_layer_vao,
+            self.point_layer_vbo,
+            self.point_layer_vao,
             self.grid_vbo,
             self.grid_vao,
             self.origin_vbo,
