@@ -332,7 +332,9 @@ class EditorState:
         self._dirty = True
         self.gpu_dirty = True
         self.skeleton_dirty = True
-        self._bindings_rev += 1
+        # 动画模式下的骨架改动只是摆姿态，bind 数据不变，不计入版本号（否则体检 bind 会被无谓重建）
+        if not self.animation_mode:
+            self._bindings_rev += 1
         # 蒙皮：仅动画模式下骨架变形时同步更新 voxel 世界位置
         # 绑骨模式下 voxel 是体模型本身，拖粒子只是在挪标注，不应触发蒙皮
         if self.animation_mode:
@@ -1278,7 +1280,7 @@ class EditorState:
             inp = self.symmetry_inputs()
             if inp["pm"] is not None and inp["mpairs"] and len(inp["voxels"]):
                 ev = SymmetryEvaluator(inp["P0"], inp["pairs"], inp["voxels"], inp["bindings"],
-                                       synthetic_poses(inp["P0"]), inp["pm"])
+                                       synthetic_poses(inp["P0"], n=12), inp["pm"])
                 out = symmetry_warnings(ev, inp["mpairs"], estimate=True)
         except (EngineSkinUnavailable, ValueError, np.linalg.LinAlgError):
             out = []

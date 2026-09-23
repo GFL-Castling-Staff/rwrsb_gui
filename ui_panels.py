@@ -294,12 +294,15 @@ _TEXT = {
         "symmetry_btn_tip": ("Find stick slots that keep the left and right sides mirror images in game,\n"
                              "without making the voxels follow their sticks worse."),
         "symmetry_title": "Symmetry optimizer",
-        "symmetry_intro": ("The game picks each stick's skinning rule by its index, and only some index pairs are mirror "
-                           "images of each other: legs (0|1 with 3|4), upper arms (12, 10) and chest (6, 9) always are; "
-                           "forearms (13, 11) are while the chest keeps its shape; (5, 8) and (14, 15) never are. "
-                           "Slots also differ in how closely the voxels follow their stick. This searches for the "
-                           "assignment with the least visible error, counting left/right differences double, and never "
-                           "moves a stick to a slot where it would sit more than 5 voxels off at rest."),
+        "symmetry_intro": ("The game picks each stick's skinning rule by its index. At the default facing only some index "
+                           "pairs are mirror images of each other: legs (0|1 with 3|4), upper arms (12, 10), chest (6, 9), "
+                           "and forearms (13, 11) while the chest keeps its shape; (5, 8) and (14, 15) never are. But the "
+                           "game computes stick orientations after turning the soldier to face its direction, and when a "
+                           "slot's axes are not orthogonal the result changes with the facing, so even those pairs drift "
+                           "apart at other facings. Slots also differ in how closely the voxels follow their stick. This "
+                           "searches for the assignment with the least visible error over facings 0/45/90/135 deg, "
+                           "counting left/right differences double, and never moves a stick to a slot where it would sit "
+                           "more than 5 voxels off at rest."),
         "symmetry_source_synth": ("Poses: synthetic (body turned as a whole, limbs perturbed), a quick estimate. "
                                   "Load the model's animations for real numbers."),
         "symmetry_source_file": "Poses: {name}",
@@ -328,9 +331,10 @@ _TEXT = {
         "symmetry_stale": "The skeleton or bindings changed after the search; search again.",
         "symmetry_identity": "The current slots are already the best found.",
         "symmetry_apply": "Apply suggestion",
+        "symmetry_need_stick_edit": "Tick \"Allow stick edit\" to apply the suggestion.",
         "symmetry_applied": "Sticks re-slotted (undoable). Save the model to keep the change.",
         "symmetry_failed": "Symmetry search failed: {error}",
-        "eng_w_asymmetric_pairs": "These left/right stick pairs come out different on the two sides in game even when the animation is exactly mirrored (estimated voxels): {pairs}. The game builds each side from the rule of its stick slot, and only some slot pairs are mirror images of each other. The bind tool's Symmetry optimizer can find better slots.",
+        "eng_w_asymmetric_pairs": "These left/right stick pairs come out noticeably different on the two sides in game even when the animation is exactly mirrored (estimated voxels, over several facings): {pairs}. The game builds each side from the rule of its stick slot, only some slot pairs are mirror images of each other, and with non-orthogonal axes the result also changes with the soldier's facing. The bind tool's Symmetry optimizer can find better slots.",
         "engine_bind_col_tip": ("Where the game puts this stick's voxels at rest, versus where they were modelled (voxels).\n"
                                 "The same in every frame. Graded by the relative error: over 5% (and at least 0.5 voxel)\n"
                                 "is Caution, over 15% (and at least 2 voxels) is Bad - 4 voxels on a 150-voxel leg is hard\n"
@@ -402,7 +406,8 @@ _TEXT = {
         "game_camera_btn": "Game camera##game_camera_btn",
         "game_camera_tip": ("Set the camera to the game's: perspective, {dist:.0f} voxels away (36 world units)\n"
                             "and {elev:.1f} deg above the horizon, from the scene file. Azimuth is left alone,\n"
-                            "since soldiers turn freely in game. Pixel sizes only match the game at this distance."),
+                            "since soldiers turn freely in game. Pixel sizes only match the game at this distance\n"
+                            "and a window about as tall as the game's."),
         "game_camera_done": "Camera set to the game's distance and pitch",
         "grid_btn": "Grid...",
         "grid_popup_title": "Grid options",
@@ -815,9 +820,11 @@ _TEXT = {
         "symmetry_btn": "左右对称优化...",
         "symmetry_btn_tip": "找一套槽位分配，让游戏里左右两侧互为镜像，同时不让体素跟随骨段变差。",
         "symmetry_title": "左右对称优化",
-        "symmetry_intro": ("游戏按骨段下标选蒙皮规则，只有部分下标对的规则互为镜像：腿（0|1 与 3|4）、上臂 (12, 10)、"
-                           "胸廓 (6, 9) 始终对称；前臂 (13, 11) 在胸廓不变形时对称；(5, 8)、(14, 15) 始终不对称。"
-                           "不同槽位下体素跟随骨段的程度也不一样。这里搜索可见误差最小的分配，左右差异按两倍计，"
+        "symmetry_intro": ("游戏按骨段下标选蒙皮规则。在默认朝向下，只有部分下标对的规则互为镜像：腿（0|1 与 3|4）、"
+                           "上臂 (12, 10)、胸廓 (6, 9)，以及胸廓不变形时的前臂 (13, 11)；(5, 8)、(14, 15) 始终不对称。"
+                           "但游戏是先把角色转到它面朝的方向、再算骨段朝向的，槽位的坐标轴不正交时结果随朝向变化，"
+                           "所以换个朝向这些槽位对也会不一样。不同槽位下体素跟随骨段的程度也不同。"
+                           "这里按 0/45/90/135 度四个朝向一起评估，搜索可见误差最小的分配，左右差异按两倍计，"
                            "并且不会把骨段挪到静止时就错位 5 体素以上的槽位。"),
         "symmetry_source_synth": "评估姿态：合成（躯干整体转动、四肢扰动），只是快速估计。载入模型自己的动画才是真实数值。",
         "symmetry_source_file": "评估姿态：{name}",
@@ -844,9 +851,10 @@ _TEXT = {
         "symmetry_stale": "搜索之后骨架或绑定改动过，请重新搜索。",
         "symmetry_identity": "现在的槽位已经是搜到的最佳分配。",
         "symmetry_apply": "应用建议",
+        "symmetry_need_stick_edit": "勾选「允许骨段编辑」后才能应用建议。",
         "symmetry_applied": "已重排骨段槽位（可撤销）。记得保存模型。",
         "symmetry_failed": "左右对称搜索失败：{error}",
-        "eng_w_asymmetric_pairs": "这些左右成对的骨段，即使动画严格镜像，游戏里两侧也会不一样（估计偏差，体素）：{pairs}。游戏按骨段所在槽位的规则分别计算两侧，只有部分槽位对的规则互为镜像。可用绑骨工具的「左右对称优化」换到合适的槽位。",
+        "eng_w_asymmetric_pairs": "这些左右成对的骨段，即使动画严格镜像，游戏里两侧也会明显不一样（估计偏差，体素，已考虑多个角色朝向）：{pairs}。游戏按骨段所在槽位的规则分别计算两侧，只有部分槽位对的规则互为镜像，坐标轴不正交时结果还会随角色朝向变化。可用绑骨工具的「左右对称优化」换到更合适的槽位。",
         "engine_bind_col_tip": ("游戏把这段体素静止时放在哪、与建模位置差多少（体素）。每一帧都一样。\n"
                                 "按相对误差分级：超过 5%（且至少 0.5 体素）为注意，超过 15%（且至少 2 体素）为异常——\n"
                                 "150 体素长的腿偏 4 体素很难看出，20 体素的手臂偏 4 体素就很明显。"),
@@ -913,7 +921,7 @@ _TEXT = {
         "game_camera_btn": "游戏镜头##game_camera_btn",
         "game_camera_tip": ("把相机设成游戏的：透视、距离 {dist:.0f} 体素（36 世界单位）、俯角 {elev:.1f} 度，\n"
                             "取自场景文件。方位角不动——游戏里士兵朝向本来就是转的。\n"
-                            "像素大小只有在这个距离下才和游戏一致。"),
+                            "像素大小只有在这个距离、且窗口高度与游戏相近时才和游戏一致。"),
         "game_camera_done": "相机已设为游戏的距离与俯角",
         "grid_btn": "网格...",
         "grid_popup_title": "网格选项",
@@ -4320,7 +4328,8 @@ def _draw_engine_particles_table(ui_state, editor_state):
 # 游戏按 stick 下标套蒙皮规则，只有部分槽位对两侧互为镜像；换槽位 / 换方向也会改变跟随与变形。
 # 这里在后台搜一套槽位分配，列出每对骨段现状与建议的代价，一键应用（可撤销）。
 
-_SYM_MAX_POSES = 240
+# 模型空间姿态上限；评估时每个还要按 engine_skin.SYM_HEADINGS 转成几个朝向
+_SYM_MAX_POSES = 60
 
 
 def _sym_poses_from_file(path, name_filter, P0):
@@ -4340,7 +4349,8 @@ def _sym_poses_from_file(path, name_filter, P0):
             anim = parse_single_animation(path, i)
         except Exception:
             continue
-        if not anim.frames or len(anim.frames[0].positions) != n:
+        # 每一帧的粒子数都得对得上（解析器对个别残缺帧只警告不报错）
+        if not anim.frames or any(len(f.positions) != n for f in anim.frames):
             continue
         F0 = np.asarray(anim.frames[0].positions, dtype=float)
         r = float(np.mean(np.linalg.norm(F0 - F0.mean(0), axis=1)))
@@ -4386,7 +4396,7 @@ def _sym_start(ui_state, editor_state):
                 if not poses:
                     raise ValueError(tr(ui_state, "symmetry_no_poses"))
             else:
-                poses, used = synthetic_poses(inp["P0"]), []
+                poses, used = synthetic_poses(inp["P0"], n=24), []
             job["used"], job["n_poses"] = used, len(poses)
             ev = SymmetryEvaluator(inp["P0"], inp["pairs"], inp["voxels"], inp["bindings"], poses, inp["pm"])
             current = current_slot_plan(ev, inp["mpairs"], inp["centers"], inp["lonely"])
@@ -4480,6 +4490,9 @@ def _draw_symmetry_result(ui_state, editor_state, res):
         imgui.text_colored(tr(ui_state, "symmetry_stale"), 1.0, 0.65, 0.2, 1.0)
     elif plan_is_identity(plan, pairs):
         imgui.text_colored(tr(ui_state, "symmetry_identity"), *_ENGINE_GRADE_COLORS[0])
+    elif not ui_state.allow_stick_edit:
+        # 与骨段面板的「对调方向」「交换下标」一致：没打开骨段编辑就不能改
+        imgui.text_disabled(tr(ui_state, "symmetry_need_stick_edit"))
     elif imgui.button(tr(ui_state, "symmetry_apply")):
         try:
             editor_state.apply_slot_plan(plan)

@@ -13,6 +13,8 @@ engine_skin.py
 
 纯函数 + numpy，不依赖 imgui / ModernGL / EditorState。四元数统一写作 [w, x, y, z]。
 """
+import re
+
 import numpy as np
 
 # 身体参考系会按下标访问到粒子 12
@@ -82,7 +84,9 @@ def whole_body_animation(index=None, name=None):
     if index is not None and index in WHOLE_BODY_ANIMATIONS:
         return WHOLE_BODY_ANIMATIONS[index]
     if index is None and name:
-        return _WHOLE_BODY_NAMES.get(str(name).strip().lower())
+        # vanilla 有几个注释名带下标后缀（如 "skydiving, 65"），比对前去掉
+        key = re.sub(r",\s*\d+\s*$", "", str(name).strip().lower())
+        return _WHOLE_BODY_NAMES.get(key)
     return None
 
 
@@ -568,7 +572,10 @@ SYM_PERCENTILE = 95       # 按姿态取分位数，避免个别极端帧主导
 SYM_ASYM_WEIGHT = 2.0     # 左右不一样一眼就是 bug；两侧一起偏不显眼，所以不对称按两倍计
 SYM_MAX_DRIFT = 5.0       # 新位置的静止错位上限（体素）：待机时一直看得见，超过就不考虑
 SYM_KEEP_BONUS = 2.0      # 改动至少要换来这么多体素才做，避免为一点点提升大挪骨段
-SYM_WARN = 1.0            # 结构检查：镜像骨段对的左右偏差（P95，体素）超过此值就提示
+# 结构检查：镜像骨段对的左右偏差（P95）超过这段体素尺寸的 10%、且至少 2 体素才提示。
+# 考虑角色朝向后几乎没有哪对是严格 0，按绝对值报会满屏都是
+SYM_WARN_REL = 0.10
+SYM_WARN_MIN = 2.0
 
 
 def mirror_particle_map(P, tol=0.51):
@@ -583,6 +590,9 @@ def mirror_particle_map(P, tol=0.51):
         if d[j] > tol:
             return None
         pm[k] = j
+    # 必须一一对应：两个粒子贴得很近时可能映到同一个镜像粒子，镜像姿态就会漏写一行
+    if len(set(pm.values())) != len(pm):
+        return None
     return pm
 
 
@@ -650,14 +660,31 @@ def synthetic_poses(P0, n=32, seed=0):
     return out
 
 
+# 评估时角色的朝向（绕竖直轴，度）。游戏先按角色朝向把粒子写进世界坐标，再用世界坐标算每根骨段的朝向；
+# bind 却用模型 XML 里未旋转的骨架。坐标轴不正交时 FromRotationMatrix 不随旋转协变，
+# 所以同一个动作面朝不同方向时蒙皮结果不同（vanilla 中位 0.05 体素，异形骨可达几十体素）。
+# 只看朝向 0 会高估"严格对称"：腿槽在 0° / 180° 两侧一致，45° / 90° 时就不一致了。
+# 180°–315° 与 0°–135° 的结果相近，取这四个足够。
+SYM_HEADINGS = (0.0, 45.0, 90.0, 135.0)
+
+
+def heading_matrix(deg):
+    """绕竖直轴（y）转 deg 度。"""
+    t = np.radians(float(deg))
+    c, s = np.cos(t), np.sin(t)
+    return np.array([[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]])
+
+
 class SymmetryEvaluator:
     """评估 stick 放进某槽位、以某端为原点时的可见误差（体素）。
 
     stick 的朝向只取决于槽位规则、自己的端点和身体参考系，身体参考系只看粒子位置，
     与 stick 怎么分配无关，所以每种放法的代价可以单独算，分配就成了指派问题。
+    每个模型空间姿态都按 headings 里的朝向转到世界坐标再算（bind 仍在模型空间，与游戏一致），
+    镜像比较时镜像面随朝向一起转。
     """
 
-    def __init__(self, bind_positions, stick_pairs, voxels_xyz, bindings, poses, pm):
+    def __init__(self, bind_positions, stick_pairs, voxels_xyz, bindings, poses, pm, headings=SYM_HEADINGS):
         self.P0 = np.asarray(bind_positions, dtype=float)
         self.pairs = [(int(a), int(b)) for a, b in stick_pairs]
         self.pm = pm
@@ -668,9 +695,15 @@ class SymmetryEvaluator:
             if 0 <= vi < len(self.vox):
                 self.vox_of.setdefault(ci, []).append(vi)
         self.F0 = body_frame(self.P0)
-        self.poses = [np.asarray(P, dtype=float) for P in poses]
+        self.poses, self.mposes, self.mirrors = [], [], []
+        for deg in headings:
+            R = heading_matrix(deg)
+            for P in poses:
+                P = np.asarray(P, dtype=float)
+                self.poses.append(P @ R.T)
+                self.mposes.append(mirror_pose(P, pm) @ R.T)
+                self.mirrors.append(R @ _MX @ R.T)        # 镜像面随朝向转
         self.Fs = [body_frame(P) for P in self.poses]
-        self.mposes = [mirror_pose(P, pm) for P in self.poses]
         self.mFs = [body_frame(Q) for Q in self.mposes]
         self._cache = {}
 
@@ -735,8 +768,8 @@ class SymmetryEvaluator:
         loc = V - self.P0[a]
         locm = V @ _MX.T - self.P0[pa]
         out = np.empty(n)
-        for i, (P, Q) in enumerate(zip(self.poses, self.mposes)):
-            w = (P[a] + loc @ Ts[i].T) @ _MX.T
+        for i, (P, Q, Mi) in enumerate(zip(self.poses, self.mposes, self.mirrors)):
+            w = (P[a] + loc @ Ts[i].T) @ Mi.T
             wm = Q[pa] + locm @ Tm[i].T
             out[i] = float(np.max(np.linalg.norm(w - wm, axis=1)))
         return np.nan_to_num(out, nan=1e6, posinf=1e6)
@@ -805,8 +838,9 @@ def optimise_slots(ev, mpairs, centers, lonely=(), keep_bonus=SYM_KEEP_BONUS, ma
         for si, (sr, sl) in enumerate(MIRROR_PAIR_SLOTS):
             cands = [(rr, ll, a_r, ev.pm[a_r]) for rr, ll in ((r, l), (l, r))
                      for a_r in ev.pairs[rr] if ev.pm[a_r] in ev.pairs[ll]]
-            if (sr, sl) == (r, l):
-                cands.append((r, l, ev.pairs[r][0], ev.pairs[l][0]))
+            if {sr, sl} == {r, l}:
+                # 维持原样（两侧方向可能不一致，也照样列为候选）：此时槽位 sr 上的骨段就是 sr 本身
+                cands.append((sr, sl, ev.pairs[sr][0], ev.pairs[sl][0]))
             best = None
             for rr, ll, a_r, a_l in cands:
                 cost, det = ev.pair_cost(rr, ll, sr, sl, a_r, a_l)
@@ -836,15 +870,38 @@ def optimise_slots(ev, mpairs, centers, lonely=(), keep_bonus=SYM_KEEP_BONUS, ma
     free_cache = {}
 
     def best_singles(free_slots):
-        """剩下的槽位给居中 / 落单骨段；按空槽集合记忆化。"""
+        """剩下的槽位给居中 / 落单骨段：各自代价互不影响，是指派问题。
+        按"已用了哪些空槽"做状态压缩 DP（穷举排列是阶乘级，镜像对少、居中骨段多时算不完）；按空槽集合记忆化。"""
         key = tuple(sorted(free_slots))
         if key not in free_cache:
-            best = None
-            for perm in itertools.permutations(key, len(singles)):
-                total = sum(single_opt(s, k)[0] for s, k in zip(singles, perm))
-                if best is None or total < best[0]:
-                    best = (total, perm)
-            free_cache[key] = best
+            m = len(key)
+            if len(singles) != m:
+                free_cache[key] = None
+                return None
+            # dp[mask] = (前 popcount(mask) 根单独骨段用掉 mask 这些空槽时的最小代价, 回溯用的上一个 mask, 槽位)
+            dp = {0: (0.0, None, None)}
+            for mask in range(1 << m):
+                if mask not in dp:
+                    continue
+                i = bin(mask).count("1")
+                if i == len(singles):
+                    continue
+                base = dp[mask][0]
+                for j in range(m):
+                    if mask & (1 << j):
+                        continue
+                    nm = mask | (1 << j)
+                    cand = base + single_opt(singles[i], key[j])[0]
+                    if nm not in dp or cand < dp[nm][0]:
+                        dp[nm] = (cand, mask, key[j])
+            full = (1 << m) - 1
+            perm = []
+            mask = full
+            while mask:
+                _c, prev, slot = dp[mask]
+                perm.append(slot)
+                mask = prev
+            free_cache[key] = (dp[full][0], tuple(reversed(perm)))
         return free_cache[key]
 
     best = None
@@ -885,7 +942,7 @@ def plan_is_identity(plan, stick_pairs):
 
 
 def symmetry_warnings(ev, mpairs, estimate=False):
-    """镜像骨段对左右偏差（P95）超过 SYM_WARN 的：[("asymmetric_pairs", {"pairs": ...})]。
+    """镜像骨段对左右偏差（P95）明显的（见 SYM_WARN_REL / SYM_WARN_MIN）：[("asymmetric_pairs", {"pairs": ...})]。
 
     estimate=True（合成姿态）时数值前加 "~"：会不会不对称可靠，偏多少取决于真实动作。
     """
@@ -894,7 +951,9 @@ def symmetry_warnings(ev, mpairs, estimate=False):
         if ev.n_voxels(r) < SYM_MIN_VOXELS and ev.n_voxels(l) < SYM_MIN_VOXELS:
             continue
         _cost, det = ev.pair_cost(r, l, r, l, ev.pairs[r][0], ev.pairs[l][0])
-        if det["asym"] > SYM_WARN:
+        V = ev.vox[ev.vox_of.get(r, [])]
+        reach = float(np.max(np.linalg.norm(V - ev.P0[ev.pairs[r][0]], axis=1))) if len(V) else 0.0
+        if det["asym"] >= SYM_WARN_MIN and det["asym"] > SYM_WARN_REL * reach:
             items.append((det["asym"], f"#{r}/#{l} ~{det['asym']:.0f}" if estimate
                           else f"#{r}/#{l} {det['asym']:.1f}"))
     if not items:

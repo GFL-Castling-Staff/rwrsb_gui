@@ -1052,15 +1052,16 @@ def main():
                     int(vp_h * scale_y),
                 )
                 g_camera.resize(vp_w, vp_h)
+                # 先处理「游戏镜头」，再取 mvp：否则这一帧骨架线还用旧相机、精灵已用新相机
+                if g_ui.request_game_camera:
+                    g_ui.request_game_camera = False
+                    _apply_game_camera()
                 mvp = g_camera.get_mvp()
                 g_renderer.game_look = g_ui.game_look
                 g_renderer.game_look_size = g_ui.game_look_size
                 g_renderer.sprite_size_mode = "pixel" if g_ui.game_look_px_mode else "world"
                 g_renderer.sprite_px_outline = g_ui.game_look_px_outline
                 g_renderer.sprite_px_body = g_ui.game_look_px_body
-                if g_ui.request_game_camera:
-                    g_ui.request_game_camera = False
-                    _apply_game_camera()
                 if g_ui.game_look:
                     g_renderer.set_sprite_camera(g_camera.get_view_matrix(),
                                                  g_camera.get_proj_matrix(), vp_h * scale_y)
