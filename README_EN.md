@@ -122,11 +122,13 @@ The "Check stick lengths" checkbox in the lower-right of the animation panel ena
 - **Structure checks**: fewer than 13 particles, voxels bound to stick index ≥ 17, upper-arm sticks whose endpoints differ from the particle pair the game takes their orientation from, no upper-body-layer particles, **sticks already displaced at the bind pose** (when a reference direction is nearly parallel to the stick, the game shows those voxels out of place even at rest), and so on. Also shown in the binding tool's panel.
 - **Per-stick rule inspector**: the game rule each stick gets, the particles it references, and whether the current frame is degenerate (a reference parallel to the stick makes the voxels collapse or flip in game) or distorted; "Scan whole animation" finds the worst moment and jumps there on click; flagged sticks can be highlighted orange / magenta in the viewport.
 - **Body layers**: the game uses `bodyAreaHint` to put each particle in a layer — `2` is the upper body (turns with the aim direction, replaced by upper-body animations such as reloading), anything else is the lower body (turns with the movement direction). Particles can be colored by layer; the binding tool's particle properties now use a dropdown for it.
-- **In-game composite preview (read-only)**: combines the current animation with another one into upper and lower body the way the game does (aligned at particle 8), with an upper-body twist slider (in game, up to about 37° while running, 60° while walking). Particles cannot be dragged during the preview, and the edited data is untouched.
+- **In-game composite preview (read-only)**: combines the current animation with another one into upper and lower body the way the game does (aligned at particle 8), with an upper-body twist slider (in game, up to about 37° while running, 60° while walking). Particles cannot be dragged during the preview, and the edited data is untouched. The upper layer is optional: falling, dive, climbing a ladder, swimming, going/leaving prone, surrender, skydiving and wounded are played as one whole-body animation in game, and picking one of those says so.
 
 ### Game Look
 
 "Game look (point sprites)" under "View..." draws voxels the way the game does: screen-facing squares with a black outline, brighter colors (saturation ×1.05, brightness ×1.28), and the lower half of each square darkened. Scene lighting and fog are not reproduced.
+
+Sprite size is measured in **pixels** by default, as in game: the game hardcodes the edge length per detail level (high detail outline 4.2 / body 2.6, low detail 3.6 / 2.4) and leaves distance attenuation off, so voxels do not grow when the camera moves closer. That also means it only matches the real thing at the game's camera distance: the "Game camera" button next to it sets perspective, 1152 voxels away and 58.4° above the horizon. Turn "Size in pixels" off for the old behaviour that follows zoom.
 
 ### Animation Checks
 

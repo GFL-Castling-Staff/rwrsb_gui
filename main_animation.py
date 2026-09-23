@@ -145,6 +145,20 @@ def rebuild_positions_cache():
     g_positions_np = g_editor.display_positions().astype(np.float32)
 
 
+def _apply_game_camera():
+    """把相机设成游戏的：透视、距离 36 世界单位（= 1152 体素）、俯角 58.4°。
+
+    方位角不动——游戏里士兵朝向是转的，方位角对不上没有意义。
+    """
+    from engine_skin import GAME_CAMERA_DISTANCE, GAME_CAMERA_ELEVATION_DEG
+    from ui_panels import tr
+    g_camera.set_ortho_enabled(False)
+    g_camera.distance = GAME_CAMERA_DISTANCE
+    g_camera.elevation = GAME_CAMERA_ELEVATION_DEG
+    g_camera._dirty = True
+    g_ui.push_toast(tr(g_ui, "game_camera_done"), "info")
+
+
 def _pick_particle(mx, my):
     if g_positions_np is None or len(g_positions_np) == 0:
         return -1
@@ -1041,6 +1055,12 @@ def main():
                 mvp = g_camera.get_mvp()
                 g_renderer.game_look = g_ui.game_look
                 g_renderer.game_look_size = g_ui.game_look_size
+                g_renderer.sprite_size_mode = "pixel" if g_ui.game_look_px_mode else "world"
+                g_renderer.sprite_px_outline = g_ui.game_look_px_outline
+                g_renderer.sprite_px_body = g_ui.game_look_px_body
+                if g_ui.request_game_camera:
+                    g_ui.request_game_camera = False
+                    _apply_game_camera()
                 if g_ui.game_look:
                     g_renderer.set_sprite_camera(g_camera.get_view_matrix(),
                                                  g_camera.get_proj_matrix(), vp_h * scale_y)

@@ -112,7 +112,11 @@ class VoxelRenderer:
         self.sprite_prog = ctx.program(vertex_shader=sprite_vert, fragment_shader=sprite_frag)
         self.sprite_vao = None
         self.game_look = False
-        self.game_look_size = 1.0          # 精灵边长（体素）
+        self.game_look_size = 1.0          # 精灵边长（体素），仅 sprite_size_mode="world" 用
+        # 游戏是按像素写死的（材质里距离衰减关闭），只有在游戏的镜头距离下才和游戏一致
+        self.sprite_size_mode = "pixel"    # "pixel" | "world"
+        self.sprite_px_outline = 4.2       # 高细节档：描边 4.2 / 本体 2.6
+        self.sprite_px_body = 2.6
         self._sprite_view = np.eye(4, dtype=np.float32)
         self._sprite_proj = np.eye(4, dtype=np.float32)
         self._sprite_viewport_h = 1.0
@@ -903,10 +907,13 @@ class VoxelRenderer:
         prog["u_point_scale"].value = 0.5 * self._sprite_viewport_h * float(self._sprite_proj[1, 1])
         prog["u_outline_push"].value = 1.5
         self.ctx.enable(moderngl.PROGRAM_POINT_SIZE)
-        # 游戏：描边层点径 4.2、本体 2.6（像素，约等于一个体素宽）
-        for outline, size_mult in ((1.0, 4.2 / 2.6), (0.0, 1.0)):
+        prog["u_size_mode"].value = 1 if self.sprite_size_mode == "pixel" else 0
+        # 描边层在前，本体压在上面；世界模式下沿用描边/本体 = 4.2/2.6 的比例
+        for outline, size_mult, px in ((1.0, 4.2 / 2.6, self.sprite_px_outline),
+                                       (0.0, 1.0, self.sprite_px_body)):
             prog["u_outline"].value = outline
             prog["u_sprite_size"].value = float(self.game_look_size) * size_mult
+            prog["u_sprite_px"].value = float(px)
             self.sprite_vao.render(moderngl.POINTS, vertices=self.n_voxels)
         # 其它点（粒子把手）用 ctx.point_size，关掉以免着色器没写 gl_PointSize 时尺寸未定义
         self.ctx.disable(moderngl.PROGRAM_POINT_SIZE)

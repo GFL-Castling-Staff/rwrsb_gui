@@ -325,6 +325,9 @@ _TEXT = {
         "composite_readonly": "Composite preview is on (read-only). Turn it off in the Engine window to edit.",
         "composite_status": "Composite preview (read-only)",
         "composite_load_failed": "Cannot use this animation: {error}",
+        "composite_whole_body": ("Note: the game plays \"{name}\" as one whole-body animation (channel 0) with no\n"
+                                 "upper-body layer on top, so this composite is hypothetical. The aim/move facing\n"
+                                 "split still applies to any animation, so the twist slider stays meaningful."),
         # 游戏外观渲染
         "game_look": "Game look (point sprites)",
         "game_look_tip": ("Draw voxels the way the game does: screen-facing squares (voxels have no orientation in\n"
@@ -332,6 +335,22 @@ _TEXT = {
                           "x1.28) and the lower half of each square darkened to 85%. Scene lighting and fog are not\n"
                           "reproduced."),
         "game_look_size": "Sprite size (voxels)##game_look_size",
+        "game_look_px_mode": "Size in pixels (as in game)##game_look_px_mode",
+        "game_look_px_mode_tip": ("The game writes the sprite edge length in pixels and leaves distance attenuation\n"
+                                  "off, so voxels do not grow when the camera moves closer. This only matches the\n"
+                                  "game at the game's camera distance - use the Game camera button below.\n"
+                                  "Turn it off to size sprites in voxels instead, which follows zoom."),
+        "game_look_preset": "Detail level##game_look_preset",
+        "game_look_preset_high": "High detail (4.2 / 2.6)",
+        "game_look_preset_low": "Low detail (3.6 / 2.4)",
+        "game_look_preset_custom": "Custom",
+        "game_look_px_outline": "Outline (px)##game_look_px_outline",
+        "game_look_px_body": "Body (px)##game_look_px_body",
+        "game_camera_btn": "Game camera##game_camera_btn",
+        "game_camera_tip": ("Set the camera to the game's: perspective, {dist:.0f} voxels away (36 world units)\n"
+                            "and {elev:.1f} deg above the horizon, from the scene file. Azimuth is left alone,\n"
+                            "since soldiers turn freely in game. Pixel sizes only match the game at this distance."),
+        "game_camera_done": "Camera set to the game's distance and pitch",
         "grid_btn": "Grid...",
         "grid_popup_title": "Grid options",
         "settings_btn": "View...",
@@ -775,12 +794,29 @@ _TEXT = {
         "composite_readonly": "合成预览中（只读）。要编辑请先在「引擎...」窗口关闭合成预览。",
         "composite_status": "合成预览（只读）",
         "composite_load_failed": "无法使用这个动画：{error}",
+        "composite_whole_body": ("提示：「{name}」在游戏里是整段播的（通道 0），不会再叠上身层，这里的合成只是假设。\n"
+                                 "但「上身跟瞄准、下身跟移动」与通道无关、任何动画都生效，所以扭转滑杆仍然有意义。"),
         # 游戏外观渲染
         "game_look": "游戏外观（点精灵）",
         "game_look_tip": ("按游戏的方式画体素：屏幕对齐的方块（游戏里体素没有朝向），底下先画一层放大的黑色描边；\n"
                           "颜色做游戏同样的调整（饱和度 ×1.05、亮度 ×1.28），每个方块下半部压暗到 85%。\n"
                           "不含场景光照与雾。"),
         "game_look_size": "精灵大小（体素）##game_look_size",
+        "game_look_px_mode": "大小按像素（同游戏）##game_look_px_mode",
+        "game_look_px_mode_tip": ("游戏把精灵边长按像素写死，而且关掉了距离衰减：镜头拉近体素不会跟着变大。\n"
+                                  "所以只有在游戏的镜头距离下才和游戏一致——用下面的「游戏镜头」按钮。\n"
+                                  "关掉则按体素（世界大小）算，随缩放变化。"),
+        "game_look_preset": "档位##game_look_preset",
+        "game_look_preset_high": "高细节（4.2 / 2.6）",
+        "game_look_preset_low": "低细节（3.6 / 2.4）",
+        "game_look_preset_custom": "自定义",
+        "game_look_px_outline": "描边（像素）##game_look_px_outline",
+        "game_look_px_body": "本体（像素）##game_look_px_body",
+        "game_camera_btn": "游戏镜头##game_camera_btn",
+        "game_camera_tip": ("把相机设成游戏的：透视、距离 {dist:.0f} 体素（36 世界单位）、俯角 {elev:.1f} 度，\n"
+                            "取自场景文件。方位角不动——游戏里士兵朝向本来就是转的。\n"
+                            "像素大小只有在这个距离下才和游戏一致。"),
+        "game_camera_done": "相机已设为游戏的距离与俯角",
         "grid_btn": "网格...",
         "grid_popup_title": "网格选项",
         "settings_btn": "视图...",
@@ -1076,7 +1112,12 @@ class UIState:
         self._composite_doc = None      # 合成预览：正在挑选另一层动画的文件索引
         # 游戏外观渲染（动画工具）：点精灵 + 黑描边 + 游戏配色
         self.game_look = False
-        self.game_look_size = 1.0
+        self.game_look_size = 1.0       # 世界模式下的精灵边长（体素）
+        self.game_look_px_mode = True   # True = 按像素（同游戏），False = 按世界大小
+        self.game_look_preset = "high"  # "high" | "low" | "custom"
+        self.game_look_px_outline = 4.2
+        self.game_look_px_body = 2.6
+        self.request_game_camera = False  # 视图弹窗点了「游戏镜头」，由主循环消费
         self._composite_filter = ""
 
     def push_toast(self, message: str, level: str = "info",
@@ -1503,6 +1544,51 @@ def _draw_body_layer_toggle(ui_state):
         imgui.set_tooltip(tr(ui_state, "body_hint_tip"))
     if ui_state.show_body_layers:
         imgui.text_disabled(tr(ui_state, "body_layers_legend"))
+
+
+def _draw_game_look_size(ui_state):
+    """游戏外观的精灵尺寸：像素（同游戏）/ 世界大小，加档位预设与游戏镜头按钮。"""
+    from engine_skin import (GAME_CAMERA_DISTANCE, GAME_CAMERA_ELEVATION_DEG,
+                             GAME_SPRITE_PRESETS, GAME_SPRITE_PX_MAX)
+
+    _, ui_state.game_look_px_mode = imgui.checkbox(
+        tr(ui_state, "game_look_px_mode"), ui_state.game_look_px_mode)
+    if imgui.is_item_hovered():
+        imgui.set_tooltip(tr(ui_state, "game_look_px_mode_tip"))
+
+    if ui_state.game_look_px_mode:
+        presets = ["high", "low", "custom"]
+        labels = [tr(ui_state, "game_look_preset_high"),
+                  tr(ui_state, "game_look_preset_low"),
+                  tr(ui_state, "game_look_preset_custom")]
+        cur = presets.index(ui_state.game_look_preset) if ui_state.game_look_preset in presets else 0
+        imgui.set_next_item_width(160)
+        chg, new_idx = imgui.combo(tr(ui_state, "game_look_preset"), cur, labels)
+        if chg:
+            ui_state.game_look_preset = presets[int(new_idx)]
+            if ui_state.game_look_preset in GAME_SPRITE_PRESETS:
+                outline, body = GAME_SPRITE_PRESETS[ui_state.game_look_preset]
+                ui_state.game_look_px_outline = outline
+                ui_state.game_look_px_body = body
+        if ui_state.game_look_preset == "custom":
+            imgui.set_next_item_width(160)
+            _, ui_state.game_look_px_outline = imgui.slider_float(
+                tr(ui_state, "game_look_px_outline"), ui_state.game_look_px_outline,
+                1.0, GAME_SPRITE_PX_MAX, "%.1f")
+            imgui.set_next_item_width(160)
+            _, ui_state.game_look_px_body = imgui.slider_float(
+                tr(ui_state, "game_look_px_body"), ui_state.game_look_px_body,
+                1.0, GAME_SPRITE_PX_MAX, "%.1f")
+    else:
+        imgui.set_next_item_width(160)
+        _, ui_state.game_look_size = imgui.slider_float(
+            tr(ui_state, "game_look_size"), ui_state.game_look_size, 0.5, 2.0, "%.2f")
+
+    if imgui.button(tr(ui_state, "game_camera_btn")):
+        ui_state.request_game_camera = True
+    if imgui.is_item_hovered():
+        imgui.set_tooltip(tr(ui_state, "game_camera_tip",
+                             dist=GAME_CAMERA_DISTANCE, elev=GAME_CAMERA_ELEVATION_DEG))
 
 
 def _draw_particle_editor(ui_state, editor_state):
@@ -2813,9 +2899,7 @@ def _draw_toolbar_animation(ui_state, editor_state, renderer, camera, WIN_W):
         if imgui.is_item_hovered():
             imgui.set_tooltip(tr(ui_state, "game_look_tip"))
         if ui_state.game_look:
-            imgui.set_next_item_width(160)
-            _, ui_state.game_look_size = imgui.slider_float(
-                tr(ui_state, "game_look_size"), ui_state.game_look_size, 0.5, 2.0, "%.2f")
+            _draw_game_look_size(ui_state)
         imgui.separator()
         imgui.text_disabled(tr(ui_state, "tip_axis"))
         imgui.end_popup()
@@ -3933,8 +4017,29 @@ def _composite_pick_file(ui_state, editor_state):
         ui_state._composite_filter = ""
 
 
+def _whole_body_note(ui_state, editor_state, name):
+    """name 这个动画在游戏里是否整段播（通道 0，不叠上身层）；是则返回提示文案。"""
+    from engine_skin import whole_body_animation
+    if not name:
+        return None
+    doc = editor_state.animation_source_doc
+    idx = doc.name_to_index.get(name) if doc is not None else None
+    vanilla = whole_body_animation(index=idx, name=name)
+    if not vanilla:
+        return None
+    return tr(ui_state, "composite_whole_body", name=name, vanilla=vanilla)
+
+
 def _draw_composite_section(ui_state, editor_state):
     imgui.text_wrapped(tr(ui_state, "composite_intro"))
+
+    for nm in (getattr(editor_state.current_animation, "name", None),
+               editor_state.composite_other_name):
+        note = _whole_body_note(ui_state, editor_state, nm)
+        if note:
+            imgui.push_style_color(imgui.COLOR_TEXT, 1.0, 0.78, 0.35, 1.0)
+            imgui.text_wrapped(note)
+            imgui.pop_style_color()
 
     imgui.text(tr(ui_state, "composite_current_as"))
     imgui.same_line()

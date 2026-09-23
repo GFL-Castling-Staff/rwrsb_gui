@@ -33,6 +33,58 @@ BIND_ERROR_BAD = 0.20
 BIND_DRIFT_WARN = 0.5
 BIND_DRIFT_BAD = 2.0
 
+# ── 游戏外观：点精灵尺寸与相机 ──
+# 材质里点精灵按档位写死像素边长，距离衰减是关掉的：镜头拉近体素不会变大。
+# (描边像素, 本体像素)
+GAME_SPRITE_PRESETS = {
+    "high": (4.2, 2.6),
+    "low": (3.6, 2.4),
+}
+GAME_SPRITE_PX_MAX = 10.0        # 显卡上报的 Max Point Size
+# 相机：scene.xml direction="-0.3 -1.7 1.0"（俯角 58.4°）、distance="36" 世界单位。
+# 体素按 1/32 缩放，所以换算成编辑器的体素单位是 36 * 32。
+GAME_CAMERA_DISTANCE = 36.0 * 32.0
+GAME_CAMERA_ELEVATION_DEG = 58.4
+
+# ── 整段播放的动画 ──
+# 游戏有两个动画通道：通道 0 是整副骨架的基础动画，通道 1 是可选的上身层
+# （只替换 bodyAreaHint == 2 的粒子，按粒子 8 对齐）。通道 1 为空时整段合成都跳过。
+# 下面这些是以写死下标播到通道 0 的动作，游戏里不叠上身层；
+# 上身层的动画下标要按"部位 / 槽位"去武器动画表里查，所以跟着武器变。
+WHOLE_BODY_ANIMATIONS = {
+    5: "throwing self over",
+    6: "falling",
+    7: "arriving ground",
+    8: "jumping",
+    9: "lifting up",
+    17: "going prone",
+    19: "leaving prone",
+    22: "climbing ladder",
+    23: "climbing ladder, still",
+    25: "swimming still",
+    26: "swimming forwards",
+    38: "surrender",
+    46: "dive",
+    49: "stunned",
+    65: "skydiving",
+    66: "wounded, still",
+    67: "wounded, moving forwards",
+}
+_WHOLE_BODY_NAMES = {v.lower(): v for v in WHOLE_BODY_ANIMATIONS.values()}
+
+
+def whole_body_animation(index=None, name=None):
+    """这个动画在游戏里是不是整段播（不叠上身层）？是则返回 vanilla 的名字，否则 None。
+
+    有来源文件时按下标判定（引擎只认下标）；没有下标就退回按 vanilla 的注释名匹配。
+    """
+    if index is not None and index in WHOLE_BODY_ANIMATIONS:
+        return WHOLE_BODY_ANIMATIONS[index]
+    if index is None and name:
+        return _WHOLE_BODY_NAMES.get(str(name).strip().lower())
+    return None
+
+
 VANILLA_PARTICLE_NAMES = (
     "head", "neck", "rightshoulder", "leftshoulder", "rightelbow", "leftelbow",
     "righthand", "lefthand", "midspine", "righthip", "lefthip",

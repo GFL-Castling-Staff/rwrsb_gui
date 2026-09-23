@@ -10,8 +10,12 @@ uniform mat4 u_view;
 uniform mat4 u_proj;
 // 0.5 * 视口高度（像素）* proj[1][1]：把世界尺寸换算成像素
 uniform float u_point_scale;
-// 精灵边长（世界单位，1 = 一个体素）
+// 精灵边长（世界单位，1 = 一个体素），仅 u_size_mode = 0 时使用
 uniform float u_sprite_size;
+// 1 = 按像素（游戏的做法：材质里写死边长，距离衰减关闭）；0 = 按世界大小，随缩放变化
+uniform int u_size_mode;
+// 像素模式下的精灵边长（像素）
+uniform float u_sprite_px;
 // 描边层：1 = 黑色、向远处推 u_outline_push；0 = 本体
 uniform float u_outline;
 uniform float u_outline_push;
@@ -39,7 +43,10 @@ void main() {
     // 描边层沿视线往远处推，让本体在重叠处赢得深度测试
     view_pos.z -= u_outline * u_outline_push;
     gl_Position = u_proj * view_pos;
-    gl_PointSize = max(1.0, u_point_scale * u_sprite_size / max(gl_Position.w, 1e-4));
+    float px = (u_size_mode == 1)
+        ? u_sprite_px
+        : u_point_scale * u_sprite_size / max(gl_Position.w, 1e-4);
+    gl_PointSize = max(1.0, px);
 
     // 游戏加载体素颜色时：饱和度 ×1.05、亮度 ×1.28
     vec3 hsv = rgb2hsv(i_color.rgb);

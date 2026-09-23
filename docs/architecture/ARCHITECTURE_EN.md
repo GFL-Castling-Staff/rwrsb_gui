@@ -387,8 +387,17 @@ v_normal = R * in_normal;   // R is orthonormal; no inverse-transpose needed
 
 In game, voxels are screen-aligned square point sprites with no orientation. "Game look" in the animation tool's "View..." popup reproduces this with [shaders/voxel_sprite.vert](../../shaders/voxel_sprite.vert) / `.frag`:
 
-- Reuses the same instance VBOs (read per vertex), draws `POINTS`, converts the voxel size to pixels through the projection (both perspective and ortho follow zoom); needs `set_sprite_camera(view, proj, viewport_h)`
-- Two passes: an outline pass at 4.2/2.6 times the size, pure black, pushed 1.5 voxels away along the view direction; then the body pass
+- Reuses the same instance VBOs (read per vertex), draws `POINTS`; needs `set_sprite_camera(view, proj, viewport_h)`
+- Two size semantics (`sprite_size_mode`):
+  - `"pixel"` (default, as in game): writes `gl_PointSize` directly. The game's material hardcodes the edge
+    length in pixels per detail level and leaves distance attenuation off, so voxels do not grow when the
+    camera moves closer. The levels come from the material: high detail outline 4.2 / body 2.6, low detail
+    3.6 / 2.4. This only matches the game at the game's camera distance - the "Game camera" button in the
+    "View..." popup sets perspective, 1152 voxels and 58.4 deg above the horizon (the scene file's
+    `distance="36"` world units and `direction="-0.3 -1.7 1.0"`, voxels being scaled by 1/32)
+  - `"world"`: the point size is converted to pixels through the projection (both perspective and ortho
+    follow zoom), with the outline at 4.2/2.6 times the body size
+- Two passes: a pure black outline pass pushed 1.5 voxels away along the view direction, then the body pass
 - Colors get the same adjustment the game applies when loading voxels: saturation ×1.05, brightness ×1.28; the lower half of each square ×0.85
 - `PROGRAM_POINT_SIZE` is disabled afterwards, otherwise the particle handles (whose shader does not write `gl_PointSize`) would have undefined size
 - No scene lighting or fog; original voxel colors are always used
