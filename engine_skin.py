@@ -26,10 +26,11 @@ SIGMA_BAD = 0.15
 DISTORTION_WARN = 0.10   # 相对 bind 的拉伸/压扁超过 10%
 DISTORTION_BAD = 0.30
 # bind 往返误差 ‖M(q)·M(q⁻¹) − I‖：bind 四元数非单位时两者不抵消，
-# 游戏里这段体素在 bind 姿态下就已错位（vanilla 为 0）
+# 游戏里这段体素在 bind 姿态下就已错位（vanilla 为 0）。它是相对量，约等于 错位 / 体素到 a 端的距离，
+# 看得出来与否取决于它——150 体素长的腿偏 4.5 体素（3%）几乎看不出，20 体素的手臂偏 4.5 体素就很明显
 BIND_ERROR_WARN = 0.05
-BIND_ERROR_BAD = 0.20
-# bind 姿态下体素实际错位（体素单位）；相对误差不大但骨段上的体素离 a 端很远时同样明显
+BIND_ERROR_BAD = 0.15
+# bind 姿态下体素实际错位（体素单位）只当"看得见"的下限：相对误差再大，不到半个体素也看不出
 BIND_DRIFT_WARN = 0.5
 BIND_DRIFT_BAD = 2.0
 
@@ -478,17 +479,29 @@ class EngineSkinBinding:
         return out
 
 
-def grade(info):
-    """体检结果分级：0 正常 / 1 注意 / 2 异常。"""
-    bind_error = info.get("bind_error", 0.0)
-    bind_drift = info.get("bind_drift", 0.0)
-    if (info["degenerate"] or info["sigma_min"] < SIGMA_BAD or info["distortion"] > DISTORTION_BAD
-            or bind_error > BIND_ERROR_BAD or bind_drift > BIND_DRIFT_BAD):
+def frame_grade(info):
+    """本帧姿态的分级（参考方向退化、相对 bind 的变形）：0 正常 / 1 注意 / 2 异常。"""
+    if info["degenerate"] or info["sigma_min"] < SIGMA_BAD or info["distortion"] > DISTORTION_BAD:
         return 2
-    if (info["sigma_min"] < SIGMA_WARN or info["distortion"] > DISTORTION_WARN
-            or bind_error > BIND_ERROR_WARN or bind_drift > BIND_DRIFT_WARN):
+    if info["sigma_min"] < SIGMA_WARN or info["distortion"] > DISTORTION_WARN:
         return 1
     return 0
+
+
+def bind_grade(bind_error, bind_drift):
+    """静止错位（与姿态无关）的分级：相对误差够大，且错位体素数达到看得见的下限才报。"""
+    if not np.isfinite(bind_error):
+        return 2
+    if bind_error > BIND_ERROR_BAD and bind_drift >= BIND_DRIFT_BAD:
+        return 2
+    if bind_error > BIND_ERROR_WARN and bind_drift >= BIND_DRIFT_WARN:
+        return 1
+    return 0
+
+
+def grade(info):
+    """综合分级：本帧与静止错位取较重者。"""
+    return max(frame_grade(info), bind_grade(info.get("bind_error", 0.0), info.get("bind_drift", 0.0)))
 
 
 def static_warnings(n_particles, stick_pairs, bindings, body_hints=None):
@@ -521,19 +534,370 @@ def static_warnings(n_particles, stick_pairs, bindings, body_hints=None):
 
 
 def bind_warnings(skin, only_sticks=None):
-    """bind 往返误差超阈值的 stick：[("bind_drift", {"sticks": "#4 27.1, #0 8.3"})] 或 []。
+    """静止错位看得出来的 stick：[("bind_drift", {"sticks": "#4 27.1 (48%), #0 8.3 (16%)"})] 或 []。
 
     only_sticks：只看这些 stick（通常是有体素绑定的）；None 表示全部。
-    有体素时附上 bind 姿态下体素实际被挪开的最大距离（体素单位），否则附相对误差。
+    判定见 bind_grade：没绑体素（错位 0）的 stick 不报——没有体素就看不见错位。
     """
     items = []
     for ci, err in enumerate(skin.bind_error):
         drift = skin.bind_drift[ci]
-        if (err <= BIND_ERROR_WARN and drift <= BIND_DRIFT_WARN) or (
-                only_sticks is not None and ci not in only_sticks):
+        if bind_grade(err, drift) == 0 or (only_sticks is not None and ci not in only_sticks):
             continue
-        items.append((drift if drift > 0 else err, ci, f"#{ci} {drift:.1f}" if drift > 0 else f"#{ci} {err:.0%}"))
+        items.append((err, ci, f"#{ci} {drift:.1f} ({err:.0%})"))
     if not items:
         return []
     items.sort(reverse=True)
     return [("bind_drift", {"sticks": ", ".join(label for _v, _c, label in items)})]
+
+
+# ──────────────────────────────────────────────
+# 左右对称
+# ──────────────────────────────────────────────
+# 姿态严格镜像（x 取反、左右粒子互换）后逐体素比较，下面这些槽位对两侧结果严格镜像（两侧方向一致时）：
+# 腿规则 (0|1 ↔ 3|4)、上臂 (12,10)、前臂 (13,11)、胸廓 (6,9)。(5,8)、(14,15) 两侧用同一条规则，
+# FromAxes 输入不正交时两侧算出来不一样，改方向也救不回来。
+# 但只看对称不够：同一对骨段放进不同槽位，渲染方向偏离骨段的程度（跟随）差别很大，所以要一起算代价。
+# 每项 (右槽, 左槽)；右 = x 为负的一侧，与 vanilla 的 right* 粒子一致
+MIRROR_PAIR_SLOTS = ((0, 4), (1, 3), (6, 9), (12, 10), (5, 8), (14, 15), (13, 11))
+MIRROR_CENTER_SLOTS = (2, 7, 16)
+_MX = np.diag([-1.0, 1.0, 1.0])
+
+SYM_MIN_VOXELS = 20       # 体素少于此数的骨段不计代价：零星体素挪到哪都行
+SYM_PERCENTILE = 95       # 按姿态取分位数，避免个别极端帧主导
+SYM_ASYM_WEIGHT = 2.0     # 左右不一样一眼就是 bug；两侧一起偏不显眼，所以不对称按两倍计
+SYM_MAX_DRIFT = 5.0       # 新位置的静止错位上限（体素）：待机时一直看得见，超过就不考虑
+SYM_KEEP_BONUS = 2.0      # 改动至少要换来这么多体素才做，避免为一点点提升大挪骨段
+SYM_WARN = 1.0            # 结构检查：镜像骨段对的左右偏差（P95，体素）超过此值就提示
+
+
+def mirror_particle_map(P, tol=0.51):
+    """bind 骨架关于 x = 0 镜像对称时返回 {粒子下标: 镜像粒子下标}，否则 None。"""
+    P = np.asarray(P, dtype=float)
+    if len(P) < MIN_PARTICLES:
+        return None
+    pm = {}
+    for k in range(len(P)):
+        d = np.linalg.norm(P - _MX @ P[k], axis=1)
+        j = int(np.argmin(d))
+        if d[j] > tol:
+            return None
+        pm[k] = j
+    return pm
+
+
+def mirror_pose(P, pm):
+    """姿态关于 x = 0 镜像并左右互换粒子。"""
+    P = np.asarray(P, dtype=float)
+    Q = np.empty_like(P)
+    for k, j in pm.items():
+        Q[j] = _MX @ P[k]
+    return Q
+
+
+def classify_mirror_sticks(stick_pairs, pm, P0):
+    """返回 (镜像对 [(右, 左)], 居中 [s], 落单 [s])。
+
+    镜像对：端点集合互为镜像的两根 stick；居中：端点集合镜像后是它自己；落单：找不到镜像的。
+    """
+    P0 = np.asarray(P0, dtype=float)
+    sets = [frozenset(int(v) for v in ab) for ab in stick_pairs]
+    used, mpairs, centers, lonely = set(), [], [], []
+    for s, ab in enumerate(sets):
+        if s in used:
+            continue
+        m = frozenset(pm[x] for x in ab)
+        if m == ab:
+            centers.append(s)
+            used.add(s)
+            continue
+        partners = [t for t in range(len(sets)) if t not in used and t != s and sets[t] == m]
+        if not partners:
+            lonely.append(s)
+            used.add(s)
+            continue
+        t = partners[0]
+        used |= {s, t}
+        xs = P0[list(stick_pairs[s])].mean(0)[0]
+        mpairs.append((s, t) if xs <= 0 else (t, s))
+    return mpairs, centers, lonely
+
+
+# 胸廓参考系用到的粒子（颈、两肩、midspine）：真实动作里基本一起刚性运动
+SYM_CORE_PARTICLES = (1, 2, 3, 8)
+
+
+def synthetic_poses(P0, n=32, seed=0):
+    """没有动画时的测试姿态（固定种子，结果稳定）：躯干整体随机转动、平移，其余粒子再各自扰动。
+
+    躯干保持刚性更接近真实动作：前臂槽 (13,11) 只在胸廓不变形时两侧对称，每个粒子独立扰动
+    会把它误判成不对称。偏差多大、跟随和变形多少取决于真实动作，只能当估计。
+    """
+    P0 = np.asarray(P0, dtype=float)
+    rng = np.random.default_rng(seed)
+    scale = 0.12 * float(np.mean(np.linalg.norm(P0 - P0.mean(0), axis=1)))
+    core = [i for i in SYM_CORE_PARTICLES if i < len(P0)]
+    centre = P0[core].mean(0)
+    out = []
+    for _ in range(n):
+        axis = normalise(rng.normal(size=3))
+        half = 0.5 * np.radians(rng.uniform(0.0, 25.0))
+        R = q_to_matrix(np.concatenate([[np.cos(half)], axis * np.sin(half)]))
+        P = (P0 - centre) @ R.T + centre + rng.normal(0.0, 0.3 * scale, 3)
+        noise = rng.normal(0.0, scale, P0.shape)
+        noise[core] = 0.0
+        out.append(P + noise)
+    return out
+
+
+class SymmetryEvaluator:
+    """评估 stick 放进某槽位、以某端为原点时的可见误差（体素）。
+
+    stick 的朝向只取决于槽位规则、自己的端点和身体参考系，身体参考系只看粒子位置，
+    与 stick 怎么分配无关，所以每种放法的代价可以单独算，分配就成了指派问题。
+    """
+
+    def __init__(self, bind_positions, stick_pairs, voxels_xyz, bindings, poses, pm):
+        self.P0 = np.asarray(bind_positions, dtype=float)
+        self.pairs = [(int(a), int(b)) for a, b in stick_pairs]
+        self.pm = pm
+        self.vox = np.asarray(voxels_xyz, dtype=float).reshape(-1, 3)
+        self.vox_of = {}
+        for vi, ci in bindings.items():
+            vi, ci = int(vi), int(ci)
+            if 0 <= vi < len(self.vox):
+                self.vox_of.setdefault(ci, []).append(vi)
+        self.F0 = body_frame(self.P0)
+        self.poses = [np.asarray(P, dtype=float) for P in poses]
+        self.Fs = [body_frame(P) for P in self.poses]
+        self.mposes = [mirror_pose(P, pm) for P in self.poses]
+        self.mFs = [body_frame(Q) for Q in self.mposes]
+        self._cache = {}
+
+    def other_end(self, stick, a):
+        x, y = self.pairs[stick]
+        return y if a == x else x
+
+    def n_voxels(self, stick):
+        return len(self.vox_of.get(stick, ()))
+
+    def _series(self, slot, a, b, mirrored=False):
+        """每个姿态的 T = M(q_pose)·M(q_bind⁻¹)（与游戏同样不归一化），以及 bind 往返矩阵。"""
+        key = ("T", slot, a, b, mirrored)
+        if key not in self._cache:
+            q0 = stick_orientation(slot, self.P0[a], self.P0[b], self.F0)
+            inv0 = q_to_matrix(q_inverse(q0))
+            rt = q_to_matrix(q0) @ inv0
+            Ps, Fs = (self.mposes, self.mFs) if mirrored else (self.poses, self.Fs)
+            Ts = np.array([q_to_matrix(stick_orientation(slot, P[a], P[b], F)) @ inv0
+                           for P, F in zip(Ps, Fs)]).reshape(-1, 3, 3)
+            self._cache[key] = (Ts, rt)
+        return self._cache[key]
+
+    def placement(self, stick, slot, a):
+        """stick 放进 slot、以粒子 a 为原点：(每姿态跟随误差, 每姿态变形, 静止错位, 变换序列)，单位体素。"""
+        key = ("P", stick, slot, a)
+        if key in self._cache:
+            return self._cache[key]
+        b = self.other_end(stick, a)
+        Ts, rt = self._series(slot, a, b)
+        V = self.vox[self.vox_of.get(stick, [])]
+        n = len(self.poses)
+        if len(V) < SYM_MIN_VOXELS:
+            out = (np.zeros(n), np.zeros(n), 0.0, Ts)
+        else:
+            loc = V - self.P0[a]
+            reach = float(np.max(np.linalg.norm(loc, axis=1)))
+            drift = float(np.max(np.linalg.norm(loc @ (rt - np.eye(3)).T, axis=1)))
+            dist = np.array([distortion(T) for T in Ts]) * reach
+            u0 = self.P0[b] - self.P0[a]
+            u0 = u0 / max(float(np.linalg.norm(u0)), 1e-9)
+            track = np.zeros(n)
+            for i, (T, P) in enumerate(zip(Ts, self.poses)):
+                u = P[b] - P[a]
+                v = T @ u0
+                nu, nv = float(np.linalg.norm(u)), float(np.linalg.norm(v))
+                if nu > 1e-9:
+                    track[i] = reach if nv < 1e-9 else float(np.linalg.norm(v / nv - u / nu)) * reach
+            out = (track, np.nan_to_num(dist, nan=reach, posinf=reach), drift, Ts)
+        self._cache[key] = out
+        return out
+
+    def mirror_gap(self, stick, slot, a, partner, partner_slot, pa):
+        """stick 的体素在姿态 P 下的位置镜像后，与其镜像体素（在 partner 上、以 pa 为原点）
+        在镜像姿态 P̄ 下的位置之差，逐姿态取最大（体素）。"""
+        V = self.vox[self.vox_of.get(stick, [])]
+        n = len(self.poses)
+        if len(V) < SYM_MIN_VOXELS:
+            return np.zeros(n)
+        Ts = self.placement(stick, slot, a)[3]
+        Tm, _ = self._series(partner_slot, pa, self.other_end(partner, pa), mirrored=True)
+        loc = V - self.P0[a]
+        locm = V @ _MX.T - self.P0[pa]
+        out = np.empty(n)
+        for i, (P, Q) in enumerate(zip(self.poses, self.mposes)):
+            w = (P[a] + loc @ Ts[i].T) @ _MX.T
+            wm = Q[pa] + locm @ Tm[i].T
+            out[i] = float(np.max(np.linalg.norm(w - wm, axis=1)))
+        return np.nan_to_num(out, nan=1e6, posinf=1e6)
+
+    @staticmethod
+    def _agg(per_pose, static=0.0):
+        v = float(np.percentile(per_pose, SYM_PERCENTILE)) if len(per_pose) else 0.0
+        return max(v, float(static))
+
+    def pair_cost(self, right, left, slot_r, slot_l, a_r, a_l):
+        """镜像对放进 (slot_r, slot_l)、原点分别为 a_r / a_l。返回 (代价, 明细)，单位体素。"""
+        tr, sr, dr, _ = self.placement(right, slot_r, a_r)
+        tl, sl, dl, _ = self.placement(left, slot_l, a_l)
+        asym = self.mirror_gap(right, slot_r, a_r, left, slot_l, a_l)
+        detail = {"asym": self._agg(asym), "track": self._agg(np.maximum(tr, tl)),
+                  "dist": self._agg(np.maximum(sr, sl)), "drift": max(dr, dl)}
+        cost = self._agg(np.maximum.reduce([asym * SYM_ASYM_WEIGHT, tr, tl, sr, sl]), max(dr, dl))
+        return cost, detail
+
+    def single_cost(self, stick, slot, a, mirror_self=True):
+        """单根 stick（居中或落单）。居中骨段镜像后还是它自己，同样要求左右对称。"""
+        t, s, d, _ = self.placement(stick, slot, a)
+        asym = self.mirror_gap(stick, slot, a, stick, slot, a) if mirror_self else np.zeros(len(self.poses))
+        detail = {"asym": self._agg(asym), "track": self._agg(t), "dist": self._agg(s), "drift": d}
+        return self._agg(np.maximum.reduce([asym * SYM_ASYM_WEIGHT, t, s]), d), detail
+
+
+def current_slot_plan(ev, mpairs, centers, lonely=()):
+    """现状作为一份方案（与 optimise_slots 的结果同格式），并算好代价。"""
+    plan = [{"sticks": [r, l], "slots": [r, l], "a_ends": [ev.pairs[r][0], ev.pairs[l][0]]} for r, l in mpairs]
+    plan += [{"sticks": [s], "slots": [s], "a_ends": [ev.pairs[s][0]]} for s in list(centers) + list(lonely)]
+    return evaluate_slot_plan(ev, plan, centers=set(centers))
+
+
+def evaluate_slot_plan(ev, plan, centers=None):
+    out = []
+    for item in plan:
+        st, sl, ae = item["sticks"], item["slots"], item["a_ends"]
+        if len(st) == 2:
+            cost, det = ev.pair_cost(st[0], st[1], sl[0], sl[1], ae[0], ae[1])
+        else:
+            is_center = centers is None or st[0] in centers
+            cost, det = ev.single_cost(st[0], sl[0], ae[0], mirror_self=is_center)
+        out.append({**item, "cost": cost, "detail": det})
+    return out
+
+
+def optimise_slots(ev, mpairs, centers, lonely=(), keep_bonus=SYM_KEEP_BONUS, max_drift=SYM_MAX_DRIFT):
+    """槽位指派：镜像对 -> 槽位对（含哪侧进右槽、以哪端为原点），其余骨段 -> 剩下的槽位。
+
+    目标是代价总和最小。新位置静止错位超过 max_drift 的不考虑（原位置不受限）；
+    维持原样的放法少算 keep_bonus，避免为一点点提升大挪骨段。
+    返回方案列表；骨段数不是 17、镜像对多于槽位对时返回 None。
+    """
+    n_sticks = len(ev.pairs)
+    if n_sticks != MAX_GPU_STICKS or len(mpairs) > len(MIRROR_PAIR_SLOTS):
+        return None
+    import itertools
+
+    def adj(cost, det, unchanged):
+        penalty = 1000.0 if (det["drift"] > max_drift and not unchanged) else 0.0
+        return cost + penalty - (keep_bonus if unchanged else 0.0)
+
+    pair_opt = {}
+    for pi, (r, l) in enumerate(mpairs):
+        for si, (sr, sl) in enumerate(MIRROR_PAIR_SLOTS):
+            cands = [(rr, ll, a_r, ev.pm[a_r]) for rr, ll in ((r, l), (l, r))
+                     for a_r in ev.pairs[rr] if ev.pm[a_r] in ev.pairs[ll]]
+            if (sr, sl) == (r, l):
+                cands.append((r, l, ev.pairs[r][0], ev.pairs[l][0]))
+            best = None
+            for rr, ll, a_r, a_l in cands:
+                cost, det = ev.pair_cost(rr, ll, sr, sl, a_r, a_l)
+                unchanged = (rr, ll) == (sr, sl) and (a_r, a_l) == (ev.pairs[rr][0], ev.pairs[ll][0])
+                cand = (adj(cost, det, unchanged), cost, det, rr, ll, a_r, a_l)
+                if best is None or cand[0] < best[0]:
+                    best = cand
+            pair_opt[(pi, si)] = best
+
+    singles = list(centers) + list(lonely)
+    center_set = set(centers)
+    single_cache = {}
+
+    def single_opt(s, k):
+        key = (s, k)
+        if key not in single_cache:
+            best = None
+            for a in ev.pairs[s]:
+                cost, det = ev.single_cost(s, k, a, mirror_self=s in center_set)
+                unchanged = k == s and a == ev.pairs[s][0]
+                cand = (adj(cost, det, unchanged), cost, det, s, a)
+                if best is None or cand[0] < best[0]:
+                    best = cand
+            single_cache[key] = best
+        return single_cache[key]
+
+    free_cache = {}
+
+    def best_singles(free_slots):
+        """剩下的槽位给居中 / 落单骨段；按空槽集合记忆化。"""
+        key = tuple(sorted(free_slots))
+        if key not in free_cache:
+            best = None
+            for perm in itertools.permutations(key, len(singles)):
+                total = sum(single_opt(s, k)[0] for s, k in zip(singles, perm))
+                if best is None or total < best[0]:
+                    best = (total, perm)
+            free_cache[key] = best
+        return free_cache[key]
+
+    best = None
+    n_slot_pairs = len(MIRROR_PAIR_SLOTS)
+    for perm in itertools.permutations(range(n_slot_pairs), len(mpairs)):
+        total = sum(pair_opt[(pi, si)][0] for pi, si in enumerate(perm))
+        used = {k for si in perm for k in MIRROR_PAIR_SLOTS[si]}
+        free = [k for k in range(n_sticks) if k not in used]
+        if len(free) != len(singles):
+            continue
+        sub = best_singles(free)
+        if sub is None:
+            continue
+        total += sub[0]
+        if best is None or total < best[0]:
+            best = (total, perm, sub[1])
+    if best is None:
+        return None
+    _total, perm, single_slots = best
+    plan = []
+    for pi, si in enumerate(perm):
+        _adj, cost, det, rr, ll, a_r, a_l = pair_opt[(pi, si)]
+        plan.append({"sticks": [rr, ll], "slots": list(MIRROR_PAIR_SLOTS[si]), "a_ends": [a_r, a_l],
+                     "cost": cost, "detail": det})
+    for s, k in zip(singles, single_slots):
+        _adj, cost, det, _s, a = single_opt(s, k)
+        plan.append({"sticks": [s], "slots": [k], "a_ends": [a], "cost": cost, "detail": det})
+    return plan
+
+
+def plan_is_identity(plan, stick_pairs):
+    """方案是否等于现状（槽位与原点都不变）。"""
+    for item in plan:
+        for s, k, a in zip(item["sticks"], item["slots"], item["a_ends"]):
+            if s != k or a != stick_pairs[s][0]:
+                return False
+    return True
+
+
+def symmetry_warnings(ev, mpairs, estimate=False):
+    """镜像骨段对左右偏差（P95）超过 SYM_WARN 的：[("asymmetric_pairs", {"pairs": ...})]。
+
+    estimate=True（合成姿态）时数值前加 "~"：会不会不对称可靠，偏多少取决于真实动作。
+    """
+    items = []
+    for r, l in mpairs:
+        if ev.n_voxels(r) < SYM_MIN_VOXELS and ev.n_voxels(l) < SYM_MIN_VOXELS:
+            continue
+        _cost, det = ev.pair_cost(r, l, r, l, ev.pairs[r][0], ev.pairs[l][0])
+        if det["asym"] > SYM_WARN:
+            items.append((det["asym"], f"#{r}/#{l} ~{det['asym']:.0f}" if estimate
+                          else f"#{r}/#{l} {det['asym']:.1f}"))
+    if not items:
+        return []
+    items.sort(reverse=True)
+    return [("asymmetric_pairs", {"pairs": ", ".join(label for _v, label in items)})]

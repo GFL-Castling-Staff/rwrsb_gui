@@ -130,6 +130,8 @@ class EditorState:
         self.particles = []
         self.sticks = []
         self.bindings = {}
+        # 绑定每次整体替换或原地改动都 +1，体检等缓存按它判断是否要重建
+        self._bindings_rev = 0
 
         self.source_path = None
         self.trans_bias = 127
@@ -191,6 +193,9 @@ class EditorState:
         self._engine_diag_skin = None
         self._engine_diag_reason = ""
         self._engine_diag_cache = (None, None, None)  # (binding, 位置字节, 结果)
+        # 左右不对称提示（合成姿态估计），按骨架与绑定缓存
+        self._symmetry_warn_key = None
+        self._symmetry_warn_cache = []
 
         # 旧版全局蒙皮规则开关（由 skinning_mode 派生，legacy_topology 时为 True）：
         # True 时 _compute_body_bridge_frame 跳过 vanilla 硬编码表，
@@ -277,6 +282,7 @@ class EditorState:
         self.particles = copy.deepcopy(snapshot["particles"])
         self.sticks = [stick.clone() for stick in snapshot["sticks"]]
         self.bindings = copy.deepcopy(snapshot["bindings"])
+        self._bindings_rev += 1
         self.active_stick_idx = int(snapshot["active_stick_idx"])
         self.active_particle_idx = int(snapshot.get("active_particle_idx", -1))
         # 恢复选择集；同时过滤掉越界 index（防御老 snapshot 或外部脏数据）
@@ -314,11 +320,13 @@ class EditorState:
     def _mark_bindings_changed(self):
         self._dirty = True
         self.gpu_dirty = True
+        self._bindings_rev += 1
 
     def _mark_skeleton_changed(self):
         self._dirty = True
         self.gpu_dirty = True
         self.skeleton_dirty = True
+        self._bindings_rev += 1
         # 蒙皮：仅动画模式下骨架变形时同步更新 voxel 世界位置
         # 绑骨模式下 voxel 是体模型本身，拖粒子只是在挪标注，不应触发蒙皮
         if self.animation_mode:
@@ -682,6 +690,7 @@ class EditorState:
         self._reset_skin_binding()
         self.voxels = parse_vox(path, self.trans_bias)
         self.bindings = {}
+        self._bindings_rev += 1
         self.selected_voxels = set()
         self.selected_particles = set()
         self.exit_mirror_mode()
@@ -715,6 +724,7 @@ class EditorState:
         self._reset_skin_binding()
         self.voxels = voxels
         self.bindings = bindings
+        self._bindings_rev += 1
         self.selected_voxels = set()
         self.selected_particles = set()
         self.exit_mirror_mode()
@@ -775,6 +785,7 @@ class EditorState:
         # 保留 voxels 和 bindings（供蒙皮用）
         self.voxels = voxels
         self.bindings = bindings
+        self._bindings_rev += 1
         self.selected_voxels = set()
         self.selected_particles = set()
         self.exit_mirror_mode()
@@ -1077,6 +1088,7 @@ class EditorState:
             next_ci += 1
         self.sticks = kept
         self.bindings = {vi: remap[ci] for vi, ci in self.bindings.items() if ci in remap}
+        self._bindings_rev += 1
         self.rename_sticks_from_particles(push_undo=False)
         self._normalize_stick_indices()
         # 清理 selected_particles，移除被删的 index，并对剩余 index 做重映射
@@ -1137,6 +1149,137 @@ class EditorState:
             stick.name = str(name)
         self._mark_skeleton_changed()
 
+    # ── 槽位调整：游戏按 stick 下标套规则，换下标 / 换方向会改变游戏里的蒙皮 ──
+
+    def _flip_stick_endpoints(self, stick, particles_by_id):
+        """a/b 对调；名字是自动生成的就跟着换，自定义名字保留。"""
+        auto = _make_stick_name(particles_by_id, stick.particle_a_id, stick.particle_b_id)
+        stick.particle_a_id, stick.particle_b_id = stick.particle_b_id, stick.particle_a_id
+        if stick.name == auto:
+            stick.name = _make_stick_name(particles_by_id, stick.particle_a_id, stick.particle_b_id)
+
+    def reverse_stick(self, stick_idx):
+        """对调骨段方向（a 端是游戏里这段体素的原点）。"""
+        if self.animation_mode or not (0 <= stick_idx < len(self.sticks)):
+            return
+        self._push_undo()
+        self._flip_stick_endpoints(self.sticks[stick_idx], {p["id"]: p for p in self.particles})
+        self._tree_dirty = True
+        self._mark_skeleton_changed()
+
+    def swap_sticks(self, i, j):
+        """交换两根骨段的下标，体素绑定跟着骨段走（游戏里两段体素换用对方的槽位规则）。"""
+        n = len(self.sticks)
+        if self.animation_mode or i == j or not (0 <= i < n and 0 <= j < n):
+            return
+        self._push_undo()
+        self.sticks[i], self.sticks[j] = self.sticks[j], self.sticks[i]
+        swap = {i: j, j: i}
+        self.bindings = {vi: swap.get(ci, ci) for vi, ci in self.bindings.items()}
+        self._bindings_rev += 1
+        if self.active_stick_idx in swap:
+            self.active_stick_idx = swap[self.active_stick_idx]
+        self._normalize_stick_indices()
+        self._tree_dirty = True
+        self._mark_skeleton_changed()
+
+    def apply_slot_plan(self, plan):
+        """按槽位方案重排骨段（engine_skin.optimise_slots 的结果），一步可撤销。
+
+        方案每项：sticks = 原下标，slots = 新下标，a_ends = 新 a 端的粒子下标。
+        方案必须覆盖全部骨段且新下标不重复，否则抛 ValueError、不做任何改动。
+        """
+        if self.animation_mode:
+            raise ValueError("动画模式下不能调整骨段")
+        n = len(self.sticks)
+        new = [None] * n
+        move = {}
+        for item in plan:
+            for s, k, a in zip(item["sticks"], item["slots"], item["a_ends"]):
+                s, k, a = int(s), int(k), int(a)
+                if not (0 <= s < n and 0 <= k < n and 0 <= a < len(self.particles)):
+                    raise ValueError(f"方案越界：stick {s} -> {k}")
+                if new[k] is not None or s in move:
+                    raise ValueError(f"方案重复：stick {s} -> {k}")
+                a_id = int(self.particles[a]["id"])
+                st = self.sticks[s]
+                if a_id not in (st.particle_a_id, st.particle_b_id):
+                    raise ValueError(f"stick {s} 的端点里没有粒子 {a}")
+                new[k] = (s, a_id)
+                move[s] = k
+        if len(move) != n:
+            raise ValueError("方案没有覆盖全部骨段")
+        self._push_undo()
+        particles_by_id = {p["id"]: p for p in self.particles}
+        old_active = self.active_stick_idx
+        sticks = []
+        for s, a_id in new:
+            st = self.sticks[s]
+            if st.particle_a_id != a_id:
+                self._flip_stick_endpoints(st, particles_by_id)
+            sticks.append(st)
+        self.sticks = sticks
+        self.bindings = {vi: move[ci] for vi, ci in self.bindings.items() if ci in move}
+        self._bindings_rev += 1
+        self.active_stick_idx = move.get(old_active, old_active)
+        self._normalize_stick_indices()
+        self._tree_dirty = True
+        self._mark_skeleton_changed()
+
+    def slot_signature(self):
+        """骨架 + 绑定的签名：后台算完方案后用它判断数据有没有被改过。"""
+        return (self._bindings_rev,
+                tuple((s.particle_a_id, s.particle_b_id) for s in self.sticks),
+                tuple((int(p["id"]), float(p["x"]), float(p["y"]), float(p["z"])) for p in self.particles),
+                len(self.voxels))
+
+    def symmetry_inputs(self):
+        """左右对称评估的输入快照（可交给后台线程）：bind 粒子位置、stick 端点下标、体素 bind 位置、绑定。
+
+        bind 源同体检：动画模式用 canonical 骨架与体素，绑骨模式用当前骨架与体素。
+        骨架不是左右镜像对称时 "pm" 为 None。
+        """
+        from engine_skin import mirror_particle_map, classify_mirror_sticks
+        if self.animation_mode and self._canonical_skeleton_pose:
+            P0 = np.asarray(self._canonical_skeleton_pose, dtype=float)
+            vox = self._canonical_voxel_positions or []
+        else:
+            P0 = np.asarray([(p["x"], p["y"], p["z"]) for p in self.particles], dtype=float)
+            vox = self.voxels
+        pairs = self._stick_index_pairs(self.particles)
+        pm = mirror_particle_map(P0)
+        mpairs, centers, lonely = classify_mirror_sticks(pairs, pm, P0) if pm is not None else ([], [], [])
+        return {"P0": P0, "pairs": pairs, "voxels": np.asarray([v[:3] for v in vox], dtype=float).reshape(-1, 3),
+                "bindings": dict(self.bindings), "pm": pm, "mpairs": mpairs, "centers": centers,
+                "lonely": lonely, "signature": self.slot_signature()}
+
+    def symmetry_structure_warnings(self):
+        """结构检查用的左右不对称提示（合成姿态，只判断会不会不对称）。按骨架与绑定缓存。"""
+        from engine_skin import SymmetryEvaluator, synthetic_poses, symmetry_warnings, EngineSkinUnavailable
+        if len(self.particles) < 13 or not self.voxels or not self.bindings:
+            return []
+        if self.animation_mode:
+            # 动画模式下粒子每帧在动，签名只看 canonical 骨架，否则播放时每帧都要重算
+            canon = self._canonical_skeleton_pose or []
+            key = (True, self._bindings_rev, tuple((s.particle_a_id, s.particle_b_id) for s in self.sticks),
+                   tuple(tuple(map(float, c)) for c in canon), len(self._canonical_voxel_positions or []))
+        else:
+            key = (False, self.slot_signature())
+        if key == self._symmetry_warn_key:
+            return self._symmetry_warn_cache
+        out = []
+        try:
+            inp = self.symmetry_inputs()
+            if inp["pm"] is not None and inp["mpairs"] and len(inp["voxels"]):
+                ev = SymmetryEvaluator(inp["P0"], inp["pairs"], inp["voxels"], inp["bindings"],
+                                       synthetic_poses(inp["P0"]), inp["pm"])
+                out = symmetry_warnings(ev, inp["mpairs"], estimate=True)
+        except (EngineSkinUnavailable, ValueError, np.linalg.LinAlgError):
+            out = []
+        self._symmetry_warn_key = key
+        self._symmetry_warn_cache = out
+        return out
+
     def delete_stick(self, stick_idx):
         if stick_idx < 0 or stick_idx >= len(self.sticks):
             return
@@ -1149,6 +1292,7 @@ class EditorState:
             elif old_ci > stick_idx:
                 remap[old_ci] = old_ci - 1
         self.bindings = {vi: remap[ci] for vi, ci in self.bindings.items() if ci in remap}
+        self._bindings_rev += 1
         self._normalize_stick_indices()
         self._tree_dirty = True
         self._mark_skeleton_changed()
@@ -1798,6 +1942,7 @@ class EditorState:
         """
         self.voxels = []
         self.bindings = {}
+        self._bindings_rev += 1
         self.selected_voxels = set()
         self._voxel_local_offsets = {}
         self._voxel_groups = {}
@@ -2420,17 +2565,27 @@ class EditorState:
 
         动画模式且预览在用引擎规则时直接复用；其它情况另建一个不带体素的 bind——
         体检回答的是"游戏会怎么处理"，与预览选哪种规则无关。bind 源：动画模式用
-        canonical 骨架；绑骨时正在编辑的骨架本身就是 bind 姿态。
+        canonical 骨架与体素；绑骨时正在编辑的骨架和体素本身就是 bind 姿态。
+        带上体素才算得出静止错位的体素数（动画模式下 self.voxels 是蒙皮后的，不能用）。
         """
         if self.animation_mode and self._engine_skin is not None:
             return self._engine_skin, ""
         from engine_skin import EngineSkinBinding
-        if self.animation_mode and self._canonical_skeleton_pose:
+        if self.animation_mode:
             source = self._canonical_skeleton_pose
+            vox = self._canonical_voxel_positions
+            if not source:
+                source = [(float(p["x"]), float(p["y"]), float(p["z"])) for p in self.particles]
+                vox = None
         else:
             source = [(float(p["x"]), float(p["y"]), float(p["z"])) for p in self.particles]
+            vox = self.voxels
+        if vox is None or len(vox) == 0 or not self.bindings:
+            vox, bindings = [], {}
+        else:
+            bindings = self.bindings
         key = (tuple(source), tuple((s.particle_a_id, s.particle_b_id) for s in self.sticks),
-               tuple(int(p["id"]) for p in self.particles))
+               tuple(int(p["id"]) for p in self.particles), self._bindings_rev, len(vox))
         if key != self._engine_diag_key:
             self._engine_diag_key = key
             self._engine_diag_skin = None
@@ -2439,7 +2594,7 @@ class EditorState:
                 if len(source) != len(self.particles):
                     raise ValueError("canonical 骨架与当前粒子数不一致")
                 self._engine_diag_skin = EngineSkinBinding(
-                    source, self._stick_index_pairs(self.particles), [], {})
+                    source, self._stick_index_pairs(self.particles), [v[:3] for v in vox], bindings)
             except Exception as exc:
                 self._engine_diag_reason = str(exc)
         return self._engine_diag_skin, self._engine_diag_reason
@@ -2477,10 +2632,12 @@ class EditorState:
     def engine_scan_animation(self, n_samples=60):
         """整段动画体检：返回 {stick 下标: {"grade","sigma_min","distortion","time",...}}（取最差一刻）。
 
+        grade 只看每一刻的姿态（frame_grade）；静止错位与姿态无关，在规则表里单独成列。
+
         采样点 = 全部关键帧时刻 + 均匀 n_samples 个点；合成预览开着时按合成后的姿态扫，
         与"本帧"一栏一致。无法扫描时抛 ValueError 说明原因。
         """
-        from engine_skin import grade
+        from engine_skin import frame_grade
         anim = self.current_animation
         if not self.animation_mode or anim is None or not anim.frames:
             raise ValueError("没有可扫描的动画")
@@ -2502,7 +2659,7 @@ class EditorState:
             if not np.all(np.isfinite(P)):
                 continue
             for ci, info in enumerate(skin.diagnose(P)):
-                g = grade(info)
+                g = frame_grade(info)
                 key = (g, -info["sigma_min"], info["distortion"])
                 prev = worst.get(ci)
                 if prev is None or key > prev["_key"]:
@@ -2526,6 +2683,7 @@ class EditorState:
             # 有体素时只看绑了体素的骨段（没绑体素的骨段错位也看不见）
             bound = set(self.bindings.values()) if self.bindings else None
             out += bind_warnings(skin, bound)
+        out += self.symmetry_structure_warnings()
         return out
 
     def _update_voxels_engine(self):

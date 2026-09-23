@@ -30,7 +30,7 @@ from ui_panels    import (UIState, draw_toolbar, draw_bone_panel,
                           draw_status_bar, draw_load_dialog, draw_save_dialog,
                           draw_preset_dialog,
                           draw_box_select_overlay, draw_exit_dialog,
-                          draw_toasts, tr)
+                          draw_toasts, draw_symmetry_window, tr)
 from animation_io import EXPECTED_STICK_COUNT
 
 import time
@@ -1509,6 +1509,7 @@ def main():
             draw_bone_panel(g_ui, g_editor, WIN_W, WIN_H,
                             g_renderer, g_skeleton_sticks, g_camera)
             draw_status_bar(g_ui, g_editor, WIN_W, WIN_H)
+            draw_symmetry_window(g_ui, g_editor, WIN_W, WIN_H)
 
             draw_load_dialog(g_ui, g_editor, g_renderer,
                              g_skeleton_sticks, WIN_W, WIN_H)

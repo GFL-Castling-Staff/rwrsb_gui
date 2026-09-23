@@ -2,6 +2,7 @@
 ui_panels.py
 """
 import os
+import math
 import time
 import logging
 from dataclasses import dataclass, field
@@ -255,6 +256,7 @@ _TEXT = {
         "engine_col_stick": "Stick",
         "engine_col_rule": "Engine rule",
         "engine_col_refs": "Refs",
+        "engine_col_bind": "At rest",
         "engine_col_now": "Now",
         "engine_col_worst": "Worst",
         "engine_grade_0": "OK",
@@ -280,8 +282,59 @@ _TEXT = {
         "eng_w_arm_source_mismatch": "Stick #{stick} does not connect particles {a} and {b}; in game its voxels take their orientation from the {a}->{b} line, not from this stick.",
         "eng_w_anchor_not_lower": "Particle 8 has bodyAreaHint {hint} (vanilla: 1); it will turn with the upper body (aim direction).",
         "eng_w_no_upper_layer": "No particle has bodyAreaHint = 2; upper-body animation layers (aiming, reloading) will have no effect in game.",
-        "eng_w_bind_drift": "These sticks' reference direction is nearly parallel to the stick in the bind pose, so in game their voxels are displaced even at rest (max drift in voxels, or relative error): {sticks}. Re-pose those sticks in the model's bind skeleton.",
+        "eng_w_bind_drift": "These sticks' reference direction is nearly parallel to the stick in the bind pose, so in game their voxels are displaced even at rest (max drift in voxels, relative error): {sticks}. Re-pose those sticks in the model's bind skeleton, or move them to another slot.",
         "engine_bind_error_tip": "Bind round-trip error {pct:.0f}%, max voxel drift at bind {drift:.1f}",
+        "stick_reverse": "Reverse direction (swap a / b)",
+        "stick_reverse_tip": ("The game places this stick's voxels relative to its a end and turns them from there;\n"
+                              "reversing moves that origin to the other end and changes how the slot rule builds its frame."),
+        "stick_swap": "Swap index",
+        "stick_swap_tip": ("Swap this stick's index with the chosen one; voxel bindings move with the sticks.\n"
+                           "The game picks the skinning rule by index, so this changes how both sticks move in game."),
+        "symmetry_btn": "Symmetry optimizer...",
+        "symmetry_btn_tip": ("Find stick slots that keep the left and right sides mirror images in game,\n"
+                             "without making the voxels follow their sticks worse."),
+        "symmetry_title": "Symmetry optimizer",
+        "symmetry_intro": ("The game picks each stick's skinning rule by its index, and only some index pairs are mirror "
+                           "images of each other: legs (0|1 with 3|4), upper arms (12, 10) and chest (6, 9) always are; "
+                           "forearms (13, 11) are while the chest keeps its shape; (5, 8) and (14, 15) never are. "
+                           "Slots also differ in how closely the voxels follow their stick. This searches for the "
+                           "assignment with the least visible error, counting left/right differences double, and never "
+                           "moves a stick to a slot where it would sit more than 5 voxels off at rest."),
+        "symmetry_source_synth": ("Poses: synthetic (body turned as a whole, limbs perturbed), a quick estimate. "
+                                  "Load the model's animations for real numbers."),
+        "symmetry_source_file": "Poses: {name}",
+        "symmetry_filter": "Name contains",
+        "symmetry_filter_tip": ("Only animations whose name contains this text (case-insensitive); useful when one file\n"
+                                "holds animations for several skeletons. Animations with another particle count or size\n"
+                                "are skipped anyway."),
+        "symmetry_use_synth": "Use synthetic poses",
+        "symmetry_pick_file": "Load animations...",
+        "symmetry_compute": "Search",
+        "symmetry_running": "Searching... (a few seconds)",
+        "symmetry_not_mirror": "The bind skeleton is not left/right symmetric about x = 0, so there is nothing to compare.",
+        "symmetry_no_plan": "The search needs exactly 17 sticks, with left/right pairs among them.",
+        "symmetry_no_voxels": "No voxels are bound yet.",
+        "symmetry_no_poses": "No animation in the file fits this skeleton (name filter, particle count, size).",
+        "symmetry_poses_file": "Used {anims} animations, {poses} poses.",
+        "symmetry_poses_synth": "Used {poses} synthetic poses.",
+        "symmetry_col_pair": "Sticks",
+        "symmetry_col_now": "Now",
+        "symmetry_col_cost": "Cost",
+        "symmetry_col_new": "Suggested",
+        "symmetry_origin_tip": "Slot index; * = direction reversed. Origin (a end): {origin}",
+        "symmetry_detail": ("Left/right difference {asym:.1f}, follow {track:.1f}, distortion {dist:.1f}, "
+                            "at rest {drift:.1f} (voxels, 95th percentile over poses)"),
+        "symmetry_total": "Total {now:.0f} -> {new:.0f} (voxels; lower is better)",
+        "symmetry_stale": "The skeleton or bindings changed after the search; search again.",
+        "symmetry_identity": "The current slots are already the best found.",
+        "symmetry_apply": "Apply suggestion",
+        "symmetry_applied": "Sticks re-slotted (undoable). Save the model to keep the change.",
+        "symmetry_failed": "Symmetry search failed: {error}",
+        "eng_w_asymmetric_pairs": "These left/right stick pairs come out different on the two sides in game even when the animation is exactly mirrored (estimated voxels): {pairs}. The game builds each side from the rule of its stick slot, and only some slot pairs are mirror images of each other. The bind tool's Symmetry optimizer can find better slots.",
+        "engine_bind_col_tip": ("Where the game puts this stick's voxels at rest, versus where they were modelled (voxels).\n"
+                                "The same in every frame. Graded by the relative error: over 5% (and at least 0.5 voxel)\n"
+                                "is Caution, over 15% (and at least 2 voxels) is Bad - 4 voxels on a 150-voxel leg is hard\n"
+                                "to see, 4 voxels on a 20-voxel arm is obvious."),
         "engine_scan_failed": "Cannot scan: {error}",
         # bodyAreaHint 语义
         "body_hint_lower": "1 Lower body (follows move direction)",
@@ -725,6 +778,7 @@ _TEXT = {
         "engine_col_stick": "骨段",
         "engine_col_rule": "引擎规则",
         "engine_col_refs": "参考粒子",
+        "engine_col_bind": "静止错位",
         "engine_col_now": "本帧",
         "engine_col_worst": "整段最差",
         "engine_grade_0": "正常",
@@ -750,8 +804,52 @@ _TEXT = {
         "eng_w_arm_source_mismatch": "骨段 #{stick} 两端不是粒子 {a}、{b}；游戏里它的体素朝向取自 {a} -> {b} 连线，不跟本骨段转。",
         "eng_w_anchor_not_lower": "粒子 8 的 bodyAreaHint 是 {hint}（vanilla 为 1）；它会随上半身层跟瞄准方向转。",
         "eng_w_no_upper_layer": "没有 bodyAreaHint = 2 的粒子；游戏里的上半身动画层（瞄准、换弹等）不会生效。",
-        "eng_w_bind_drift": "这些骨段在 bind 姿态下参考方向与骨段几乎平行，游戏里它们的体素在静止时就会错位（最大错位体素数或相对误差）：{sticks}。请调整模型 bind 骨架里这些骨段的摆放。",
+        "eng_w_bind_drift": "这些骨段在 bind 姿态下参考方向与骨段几乎平行，游戏里它们的体素在静止时就会错位（最大错位体素数、相对误差）：{sticks}。请调整模型 bind 骨架里这些骨段的摆放，或把它们换到别的槽位。",
         "engine_bind_error_tip": "bind 往返误差 {pct:.0f}%，bind 姿态下体素最大错位 {drift:.1f}",
+        "stick_reverse": "对调方向（a / b 互换）",
+        "stick_reverse_tip": ("游戏以骨段的 a 端为这段体素的原点来摆放和转动；\n"
+                              "对调后原点换到另一端，槽位规则建坐标系的方式也随之改变。"),
+        "stick_swap": "交换下标",
+        "stick_swap_tip": ("把当前骨段与所选骨段的下标互换，体素绑定跟着骨段走。\n"
+                           "游戏按下标选蒙皮规则，所以两根骨段在游戏里的动法都会变。"),
+        "symmetry_btn": "左右对称优化...",
+        "symmetry_btn_tip": "找一套槽位分配，让游戏里左右两侧互为镜像，同时不让体素跟随骨段变差。",
+        "symmetry_title": "左右对称优化",
+        "symmetry_intro": ("游戏按骨段下标选蒙皮规则，只有部分下标对的规则互为镜像：腿（0|1 与 3|4）、上臂 (12, 10)、"
+                           "胸廓 (6, 9) 始终对称；前臂 (13, 11) 在胸廓不变形时对称；(5, 8)、(14, 15) 始终不对称。"
+                           "不同槽位下体素跟随骨段的程度也不一样。这里搜索可见误差最小的分配，左右差异按两倍计，"
+                           "并且不会把骨段挪到静止时就错位 5 体素以上的槽位。"),
+        "symmetry_source_synth": "评估姿态：合成（躯干整体转动、四肢扰动），只是快速估计。载入模型自己的动画才是真实数值。",
+        "symmetry_source_file": "评估姿态：{name}",
+        "symmetry_filter": "名字包含",
+        "symmetry_filter_tip": ("只用名字里含这个词的动画（不分大小写）；一个文件里装了几种骨架的动画时用。\n"
+                                "粒子数或尺寸对不上的动画无论如何都会跳过。"),
+        "symmetry_use_synth": "改用合成姿态",
+        "symmetry_pick_file": "载入动画...",
+        "symmetry_compute": "开始搜索",
+        "symmetry_running": "搜索中...（几秒钟）",
+        "symmetry_not_mirror": "bind 骨架关于 x = 0 并不左右对称，没有可比较的左右两侧。",
+        "symmetry_no_plan": "需要正好 17 根骨段、并且其中有左右成对的骨段才能搜索。",
+        "symmetry_no_voxels": "还没有绑定体素。",
+        "symmetry_no_poses": "文件里没有与这副骨架匹配的动画（名字筛选、粒子数、尺寸）。",
+        "symmetry_poses_file": "用了 {anims} 个动画、{poses} 个姿态。",
+        "symmetry_poses_synth": "用了 {poses} 个合成姿态。",
+        "symmetry_col_pair": "骨段",
+        "symmetry_col_now": "现在",
+        "symmetry_col_cost": "代价",
+        "symmetry_col_new": "建议",
+        "symmetry_origin_tip": "槽位下标；* 表示方向对调。原点（a 端）：{origin}",
+        "symmetry_detail": "左右差异 {asym:.1f}、跟随 {track:.1f}、变形 {dist:.1f}、静止错位 {drift:.1f}（体素，按姿态取 P95）",
+        "symmetry_total": "合计 {now:.0f} -> {new:.0f}（体素，越小越好）",
+        "symmetry_stale": "搜索之后骨架或绑定改动过，请重新搜索。",
+        "symmetry_identity": "现在的槽位已经是搜到的最佳分配。",
+        "symmetry_apply": "应用建议",
+        "symmetry_applied": "已重排骨段槽位（可撤销）。记得保存模型。",
+        "symmetry_failed": "左右对称搜索失败：{error}",
+        "eng_w_asymmetric_pairs": "这些左右成对的骨段，即使动画严格镜像，游戏里两侧也会不一样（估计偏差，体素）：{pairs}。游戏按骨段所在槽位的规则分别计算两侧，只有部分槽位对的规则互为镜像。可用绑骨工具的「左右对称优化」换到合适的槽位。",
+        "engine_bind_col_tip": ("游戏把这段体素静止时放在哪、与建模位置差多少（体素）。每一帧都一样。\n"
+                                "按相对误差分级：超过 5%（且至少 0.5 体素）为注意，超过 15%（且至少 2 体素）为异常——\n"
+                                "150 体素长的腿偏 4 体素很难看出，20 体素的手臂偏 4 体素就很明显。"),
         "engine_scan_failed": "无法扫描：{error}",
         # bodyAreaHint 语义
         "body_hint_lower": "1 下半身（跟移动方向）",
@@ -1119,6 +1217,16 @@ class UIState:
         self.game_look_px_body = 2.6
         self.request_game_camera = False  # 视图弹窗点了「游戏镜头」，由主循环消费
         self._composite_filter = ""
+        # 骨段「与…交换下标」的目标（绑骨工具）
+        self._swap_target = 0
+        # 左右对称优化窗口（绑骨工具）
+        self.show_symmetry_window = False
+        self._sym_anim_path = None      # 评估用的动画文件；None = 合成姿态
+        self._sym_anim_filter = ""      # 只用名字含此词的动画（一个文件里装了几种骨架的动画时用）
+        self._sym_job = None            # 后台计算：{"done", "result", "error", ...}
+        self._sym_result = None         # {"current", "plan", "pairs"}
+        self._sym_signature = None      # 算方案时的骨架 + 绑定签名；变了就不能直接应用
+        self._sym_status = ""
 
     def push_toast(self, message: str, level: str = "info",
                    also_log: bool = True, exc_info=None) -> None:
@@ -1773,6 +1881,23 @@ def _draw_active_stick_editor(ui_state, editor_state):
     if imgui.button(tr(ui_state, "auto_rename"), width=-1):
         editor_state.rename_sticks_from_particles()
 
+    # 槽位：游戏按 stick 下标套蒙皮规则，a 端是这段体素的原点
+    if imgui.button(tr(ui_state, "stick_reverse"), width=-1):
+        editor_state.reverse_stick(editor_state.active_stick_idx)
+    if imgui.is_item_hovered():
+        imgui.set_tooltip(tr(ui_state, "stick_reverse_tip"))
+    n_sticks = len(editor_state.sticks)
+    if n_sticks > 1:
+        labels = [f"[{i}] {s.name}" for i, s in enumerate(editor_state.sticks)]
+        target = ui_state._swap_target if 0 <= ui_state._swap_target < n_sticks else 0
+        imgui.set_next_item_width(max(80.0, imgui.get_content_region_available_width() - 90.0))
+        _, ui_state._swap_target = imgui.combo("##swap_target", target, labels)
+        imgui.same_line()
+        if imgui.button(tr(ui_state, "stick_swap")):
+            editor_state.swap_sticks(editor_state.active_stick_idx, ui_state._swap_target)
+        if imgui.is_item_hovered():
+            imgui.set_tooltip(tr(ui_state, "stick_swap_tip"))
+
     _push_red()
     if imgui.button(tr(ui_state, "delete_active_stick"), width=-1):
         was_at_target = len(editor_state.sticks) == EXPECTED_STICK_COUNT
@@ -1872,6 +1997,10 @@ def draw_bone_panel(ui_state, editor_state, WIN_W, WIN_H, renderer, skeleton_sti
             )
     # 引擎结构检查（只在有问题时显示）
     _draw_engine_warnings(ui_state, editor_state, show_ok=False)
+    if imgui.button(tr(ui_state, "symmetry_btn"), width=-1):
+        ui_state.show_symmetry_window = True
+    if imgui.is_item_hovered():
+        imgui.set_tooltip(tr(ui_state, "symmetry_btn_tip"))
     if 0 <= editor_state.active_particle_idx < len(editor_state.particles):
         active_particle = editor_state.particles[editor_state.active_particle_idx]
         imgui.text(tr(ui_state, "active_particle", name=active_particle["name"], pid=active_particle["id"]))
@@ -3817,6 +3946,7 @@ _ENGINE_WARNING_COLORS = {
     "no_upper_layer": (1.0, 0.65, 0.2, 1.0),
     "anchor_not_lower": (0.75, 0.75, 0.75, 1.0),
     "bind_drift": (1.0, 0.35, 0.35, 1.0),
+    "asymmetric_pairs": (1.0, 0.65, 0.2, 1.0),
 }
 
 
@@ -3882,8 +4012,9 @@ def _engine_anim_signature(editor_state):
 
 def _engine_diag_cell(ui_state, info):
     """返回 (单元格文本, 颜色, 等级文字)。等级靠颜色表达，文字放进悬停提示以节省列宽。"""
-    from engine_skin import grade
-    g = info["grade"] if "grade" in info else grade(info)
+    from engine_skin import frame_grade
+    # 本帧 / 整段最差只按这一刻的姿态着色；静止错位与姿态无关，单独一列
+    g = info["grade"] if "grade" in info else frame_grade(info)
     dist = info["distortion"]
     dist_pct = dist * 100.0 if dist != float("inf") else 999.0
     text = tr(ui_state, "engine_cell_diag", sigma=info["sigma_min"], dist=dist_pct)
@@ -4095,13 +4226,14 @@ def _draw_composite_section(ui_state, editor_state):
 def _draw_engine_rules_table(ui_state, editor_state, diag, scan):
     # 不开 TABLE_RESIZABLE：可调宽的定宽列只在首次出现时按内容定宽，扫描后新内容会被截断
     flags = imgui.TABLE_BORDERS | imgui.TABLE_ROW_BACKGROUND | imgui.TABLE_SIZING_FIXED_FIT
-    table = imgui.begin_table("##eng_rules", 5, flags)
+    table = imgui.begin_table("##eng_rules", 6, flags)
     if not table.opened:
         return
+    from engine_skin import bind_grade
     # try/finally：行内出错也要 end_table，否则 imgui 的 ID 栈失衡、整帧断言
     try:
         for key in ("engine_col_stick", "engine_col_rule", "engine_col_refs",
-                    "engine_col_now", "engine_col_worst"):
+                    "engine_col_bind", "engine_col_now", "engine_col_worst"):
             imgui.table_setup_column(tr(ui_state, key))
         imgui.table_headers_row()
         for ci, stick in enumerate(editor_state.sticks):
@@ -4119,16 +4251,25 @@ def _draw_engine_rules_table(ui_state, editor_state, diag, scan):
                 imgui.set_tooltip(_engine_refs_label(ui_state, editor_state, ci))
             imgui.table_set_column_index(3)
             if diag and ci < len(diag):
+                err = diag[ci].get("bind_error", 0.0)
+                drift = diag[ci].get("bind_drift", 0.0)
+                if drift > 0.0 or not math.isfinite(err):
+                    g = bind_grade(err, drift)
+                    imgui.text_colored(f"{drift:.1f}", *_ENGINE_GRADE_COLORS[g])
+                    if imgui.is_item_hovered():
+                        imgui.set_tooltip(
+                            tr(ui_state, f"engine_grade_{g}") + "  "
+                            + tr(ui_state, "engine_bind_error_tip", pct=min(err, 9.99) * 100.0, drift=drift)
+                            + "\n" + tr(ui_state, "engine_bind_col_tip"))
+                else:
+                    imgui.text_disabled("-")
+            imgui.table_set_column_index(4)
+            if diag and ci < len(diag):
                 text, col, grade_label = _engine_diag_cell(ui_state, diag[ci])
                 imgui.text_colored(text, *col)
                 if imgui.is_item_hovered():
-                    tip = f"{grade_label}  {text}\n"
-                    bind_error = diag[ci].get("bind_error", 0.0)
-                    if bind_error > 1e-6:
-                        tip += tr(ui_state, "engine_bind_error_tip", pct=min(bind_error, 9.99) * 100.0,
-                                  drift=diag[ci].get("bind_drift", 0.0)) + "\n"
-                    imgui.set_tooltip(tip + tr(ui_state, "engine_diag_tip"))
-            imgui.table_set_column_index(4)
+                    imgui.set_tooltip(f"{grade_label}  {text}\n" + tr(ui_state, "engine_diag_tip"))
+            imgui.table_set_column_index(5)
             if scan is not None and ci in scan:
                 w = scan[ci]
                 text, col, grade_label = _engine_diag_cell(ui_state, w)
@@ -4173,6 +4314,240 @@ def _draw_engine_particles_table(ui_state, editor_state):
             imgui.text_disabled(VANILLA_PARTICLE_NAMES[idx])
     finally:
         imgui.end_table()
+
+
+# ── 左右对称优化（绑骨工具）──────────────────────
+# 游戏按 stick 下标套蒙皮规则，只有部分槽位对两侧互为镜像；换槽位 / 换方向也会改变跟随与变形。
+# 这里在后台搜一套槽位分配，列出每对骨段现状与建议的代价，一键应用（可撤销）。
+
+_SYM_MAX_POSES = 240
+
+
+def _sym_poses_from_file(path, name_filter, P0):
+    """从动画文件取评估姿态：名字含筛选词、粒子数与骨架一致、尺寸相近（半径比 0.5–2）的动画，每个采 9 个时刻。"""
+    import numpy as np
+    from animation_io import parse_animation_index, parse_single_animation, interpolate_positions
+    P0 = np.asarray(P0, dtype=float)
+    n = len(P0)
+    r0 = float(np.mean(np.linalg.norm(P0 - P0.mean(0), axis=1))) or 1.0
+    doc = parse_animation_index(path)
+    flt = (name_filter or "").strip().lower()
+    poses, used = [], []
+    for i, nm in enumerate(doc.names):
+        if flt and flt not in nm.lower():
+            continue
+        try:
+            anim = parse_single_animation(path, i)
+        except Exception:
+            continue
+        if not anim.frames or len(anim.frames[0].positions) != n:
+            continue
+        F0 = np.asarray(anim.frames[0].positions, dtype=float)
+        r = float(np.mean(np.linalg.norm(F0 - F0.mean(0), axis=1)))
+        if not 0.5 <= r / r0 <= 2.0:
+            continue
+        end = max(anim.end, anim.frames[-1].time)
+        for t in (np.linspace(0.0, end, 9) if end > 0 else [0.0]):
+            poses.append(np.asarray(interpolate_positions(anim, float(t), n_particles=n), dtype=float))
+        used.append(nm)
+    if len(poses) > _SYM_MAX_POSES:
+        keep = np.linspace(0, len(poses) - 1, _SYM_MAX_POSES).round().astype(int)
+        poses = [poses[k] for k in keep]
+    return poses, used
+
+
+def _sym_start(ui_state, editor_state):
+    """在后台线程里搜索；输入先在主线程取快照，线程不碰编辑器状态。"""
+    import threading
+    from engine_skin import (SymmetryEvaluator, current_slot_plan, optimise_slots, synthetic_poses,
+                             MAX_GPU_STICKS)
+    try:
+        inp = editor_state.symmetry_inputs()
+    except Exception as exc:
+        ui_state.push_toast(tr(ui_state, "symmetry_failed", error=exc), "error", exc_info=True)
+        return
+    if inp["pm"] is None:
+        ui_state._sym_status = tr(ui_state, "symmetry_not_mirror")
+        return
+    if len(inp["pairs"]) != MAX_GPU_STICKS or not inp["mpairs"]:
+        ui_state._sym_status = tr(ui_state, "symmetry_no_plan")
+        return
+    if not len(inp["voxels"]) or not inp["bindings"]:
+        ui_state._sym_status = tr(ui_state, "symmetry_no_voxels")
+        return
+    path, flt = ui_state._sym_anim_path, ui_state._sym_anim_filter
+    job = {"done": False, "result": None, "error": None, "signature": inp["signature"],
+           "used": [], "n_poses": 0, "path": path}
+
+    def run():
+        try:
+            if path:
+                poses, used = _sym_poses_from_file(path, flt, inp["P0"])
+                if not poses:
+                    raise ValueError(tr(ui_state, "symmetry_no_poses"))
+            else:
+                poses, used = synthetic_poses(inp["P0"]), []
+            job["used"], job["n_poses"] = used, len(poses)
+            ev = SymmetryEvaluator(inp["P0"], inp["pairs"], inp["voxels"], inp["bindings"], poses, inp["pm"])
+            current = current_slot_plan(ev, inp["mpairs"], inp["centers"], inp["lonely"])
+            plan = optimise_slots(ev, inp["mpairs"], inp["centers"], inp["lonely"])
+            job["result"] = {"current": current, "plan": plan, "pairs": inp["pairs"]}
+        except Exception as exc:
+            job["error"] = exc
+        finally:
+            job["done"] = True
+
+    ui_state._sym_status = ""
+    ui_state._sym_result = None
+    ui_state._sym_job = job
+    threading.Thread(target=run, daemon=True).start()
+
+
+def _sym_pick_file(ui_state):
+    from file_dialogs import open_file_dialog, _is_supported as _fd_supported
+    if not _fd_supported():
+        ui_state.push_toast(tr(ui_state, "system_dialog_unavailable"), "error")
+        return
+    path = open_file_dialog(tr(ui_state, "symmetry_pick_file"), [("XML files", "*.xml"), ("All files", "*.*")])
+    if path:
+        ui_state._sym_anim_path = path
+
+
+def _sym_item_label(editor_state, item, pairs):
+    """方案里一项的 "槽位 / 原点" 文本；原点与现状不同时标注反向。"""
+    names = [p["name"] for p in editor_state.particles]
+    parts = []
+    for s, k, a in zip(item["sticks"], item["slots"], item["a_ends"]):
+        flip = "*" if a != pairs[s][0] else ""
+        parts.append(f"{k}{flip}")
+    origin = "/".join(names[a] if 0 <= a < len(names) else str(a) for a in item["a_ends"])
+    return ",".join(parts), origin
+
+
+def _sym_cost_tip(ui_state, item):
+    d = item["detail"]
+    return tr(ui_state, "symmetry_detail", asym=d["asym"], track=d["track"], dist=d["dist"], drift=d["drift"])
+
+
+def _draw_symmetry_result(ui_state, editor_state, res):
+    from engine_skin import plan_is_identity
+    current, plan, pairs = res["current"], res["plan"], res["pairs"]
+    if plan is None:
+        imgui.text_wrapped(tr(ui_state, "symmetry_no_plan"))
+        return
+    by_sticks = {tuple(sorted(i["sticks"])): i for i in plan}
+    flags = imgui.TABLE_BORDERS | imgui.TABLE_ROW_BACKGROUND | imgui.TABLE_SIZING_FIXED_FIT
+    table = imgui.begin_table("##sym_table", 5, flags)
+    if table.opened:
+        try:
+            for key in ("symmetry_col_pair", "symmetry_col_now", "symmetry_col_cost",
+                        "symmetry_col_new", "symmetry_col_cost"):
+                imgui.table_setup_column(tr(ui_state, key))
+            imgui.table_headers_row()
+            for cur in sorted(current, key=lambda i: min(i["sticks"])):
+                new = by_sticks.get(tuple(sorted(cur["sticks"])))
+                imgui.table_next_row()
+                imgui.table_set_column_index(0)
+                label = "/".join(f"#{s}" for s in cur["sticks"])
+                imgui.text(label)
+                if imgui.is_item_hovered():
+                    imgui.set_tooltip("\n".join(editor_state.sticks[s].name for s in cur["sticks"]
+                                                if s < len(editor_state.sticks)))
+                for col, item in ((1, cur), (3, new)):
+                    imgui.table_set_column_index(col)
+                    if item is None:
+                        imgui.text_disabled("-")
+                        continue
+                    slots, origin = _sym_item_label(editor_state, item, pairs)
+                    changed = col == 3 and (item["slots"] != cur["slots"] or item["a_ends"] != cur["a_ends"])
+                    if changed:
+                        imgui.text_colored(slots, 0.45, 0.8, 1.0, 1.0)
+                    else:
+                        imgui.text(slots)
+                    if imgui.is_item_hovered():
+                        imgui.set_tooltip(tr(ui_state, "symmetry_origin_tip", origin=origin))
+                    imgui.table_set_column_index(col + 1)
+                    imgui.text(f"{item['cost']:.1f}")
+                    if imgui.is_item_hovered():
+                        imgui.set_tooltip(_sym_cost_tip(ui_state, item))
+        finally:
+            imgui.end_table()
+    total_now = sum(i["cost"] for i in current)
+    total_new = sum(i["cost"] for i in plan)
+    imgui.text(tr(ui_state, "symmetry_total", now=total_now, new=total_new))
+    stale = editor_state.slot_signature() != ui_state._sym_signature
+    if stale:
+        imgui.text_colored(tr(ui_state, "symmetry_stale"), 1.0, 0.65, 0.2, 1.0)
+    elif plan_is_identity(plan, pairs):
+        imgui.text_colored(tr(ui_state, "symmetry_identity"), *_ENGINE_GRADE_COLORS[0])
+    elif imgui.button(tr(ui_state, "symmetry_apply")):
+        try:
+            editor_state.apply_slot_plan(plan)
+            ui_state._sym_signature = editor_state.slot_signature()
+            ui_state._sym_result = None
+            ui_state.push_toast(tr(ui_state, "symmetry_applied"), "info")
+        except Exception as exc:
+            ui_state.push_toast(tr(ui_state, "symmetry_failed", error=exc), "error", exc_info=True)
+
+
+def _draw_symmetry_inner(ui_state, editor_state):
+    imgui.text_wrapped(tr(ui_state, "symmetry_intro"))
+    imgui.separator()
+    if ui_state._sym_anim_path:
+        imgui.text_wrapped(tr(ui_state, "symmetry_source_file", name=Path(ui_state._sym_anim_path).name))
+        imgui.set_next_item_width(200)
+        _, ui_state._sym_anim_filter = imgui.input_text(
+            tr(ui_state, "symmetry_filter") + "##sym_filter", ui_state._sym_anim_filter, 128)
+        if imgui.is_item_hovered():
+            imgui.set_tooltip(tr(ui_state, "symmetry_filter_tip"))
+        if imgui.button(tr(ui_state, "symmetry_use_synth")):
+            ui_state._sym_anim_path = None
+        imgui.same_line()
+    else:
+        imgui.text_wrapped(tr(ui_state, "symmetry_source_synth"))
+    if imgui.button(tr(ui_state, "symmetry_pick_file")):
+        _sym_pick_file(ui_state)
+
+    job = ui_state._sym_job
+    if job is not None and job["done"]:
+        ui_state._sym_job = None
+        if job["error"] is not None:
+            ui_state._sym_status = tr(ui_state, "symmetry_failed", error=job["error"])
+        else:
+            ui_state._sym_result = job["result"]
+            ui_state._sym_signature = job["signature"]
+            if job["path"]:
+                ui_state._sym_status = tr(ui_state, "symmetry_poses_file", anims=len(job["used"]),
+                                          poses=job["n_poses"])
+            else:
+                ui_state._sym_status = tr(ui_state, "symmetry_poses_synth", poses=job["n_poses"])
+    if ui_state._sym_job is not None:
+        imgui.text_colored(tr(ui_state, "symmetry_running"), 0.45, 0.8, 1.0, 1.0)
+        # 搜索是纯 Python 计算，与主循环抢 GIL；计算期间每帧让出一点时间，界面照常刷新
+        time.sleep(0.01)
+    elif imgui.button(tr(ui_state, "symmetry_compute")):
+        _sym_start(ui_state, editor_state)
+    if ui_state._sym_status:
+        imgui.text_wrapped(ui_state._sym_status)
+    if ui_state._sym_result is not None and ui_state._sym_job is None:
+        imgui.separator()
+        _draw_symmetry_result(ui_state, editor_state, ui_state._sym_result)
+
+
+def draw_symmetry_window(ui_state, editor_state, WIN_W, WIN_H):
+    """左右对称优化窗口（绑骨工具）。"""
+    if not ui_state.show_symmetry_window:
+        return
+    imgui.set_next_window_size(560, 520, imgui.FIRST_USE_EVER)
+    imgui.set_next_window_position(max(0, WIN_W - 570), 60, imgui.FIRST_USE_EVER)
+    expanded, opened = imgui.begin(tr(ui_state, "symmetry_title") + "##symmetry_window", closable=True)
+    if not opened:
+        ui_state.show_symmetry_window = False
+    try:
+        if expanded:
+            _draw_symmetry_inner(ui_state, editor_state)
+    finally:
+        imgui.end()
 
 
 # ── 非法 voxel binding 对话框 ─────────────────────
