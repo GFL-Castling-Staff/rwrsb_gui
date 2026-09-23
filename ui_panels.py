@@ -3241,7 +3241,7 @@ def _enter_anim_safe(ui_state, editor_state, anim):
         if editor_state.skinning_fallback_reason:
             ui_state.push_toast(tr(ui_state, "skin_fallback",
                                    reason=editor_state.skinning_fallback_reason), "warning")
-        n_issues = len(editor_state.engine_structure_warnings())
+        n_issues = len(editor_state.engine_structure_warnings(fresh=True))
         if n_issues:
             ui_state.push_toast(tr(ui_state, "engine_structure_toast", n=n_issues), "warning")
     except ValueError as exc:

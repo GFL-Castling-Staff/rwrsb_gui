@@ -6,6 +6,7 @@ import copy
 import json
 import logging
 import re
+import time
 from pathlib import Path
 
 import numpy as np
@@ -196,6 +197,11 @@ class EditorState:
         # 左右不对称提示（合成姿态估计），按骨架与绑定缓存
         self._symmetry_warn_key = None
         self._symmetry_warn_cache = []
+        # 结构检查结果与防抖状态（见 engine_structure_warnings）
+        self._structure_done_key = None
+        self._structure_cache = []
+        self._structure_pending_key = None
+        self._structure_pending_since = 0.0
 
         # 旧版全局蒙皮规则开关（由 skinning_mode 派生，legacy_topology 时为 True）：
         # True 时 _compute_body_bridge_frame 跳过 vanilla 硬编码表，
@@ -2437,6 +2443,8 @@ class EditorState:
         self.skinning_fallback_reason = ""
         self._voxel_local_offsets = {}
         self._voxel_groups = {}
+        # 新模型的结构检查立刻重算，不走防抖
+        self._structure_done_key = None
 
     def _stick_index_pairs(self, particles):
         """按 stick 顺序返回 (a 粒子下标, b 粒子下标)；端点缺失时抛 EngineSkinUnavailable。"""
@@ -2668,11 +2676,45 @@ class EditorState:
             w.pop("_key", None)
         return worst
 
-    def engine_structure_warnings(self):
-        """与姿态无关的引擎结构检查，返回 [(code, params)]。没有骨架时不检查。"""
-        from engine_skin import static_warnings, bind_warnings
+    # 骨架连续变化（拖粒子）时结构检查沿用上次结果，停手这么久之后再重算：
+    # 大模型上整套检查要几十毫秒，每帧重算会让拖动明显卡顿
+    STRUCTURE_DEBOUNCE = 0.25
+
+    def _structure_key(self):
+        """结构检查依赖的输入签名。动画模式下只看 canonical 骨架（粒子每帧在动，与检查无关）。"""
+        hints = tuple(int(p.get("bodyAreaHint", 1)) for p in self.particles)
+        sticks = tuple((s.particle_a_id, s.particle_b_id) for s in self.sticks)
+        if self.animation_mode:
+            canon = self._canonical_skeleton_pose or ()
+            return (True, self._bindings_rev, sticks, hints, tuple(tuple(map(float, c)) for c in canon),
+                    len(self._canonical_voxel_positions or ()), self._engine_skin)
+        return (False, self.slot_signature(), hints)
+
+    def engine_structure_warnings(self, fresh=False):
+        """与姿态无关的引擎结构检查，返回 [(code, params)]。没有骨架时不检查。
+
+        fresh=False 时防抖：输入还在变化就返回上次结果（见 STRUCTURE_DEBOUNCE）；
+        需要立刻反映改动的调用方（如进入动画时的提示）传 fresh=True。
+        """
         if not self.particles:
             return []
+        key = self._structure_key()
+        if key == self._structure_done_key:
+            return self._structure_cache
+        now = time.monotonic()
+        if key != self._structure_pending_key:
+            self._structure_pending_key = key
+            self._structure_pending_since = now
+        if (not fresh and self._structure_done_key is not None
+                and now - self._structure_pending_since < self.STRUCTURE_DEBOUNCE):
+            return self._structure_cache
+        out = self._compute_structure_warnings()
+        self._structure_done_key = key
+        self._structure_cache = out
+        return out
+
+    def _compute_structure_warnings(self):
+        from engine_skin import static_warnings, bind_warnings
         id_to_idx = {int(p["id"]): i for i, p in enumerate(self.particles)}
         pairs = [(id_to_idx.get(int(s.particle_a_id), -1), id_to_idx.get(int(s.particle_b_id), -1))
                  for s in self.sticks]
