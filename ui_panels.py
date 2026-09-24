@@ -381,6 +381,15 @@ _TEXT = {
         "composite_clear": "Turn off composite preview",
         "composite_readonly": "Composite preview is on (read-only). Turn it off in the Engine window to edit.",
         "composite_status": "Composite preview (read-only)",
+        "anim_heading": "Facing",
+        "anim_heading_tip": ("The game turns the soldier to its facing before it works out each stick's orientation, and\n"
+                             "when a stick slot's axes are not orthogonal the same animation skins differently at\n"
+                             "different facings. The engine-rule preview is computed at this facing and turned back,\n"
+                             "so the model stays put and only the facing-dependent differences show. The per-frame\n"
+                             "inspector and the whole-animation scan use it too. Legacy rules do not depend on facing."),
+        "anim_heading_reset": "Reset",
+        "anim_heading_legacy": "Facing only affects the engine rule; the legacy preview looks the same at any facing.",
+        "heading_status": "Facing {deg:.0f}°",
         "composite_load_failed": "Cannot use this animation: {error}",
         "composite_whole_body": ("Note: the game plays \"{name}\" as one whole-body animation (channel 0) with no\n"
                                  "upper-body layer on top, so this composite is hypothetical. The aim/move facing\n"
@@ -899,6 +908,13 @@ _TEXT = {
         "composite_clear": "关闭合成预览",
         "composite_readonly": "合成预览中（只读）。要编辑请先在「引擎...」窗口关闭合成预览。",
         "composite_status": "合成预览（只读）",
+        "anim_heading": "角色朝向",
+        "anim_heading_tip": ("游戏先把角色转到它面朝的方向，再算每根骨段的朝向；骨段所在槽位的坐标轴不正交时，\n"
+                             "同一个动作面朝不同方向蒙皮结果不同。引擎精确规则的预览按这个朝向算、再转回来显示——\n"
+                             "模型原地不动，只看随朝向变化的差异。本帧体检和整段扫描也按它算。旧版规则与朝向无关。"),
+        "anim_heading_reset": "回正",
+        "anim_heading_legacy": "朝向只影响引擎精确规则；旧版规则的预览在任何朝向下都一样。",
+        "heading_status": "朝向 {deg:.0f}°",
         "composite_load_failed": "无法使用这个动画：{error}",
         "composite_whole_body": ("提示：「{name}」在游戏里是整段播的（通道 0），不会再叠上身层，这里的合成只是假设。\n"
                                  "但「上身跟瞄准、下身跟移动」与通道无关、任何动画都生效，所以扭转滑杆仍然有意义。"),
@@ -2282,6 +2298,10 @@ def draw_status_bar(ui_state, editor_state, WIN_W, WIN_H):
         if editor_state.composite_active():
             imgui.same_line()
             imgui.text_colored("| " + tr(ui_state, "composite_status"), 0.75, 0.45, 1.0, 1.0)
+        if abs(editor_state.preview_heading_deg) > 1e-9:
+            imgui.same_line()
+            imgui.text_colored("| " + tr(ui_state, "heading_status", deg=editor_state.preview_heading_deg),
+                               0.45, 0.8, 1.0, 1.0)
     imgui.end()
 
 
@@ -3799,6 +3819,21 @@ def _draw_anim_panel_inner(ui_state, editor_state, WIN_W, WIN_H):
         imgui.text_colored(tr(ui_state, "skin_fallback", reason=editor_state.skinning_fallback_reason),
                            1.0, 0.6, 0.2, 1.0)
 
+    # 角色朝向：游戏按朝向转到世界坐标后才算骨段朝向，坐标轴不正交时蒙皮随朝向变
+    imgui.set_next_item_width(220)
+    chg_hd, v_hd = imgui.slider_float(
+        tr(ui_state, "anim_heading") + "##preview_heading", editor_state.preview_heading_deg,
+        -180.0, 180.0, "%.0f°")
+    if chg_hd:
+        editor_state.set_preview_heading(round(v_hd))
+    if imgui.is_item_hovered():
+        imgui.set_tooltip(tr(ui_state, "anim_heading_tip"))
+    imgui.same_line()
+    if imgui.button(tr(ui_state, "anim_heading_reset") + "##preview_heading_reset"):
+        editor_state.set_preview_heading(0.0)
+    if abs(editor_state.preview_heading_deg) > 1e-9 and editor_state.effective_skinning_mode() != "engine":
+        imgui.text_disabled(tr(ui_state, "anim_heading_legacy"))
+
     chg_chk, v = imgui.checkbox(
         tr(ui_state, "anim_check_lengths") + "##check_len",
         ui_state._anim_check_lengths)
@@ -4015,6 +4050,7 @@ def _engine_anim_signature(editor_state):
         tuple(sorted(editor_state._baseline_locked_indices)),
         tuple(editor_state._baseline_positions or ()),
         tuple((s.particle_a_id, s.particle_b_id) for s in editor_state.sticks),
+        round(editor_state.preview_heading_deg, 6),   # 扫描按当前朝向算，改朝向后结果过期
     ))
 
 

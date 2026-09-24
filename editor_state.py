@@ -186,6 +186,9 @@ class EditorState:
         #   "legacy_table"    — 旧版：按 vanilla 粒子 id/name 查 lateral 规则表
         #   "legacy_topology" — 旧版：拓扑邻居作 lateral 参考
         self.skinning_mode = "engine"
+        # 预览的角色朝向（度，绕竖直轴）：游戏先把角色转到面朝方向、再算骨段朝向，坐标轴不正交时
+        # 结果随朝向变化。引擎蒙皮按这个朝向算、再转回来显示（模型原地不动）；旧版规则与朝向无关
+        self.preview_heading_deg = 0.0
         # engine 模式建不起来时的原因（空串 = 正常）；此时实际落回 legacy_table
         self.skinning_fallback_reason = ""
         self._engine_skin = None  # engine_skin.EngineSkinBinding | None
@@ -2192,6 +2195,29 @@ class EditorState:
         self.update_voxel_positions_from_skeleton()
         self.gpu_dirty = True
 
+    def set_preview_heading(self, deg):
+        """设置预览的角色朝向（-180..180 度），动画模式下立刻按新朝向重算蒙皮。"""
+        deg = float(deg)
+        if not np.isfinite(deg):
+            return
+        deg = max(-180.0, min(180.0, deg))
+        if abs(deg - self.preview_heading_deg) < 1e-9:
+            return
+        self.preview_heading_deg = deg
+        if self.animation_mode:
+            self.update_voxel_positions_from_skeleton()
+            self.gpu_dirty = True
+
+    def _heading_matrix(self):
+        """当前预览朝向的旋转矩阵；朝向为 0 或不在动画模式时返回 None。
+
+        朝向滑杆只在动画模式下可见，退出动画模式后体检（引擎视图仍可能开着）不能被残留的朝向影响。
+        """
+        if not self.animation_mode or abs(self.preview_heading_deg) < 1e-9:
+            return None
+        from engine_skin import heading_matrix
+        return heading_matrix(self.preview_heading_deg)
+
     def set_use_global_lateral_ref(self, value: bool):
         """旧接口：在两种旧版规则之间切换。"""
         self.set_skinning_mode("legacy_topology" if value else "legacy_table")
@@ -2619,6 +2645,9 @@ class EditorState:
         P = np.asarray(positions, dtype=np.float64)
         if len(P) != skin.n_particles or not np.all(np.isfinite(P)):
             return None
+        R = self._heading_matrix()
+        if R is not None:
+            P = P @ R.T                     # 与预览一致：按当前角色朝向体检
         # 缓存按 binding 对象本身（is）与位置比较；不能用 id()——旧对象释放后地址会被新对象复用
         key = P.tobytes()
         cached_skin, cached_key, cached = self._engine_diag_cache
@@ -2659,6 +2688,7 @@ class EditorState:
         times = sorted({round(f.time, 6) for f in anim.frames}
                        | {round(float(t), 6) for t in np.linspace(0.0, last, n_samples)})
         composite = self.composite_active()
+        heading = self._heading_matrix()
         worst = {}
         for t in times:
             P = np.array(self._positions_at(t), dtype=np.float64)
@@ -2666,6 +2696,8 @@ class EditorState:
                 raise ValueError(f"动画的粒子数（{len(P)}）与骨架（{skin.n_particles}）不一致")
             if composite:
                 P = self._apply_composite(P, t)
+            if heading is not None:
+                P = P @ heading.T
             if not np.all(np.isfinite(P)):
                 continue
             for ci, info in enumerate(skin.diagnose(P)):
@@ -2738,7 +2770,14 @@ class EditorState:
         P = self.display_positions()
         if not np.all(np.isfinite(P)):
             return
-        worlds, deltas = skin.pose(P)
+        R = self._heading_matrix()
+        if R is not None:
+            # 与游戏一致：在转到该朝向的世界坐标里算，再把结果转回来显示
+            worlds, deltas = skin.pose(P @ R.T)
+            worlds = {ci: (vis, pos @ R) for ci, (vis, pos) in worlds.items()}
+            deltas = [R.T @ d for d in deltas]
+        else:
+            worlds, deltas = skin.pose(P)
         if not worlds:
             return
         self._ensure_bone_orientation_arrays()
