@@ -277,7 +277,7 @@ Symmetry alone is not enough, though: the same pair in different slots differs a
 
 ### bodyAreaHint decides the upper/lower animation layer
 
-In game, particles with `bodyAreaHint == 2` belong to the upper-body layer: they turn with the aim direction, and while an upper-body animation plays (aiming, reloading...) their positions come from that animation, aligned at particle 8. Any other value is the lower-body layer, which turns with the movement direction. Running lets the upper body twist up to about 37° from the legs, walking about 60°. The binding tool edits the hint with a dropdown, and both tools can "Color by body layer".
+In game, particles with `bodyAreaHint == 2` belong to the upper-body layer: they turn with the aim direction, and while an upper-body animation plays (aiming, reloading...) their positions come from that animation, aligned at particle 8. Any other value is the lower-body layer, which turns with the movement direction. Running lets the upper body twist up to about 37° from the legs, walking about 60°; while aiming it follows the crosshair freely, up to 180° (the legs keep the movement direction, and past about 90° the game plays the walking-backwards animation). The binding tool edits the hint with a dropdown, and both tools can "Color by body layer".
 
 ### Control keys
 

@@ -349,7 +349,8 @@ _TEXT = {
                           "2 = upper body: turns with the aim direction; while an upper-body animation plays\n"
                           "(aiming, reloading...) its position comes from that animation, aligned at particle 8.\n"
                           "Anything else = lower body: turns with the movement direction.\n"
-                          "Running lets the upper body twist up to ~37 deg from the legs, walking ~60 deg."),
+                          "Running lets the upper body twist up to ~37 deg from the legs, walking ~60 deg;\n"
+                          "while aiming it follows the crosshair freely, up to 180 deg."),
         "show_body_layers": "Color by body layer",
         "body_layers_legend": "Purple = upper layer (hint 2), green = lower layer",
         "engine_layers_header": "Body layers (bodyAreaHint)",
@@ -377,7 +378,9 @@ _TEXT = {
         "composite_pick_file": "From file...",
         "composite_filter": "Filter##composite_filter",
         "composite_twist": "Upper-body twist (deg)##composite_twist",
-        "composite_twist_hint": "In game: running up to ~37 deg, walking ~60 deg, fully toward the crosshair when aiming.",
+        "composite_twist_hint": ("In game: running up to ~37 deg, walking ~60 deg; standing, the legs catch up past 60 deg.\n"
+                                 "Aiming: the upper body follows the crosshair with no limit (up to 180 deg);\n"
+                                 "past ~90 deg from the movement direction the game plays the walking-backwards animation."),
         "composite_clear": "Turn off composite preview",
         "composite_readonly": "Composite preview is on (read-only). Turn it off in the Engine window to edit.",
         "composite_status": "Composite preview (read-only)",
@@ -877,7 +880,7 @@ _TEXT = {
                           "2 = 上半身层：跟瞄准方向转；播放上半身动画（瞄准、换弹等）时，位置取自该动画，\n"
                           "并以粒子 8 对齐。\n"
                           "其它值 = 下半身层：跟移动方向转。\n"
-                          "奔跑时上身最多相对腿部扭约 37°，走路约 60°。"),
+                          "奔跑时上身最多相对腿部扭约 37°，走路约 60°；瞄准时完全跟准星，最大可到 180°。"),
         "show_body_layers": "按上下半身层着色",
         "body_layers_legend": "紫 = 上半身层（hint 2），绿 = 下半身层",
         "engine_layers_header": "上下半身分层（bodyAreaHint）",
@@ -904,7 +907,9 @@ _TEXT = {
         "composite_pick_file": "从文件选...",
         "composite_filter": "过滤##composite_filter",
         "composite_twist": "上身扭转（度）##composite_twist",
-        "composite_twist_hint": "游戏里：奔跑最多约 37°、走路约 60°，瞄准时完全转向准星。",
+        "composite_twist_hint": ("游戏里：奔跑最多约 37°、走路约 60°；站着不动时扭过 60° 腿会跟上。\n"
+                                 "瞄准时上身完全跟准星、不限角度（最大 180°）；\n"
+                                 "准星偏离移动方向约 90° 以上会改播倒退走动画。"),
         "composite_clear": "关闭合成预览",
         "composite_readonly": "合成预览中（只读）。要编辑请先在「引擎...」窗口关闭合成预览。",
         "composite_status": "合成预览（只读）",
@@ -4255,7 +4260,7 @@ def _draw_composite_section(ui_state, editor_state):
 
     imgui.set_next_item_width(220)
     chg, v = imgui.slider_float(tr(ui_state, "composite_twist"),
-                                float(editor_state.composite_twist_deg), -90.0, 90.0, "%.1f")
+                                float(editor_state.composite_twist_deg), -180.0, 180.0, "%.1f")
     if chg:
         editor_state.set_composite(twist_deg=v)
     imgui.text_disabled(tr(ui_state, "composite_twist_hint"))
